@@ -194,7 +194,7 @@ export default function PlanBoard({
           )}
         </div>
         {/* Tam olarak targetDays kadar kutucuk: yüklü günler dolu, kalanlar kilitli. */}
-        <div className="edge-fade-x flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-5 px-5" style={{ scrollSnapType: "x proximity" }}>
+        <div className="edge-fade-x flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 md:-mx-8 md:px-8" style={{ scrollSnapType: "x proximity" }}>
           {calendar.map((cell) =>
             cell.locked ? (
               <button
@@ -233,7 +233,7 @@ export default function PlanBoard({
 
       {/* Günün Stratejik Adımları */}
       {activeDayObj && (
-        <div key={effectiveActiveDay} className="day-reveal flex flex-col gap-2.5">
+        <div key={effectiveActiveDay} className="day-reveal flex flex-col gap-3">
           {/* Aktif günün arkasından sızan hafif neon aura */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -248,7 +248,7 @@ export default function PlanBoard({
               </span>
             </div>
           </div>
-          <h2 className="text-[15px] font-bold tracking-tight text-[#ECF2F4] -mt-0.5">Günün Stratejik Adımları</h2>
+          <h2 className="text-[15px] font-bold tracking-tight text-[#ECF2F4] -mt-1.5">Günün Stratejik Adımları</h2>
 
           {activeDayObj.tasks.length > 0 && activeDayObj.tasks.every((t) => t.is_completed) && (
             <div
@@ -259,6 +259,8 @@ export default function PlanBoard({
             </div>
           )}
 
+          {/* Masaüstünde 2/3/4'lü grid — mobilde tek sütun */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {activeDayObj.tasks.map((t) => {
             const pr = t.priority ? PRIORITY_STYLE[t.priority] : null;
             return (
@@ -323,6 +325,7 @@ export default function PlanBoard({
               </div>
             );
           })}
+          </div>
         </div>
       )}
     </div>

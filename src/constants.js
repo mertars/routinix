@@ -59,6 +59,125 @@ export const STAGE_PLAN = "plan";
 
 export const MIN_GOAL_LENGTH = 5;
 
+// "✨ Şablon Keşfet" (Template Hub) için görsel ağırlıklı, hazır rota kütüphanesi.
+// Her şablon: kapak görseli, süre, 2 cümlelik tanıtım, illüstratif tamamlanma
+// oranı ve önizleme için kısa rutin/gün listesi taşır. "Şablonu Kullan" tıklanınca
+// goal + category + totalDays usePlanStudio.startFromTemplate'e aktarılır.
+export const TEMPLATE_LIBRARY = [
+  {
+    id: "docker-14",
+    category: "software",
+    emoji: "💻",
+    title: "14 Günlük Docker Ustalığı",
+    description: "Konteynerleşmeyi sıfırdan production seviyesine taşı. İmaj optimizasyonu, compose ve orkestrasyon temelleri iki haftada elinde.",
+    image: "https://images.unsplash.com/photo-1605745341112-85968b19335b?auto=format&fit=crop&w=800&q=60",
+    totalDays: 14,
+    completionRate: 88,
+    goal: "14 günde Docker ve konteyner temellerini sıfırdan öğrenmek",
+    previewRoutines: ["Günlük 20 dk resmi dokümantasyon okuma", "Her imajı optimize edip boyut kıyasla", "Öğrendiğini tek cümlelik günlük ile not al"],
+    previewDays: ["Temel kavramlar & ilk container", "Dockerfile & imaj katmanları", "Volume & network yönetimi", "Docker Compose ile çoklu servis", "Optimizasyon & multi-stage build"],
+  },
+  {
+    id: "system-design-30",
+    category: "software",
+    emoji: "🏗️",
+    title: "30 Günlük Sistem Tasarımı",
+    description: "Ölçeklenebilir mimari düşünme becerini Principal Architect seviyesine çıkar. Gerçek vaka analizleriyle trade-off'ları içselleştir.",
+    image: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=60",
+    totalDays: 30,
+    completionRate: 76,
+    goal: "30 günde sistem tasarımı ve ölçeklenebilir mimari becerilerini ileri seviyeye taşımak",
+    previewRoutines: ["Haftalık 1 vaka analizi (case study)", "Mimari kararları diyagramla belgelendir", "Bir trade-off'u yazılı savun"],
+    previewDays: ["Ölçeklenebilirlik temelleri", "Veritabanı sharding & replikasyon", "Cache stratejileri", "Mesaj kuyrukları & async işleme", "Load balancing & CDN"],
+  },
+  {
+    id: "upper-body-28",
+    category: "fitness",
+    emoji: "🏋️",
+    title: "Üst Vücut Hipertrofi Programı",
+    description: "Push/Pull split ile progressive overload uygula, 4 haftada gözle görülür kas kütlesi ve güç artışı hedefle. CSCS prensipleriyle programlanır.",
+    image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=800&q=60",
+    totalDays: 28,
+    completionRate: 92,
+    goal: "4 haftalık üst vücut hipertrofi (Push/Pull) antrenman programı ile kas kütlesi ve güç artırmak",
+    previewRoutines: ["Her antrenman öncesi 10 dk ısınma", "Setler arası RPE not et", "Haftalık vücut ölçümü kaydet"],
+    previewDays: ["Push: Göğüs & Omuz", "Pull: Sırt & Biceps", "Aktif dinlenme & mobility", "Push: Hacim artışı", "Pull: Güç odaklı"],
+  },
+  {
+    id: "run-5k-21",
+    category: "fitness",
+    emoji: "🏃",
+    title: "21 Günlük 5K Koşu Kondisyonu",
+    description: "Sıfırdan kesintisiz 5K koşabilecek kardiyovasküler kapasiteye ulaş. Kademeli mesafe artışıyla sakatlanma riskini minimumda tutar.",
+    image: "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?auto=format&fit=crop&w=800&q=60",
+    totalDays: 21,
+    completionRate: 83,
+    goal: "21 günde kesintisiz 5K koşabilecek kondisyona ulaşmak",
+    previewRoutines: ["Koşu öncesi 5 dk dinamik esneme", "Nabız/tempo not et", "Haftada 1 dinlenme günü"],
+    previewDays: ["Yürüyüş-koşu geçişleri (Gün 1)", "Tempo artışı (Gün 5)", "Mesafe odaklı koşu (Gün 10)", "Aktif toparlanma (Gün 15)", "Kesintisiz 5K denemesi (Gün 21)"],
+  },
+  {
+    id: "kas-6",
+    category: "vacation",
+    emoji: "🏖️",
+    title: "Kaş & Çevresi Romantik Rotası",
+    description: "Koyları, tekne turlarını ve gastronomi duraklarını dengeleyen 6 günlük bir kaçamak. Kalabalıktan uzak, huzurlu bir tempo ile kurgulanır.",
+    image: "https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?auto=format&fit=crop&w=800&q=60",
+    totalDays: 6,
+    completionRate: 88,
+    goal: "6 günlük Kaş tatili — koylar, tekne turu ve gastronomi rotası",
+    previewRoutines: ["Sabah erken saatte plaj/koy çıkışı", "Günün bütçesini akşam gözden geçir", "Yerel bir restoranı listene ekle"],
+    previewDays: ["Varış & merkez keşif", "Tekne turu & gizli koylar", "Kalkan gezisi & gastronomi", "Sahil yürüyüşü & dalış", "Antik kent ziyareti", "Serbest gün & dönüş hazırlığı"],
+  },
+  {
+    id: "kapadokya-4",
+    category: "vacation",
+    emoji: "🗺️",
+    title: "Kapadokya Balon & Vadi Turu",
+    description: "Gün doğumu balon turundan vadi yürüyüşlerine, yer altı şehrinden şarap tadımına 4 günlük yoğun ama dengeli bir rota.",
+    image: "https://images.unsplash.com/photo-1641128324972-af3212f0f6bd?auto=format&fit=crop&w=800&q=60",
+    totalDays: 4,
+    completionRate: 90,
+    goal: "4 günlük Kapadokya gezisi — balon turu, vadi yürüyüşleri ve yeraltı şehri rotası",
+    previewRoutines: ["Balon turu için gün doğumundan önce kalk", "Her vadi sonrası su molası ver", "Günlük fotoğraf/anı notu tut"],
+    previewDays: ["Varış & Ürgüp keşfi", "Gün doğumu balon turu & vadiler", "Yeraltı şehri & şarap tadımı", "Panorama noktaları & dönüş"],
+  },
+  {
+    id: "english-30",
+    category: "general",
+    emoji: "🗣️",
+    title: "30 Günlük İngilizce Akıcılık",
+    description: "Konuşma pratiğini gündelik alışkanlığa dönüştürerek akıcı seviyeye taşı. Meta-Learning teknikleriyle kalıcı kelime hazinesi inşa eder.",
+    image: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=800&q=60",
+    totalDays: 30,
+    completionRate: 79,
+    goal: "30 günde İngilizce konuşma pratiğini akıcı seviyeye taşımak",
+    previewRoutines: ["Günlük 15 dk gölge okuma (shadowing)", "5 yeni kelimeyi cümlede kullan", "Haftalık kısa video günlüğü kaydet"],
+    previewDays: ["Telaffuz & gölge okuma", "Günlük konuşma kalıpları", "Dinleme & not alma", "Serbest konuşma pratiği", "Haftalık değerlendirme"],
+  },
+  {
+    id: "guitar-45",
+    category: "general",
+    emoji: "🎸",
+    title: "45 Günlük Gitar Başlangıç",
+    description: "Temel akorlardan ilk üç şarkıyı çalabilecek seviyeye adım adım ilerle. Parmak egzersizleri ve ritim çalışmalarıyla desteklenir.",
+    image: "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=800&q=60",
+    totalDays: 45,
+    completionRate: 81,
+    goal: "45 günde temel akorlarla 3 şarkı çalabilecek gitar seviyesi",
+    previewRoutines: ["Günlük 10 dk parmak ısınma egzersizi", "Akor geçişlerini metronomla çalış", "Haftada 1 kısa performans videosu çek"],
+    previewDays: ["Temel akorlar (Em, Am, C, G)", "Akor geçiş hızlanması", "Basit strumming pattern", "İlk şarkı denemesi", "Ritim & tempo çalışması"],
+  },
+];
+
+export const TEMPLATE_CATEGORY_TABS = [
+  { key: "all", label: "Tümü", emoji: "✨" },
+  { key: "software", label: "Yazılım & Mimari", emoji: "💻" },
+  { key: "fitness", label: "Spor & Sağlık", emoji: "🏋️" },
+  { key: "vacation", label: "Seyahat & Tatil", emoji: "🏖️" },
+  { key: "general", label: "Öğrenme", emoji: "📚" },
+];
+
 // Hedef girişinin üstünde gösterilen hazır şablon çipleri. Tıklanınca hem
 // kategori hem hedef metni otomatik dolar.
 export const TEMPLATE_CHIPS = [

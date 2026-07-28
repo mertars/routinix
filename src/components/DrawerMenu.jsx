@@ -34,8 +34,21 @@ export default function DrawerMenu({
   onNewPlan,
   onDeletePlan,
   onSignOut,
+  onOpenHub,
+  onOpenToday,
+  onOpenRoutines,
+  onOpenPlans,
 }) {
   if (!open) return null;
+
+  // Mobilde navbar'da gizlenen aksiyon butonları (masaüstünde zaten header'da
+  // yatay sıralı olduğu için burada yalnızca md altında gösterilir).
+  const quickAccess = [
+    { key: "hub", emoji: "✨", label: "Şablon Keşfet", color: "#F0B37E", onClick: onOpenHub, always: true },
+    { key: "today", emoji: "⚡", label: "Bugünün Görevleri", color: "#C99CFF", onClick: onOpenToday, always: false },
+    { key: "routines", emoji: "🔁", label: "Rutinler", color: "#7DE9C3", onClick: onOpenRoutines, always: false },
+    { key: "plans", emoji: "📂", label: "Planlarım", color: "#8FA0FF", onClick: onOpenPlans, always: false },
+  ].filter((b) => b.always || user);
 
   return (
     <>
@@ -82,6 +95,26 @@ export default function DrawerMenu({
         </div>
 
         <div className="flex-1 overflow-y-auto no-scrollbar px-5 py-5 flex flex-col gap-5">
+          {/* Hızlı Erişim — yalnızca mobilde (md'den itibaren bu butonlar zaten header'da) */}
+          <div className="md:hidden">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#7C8894] mb-2">Hızlı Erişim</p>
+            <div className="grid grid-cols-2 gap-2">
+              {quickAccess.map((b) => (
+                <button
+                  key={b.key}
+                  onClick={b.onClick}
+                  className="flex flex-col items-start gap-1 rounded-xl p-3 text-left transition-colors card-glow"
+                  style={{ background: `${b.color}14`, border: `1px solid ${b.color}40` }}
+                >
+                  <span className="text-[16px]">{b.emoji}</span>
+                  <span className="text-[11.5px] font-semibold leading-snug" style={{ color: b.color }}>
+                    {b.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Özet */}
           <div>
             <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#7C8894] mb-2">Özet</p>

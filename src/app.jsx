@@ -3,6 +3,7 @@ import { STAGE_INTRO, STAGE_WIZARD, STAGE_LOADING, STAGE_ERROR, STAGE_PLAN } fro
 import usePlanStudio from "./usePlanStudio";
 import useAuth from "./useAuth";
 import { tapFeedback } from "./lib/haptics";
+import { setLogUser } from "./utils/logger";
 import Header from "./components/Header";
 import AuthModal from "./components/AuthModal";
 import ConfirmModal from "./components/ConfirmModal";
@@ -12,6 +13,8 @@ import TodayPopover from "./components/TodayPopover";
 import RoutinesPopover from "./components/RoutinesPopover";
 import PrintModal from "./components/PrintModal";
 import PrintablePlan from "./components/PrintablePlan";
+import TemplateHub from "./components/TemplateHub";
+import MyPlansHub from "./components/MyPlansHub";
 import CategoryIntro from "./components/CategoryIntro";
 import OnboardingWizard from "./components/OnboardingWizard";
 import PlanBoard from "./components/PlanBoard";
@@ -25,10 +28,44 @@ export default function App() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
   const [routinesOpen, setRoutinesOpen] = useState(false);
+  const [hubOpen, setHubOpen] = useState(false);
+  const [plansOpen, setPlansOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [printRange, setPrintRange] = useState(Infinity);
   const ps = usePlanStudio({ user: auth.user, onRequireAuth: () => setAuthOpen(true) });
   const { stage, mode } = ps;
+
+  // Bugün / Rutinler / Şablon Keşfet / Planlarım panellerinden aynı anda yalnızca
+  // biri açık olur; tetiklendiklerinde hamburger menüsü de kapanır (mobilde
+  // Hızlı Erişim'den açılan paneller için gerekli, masaüstünde zararsız).
+  const toggleToday = () => {
+    setRoutinesOpen(false);
+    setHubOpen(false);
+    setPlansOpen(false);
+    ps.setMenuOpen(false);
+    setTodayOpen((v) => !v);
+  };
+  const toggleRoutines = () => {
+    setTodayOpen(false);
+    setHubOpen(false);
+    setPlansOpen(false);
+    ps.setMenuOpen(false);
+    setRoutinesOpen((v) => !v);
+  };
+  const toggleHub = () => {
+    setTodayOpen(false);
+    setRoutinesOpen(false);
+    setPlansOpen(false);
+    ps.setMenuOpen(false);
+    setHubOpen((v) => !v);
+  };
+  const togglePlans = () => {
+    setTodayOpen(false);
+    setRoutinesOpen(false);
+    setHubOpen(false);
+    ps.setMenuOpen(false);
+    setPlansOpen((v) => !v);
+  };
 
   // Dokunsal geri bildirim: herhangi bir butona basıldığında hafif mikro titreşim
   // (haptics açıksa). Prop-drilling yerine tek bir global dinleyici.
@@ -39,6 +76,12 @@ export default function App() {
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
   }, []);
+
+  // Kalıcılaşan (Supabase) loglara hangi kullanıcının oturumunda oluştuğunu
+  // eklemek için logger'ın modül seviyesindeki kullanıcı bağlamını senkronla.
+  useEffect(() => {
+    setLogUser(auth.user?.id ?? null);
+  }, [auth.user]);
 
   // Intro/loading/error ekranları CategoryIntro içinde, plan ekranı PlanBoard'da.
   const onIntroLike = stage === STAGE_INTRO || stage === STAGE_LOADING || stage === STAGE_ERROR;
@@ -61,15 +104,13 @@ export default function App() {
           modeAccentSoft={mode.accentSoft}
           user={auth.user}
           todayActive={todayOpen}
-          onTodayClick={() => {
-            setRoutinesOpen(false);
-            setTodayOpen((v) => !v);
-          }}
+          onTodayClick={toggleToday}
           routinesActive={routinesOpen}
-          onRoutinesClick={() => {
-            setTodayOpen(false);
-            setRoutinesOpen((v) => !v);
-          }}
+          onRoutinesClick={toggleRoutines}
+          hubActive={hubOpen}
+          onHubClick={toggleHub}
+          plansActive={plansOpen}
+          onPlansClick={togglePlans}
           onAuthClick={() => setAuthOpen(true)}
           onSignOut={() => setLogoutConfirmOpen(true)}
           onMenuToggle={() => ps.setMenuOpen((v) => !v)}
@@ -91,6 +132,10 @@ export default function App() {
             ps.setMenuOpen(false);
             setDeleteOpen(true);
           }}
+          onOpenHub={toggleHub}
+          onOpenToday={toggleToday}
+          onOpenRoutines={toggleRoutines}
+          onOpenPlans={togglePlans}
           onSignOut={() => {
             ps.setMenuOpen(false);
             setLogoutConfirmOpen(true);
@@ -101,7 +146,9 @@ export default function App() {
           className={`flex-1 min-h-0 w-full mx-auto ${
             onIntroLike
               ? "max-w-7xl px-4 md:px-6 pt-4 md:pt-8 pb-4 md:pb-10 flex flex-col"
-              : "max-w-xl px-5 pt-6 pb-16"
+              : stage === STAGE_PLAN
+                ? "max-w-7xl px-4 md:px-8 pt-6 pb-16"
+                : "max-w-xl px-5 pt-6 pb-16"
           }`}
         >
           {onIntroLike && (
@@ -188,6 +235,17 @@ export default function App() {
         plans={ps.savedPlans}
         onDelete={ps.deletePlan}
         onClose={() => setDeleteOpen(false)}
+      />
+
+      {/* Şablon Keşfet — hazır rota kütüphanesi */}
+      <TemplateHub open={hubOpen} onClose={() => setHubOpen(false)} onUseTemplate={ps.startFromTemplate} />
+
+      {/* Planlarım — tüm kayıtlı planlar, ilerlemeleriyle */}
+      <MyPlansHub
+        open={plansOpen}
+        userId={auth.user?.id}
+        onOpenPlan={ps.openSavedPlan}
+        onClose={() => setPlansOpen(false)}
       />
 
       {/* PDF / Yazdır — aralık seçimi + yazdır */}

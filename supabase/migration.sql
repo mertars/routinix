@@ -126,3 +126,38 @@ create policy "tasks_delete_own" on public.tasks
 --   alter table public.tasks add column if not exists duration_min int;
 --   alter table public.tasks add column if not exists priority text;
 -- ---------------------------------------------------------------------
+
+-- =====================================================================
+-- 5) logs — hafif frontend logging / error tracking (yalnızca WARN + ERROR)
+--    Bu tablo yukarıdaki DROP bloğuna DAHİL DEĞİL — var olan plans/routines/
+--    tasks verini etkilemeden, bu bloğu tek başına çalıştırabilirsin.
+--    src/utils/logger.js -> sendToExternalService -> src/services/logService.js
+--    zinciriyle her warn/error burada kalıcılaşır.
+-- =====================================================================
+create table if not exists public.logs (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid references auth.users (id) on delete set null,
+  level      text not null check (level in ('warn', 'error')),
+  scope      text not null default 'APP',
+  message    text not null,
+  data       jsonb,
+  user_agent text,
+  url        text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists logs_user_id_idx on public.logs (user_id);
+create index if not exists logs_created_at_idx on public.logs (created_at desc);
+
+alter table public.logs enable row level security;
+
+-- Misafir (giriş yapmamış) kullanıcılardan gelen hatalar da kaydedilsin diye
+-- user_id NULL olan insert'lere izin verilir; oturum açıksa yalnızca kendi
+-- user_id'siyle yazabilir (başkası adına log yazılamaz).
+create policy "logs_insert_own_or_anon" on public.logs
+  for insert with check (user_id is null or auth.uid() = user_id);
+
+-- Kullanıcı yalnızca kendi loglarını görebilir (ileride bir "hata geçmişi"
+-- ekranı gerekirse hazır; admin/servis rolü ayrıca genişletilebilir).
+create policy "logs_select_own" on public.logs
+  for select using (auth.uid() = user_id);

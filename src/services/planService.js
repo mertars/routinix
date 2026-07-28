@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabaseClient";
+import logger from "../utils/logger";
 
 // Plan / rutin / görevlerin Supabase kalıcılığı — aiPipelineService'in ürettiği
 // (routines + hafta hafta görevler) yeni pipeline yapısına göre.
@@ -86,7 +87,10 @@ export async function savePlanToSupabase(aiOutput, userId, mode) {
     })
     .select()
     .single();
-  if (planErr) throw planErr;
+  if (planErr) {
+    logger.error("SUPABASE", "Plan kaydedilemedi (total_days dahil)", { table: "plans", action: "insert", error: planErr });
+    throw planErr;
+  }
 
   // 2) Rutinler (varsa) — toplu insert. Rutin string ya da {frequency, content}
   //    olabilir. frequency ve content NOT NULL kolonlar olduğu için varsayılan
@@ -107,7 +111,10 @@ export async function savePlanToSupabase(aiOutput, userId, mode) {
       .filter((row) => row.content); // tamamen boş içerikli rutinleri atla
     if (routineRows.length > 0) {
       const { data, error } = await supabase.from("routines").insert(routineRows).select();
-      if (error) throw error;
+      if (error) {
+        logger.error("SUPABASE", "Rutinler kaydedilemedi", { table: "routines", action: "insert", planId: plan.id, error });
+        throw error;
+      }
       routines = data || [];
     }
   }
@@ -117,7 +124,10 @@ export async function savePlanToSupabase(aiOutput, userId, mode) {
   const taskRows = flattenWeek(aiOutput.first_week_tasks, { planId: plan.id, userId, weekNumber: 1 });
   if (taskRows.length > 0) {
     const { data, error } = await supabase.from("tasks").insert(taskRows).select();
-    if (error) throw error;
+    if (error) {
+      logger.error("SUPABASE", "1. hafta görevleri kaydedilemedi", { table: "tasks", action: "insert", planId: plan.id, error });
+      throw error;
+    }
     tasks = data || [];
   }
 
@@ -130,21 +140,30 @@ export async function saveWeekTasks(planId, userId, weekNumber, weekTasks) {
   const taskRows = flattenWeek(weekTasks, { planId, userId, weekNumber });
   if (taskRows.length === 0) return [];
   const { data, error } = await supabase.from("tasks").insert(taskRows).select();
-  if (error) throw error;
+  if (error) {
+    logger.error("SUPABASE", `${weekNumber}. hafta görevleri kaydedilemedi`, { table: "tasks", action: "insert", planId, weekNumber, error });
+    throw error;
+  }
   return data || [];
 }
 
 // Bir görevin tamamlanma durumunu günceller.
 export async function setTaskCompleted(taskId, isCompleted) {
   const { error } = await supabase.from("tasks").update({ is_completed: isCompleted }).eq("id", taskId);
-  if (error) throw error;
+  if (error) {
+    logger.error("SUPABASE", "Görev durumu güncellenemedi", { table: "tasks", action: "update", taskId, error });
+    throw error;
+  }
 }
 
 // Bir planı siler. FK'lar ON DELETE CASCADE olduğu için ilgili routines/tasks
 // satırları da otomatik silinir.
 export async function deletePlan(planId) {
   const { error } = await supabase.from("plans").delete().eq("id", planId);
-  if (error) throw error;
+  if (error) {
+    logger.error("SUPABASE", "Plan silinemedi", { table: "plans", action: "delete", planId, error });
+    throw error;
+  }
 }
 
 // "Bugünün Görevleri" popover'ı için: kullanıcının TÜM planlarını + tüm
@@ -156,9 +175,18 @@ export async function fetchDashboardData(userId) {
     supabase.from("routines").select("*").eq("user_id", userId),
     supabase.from("tasks").select("*").eq("user_id", userId).order("week_number", { ascending: true }),
   ]);
-  if (plansRes.error) throw plansRes.error;
-  if (routinesRes.error) throw routinesRes.error;
-  if (tasksRes.error) throw tasksRes.error;
+  if (plansRes.error) {
+    logger.error("SUPABASE", "Planlar çekilemedi (dashboard)", { table: "plans", action: "select", userId, error: plansRes.error });
+    throw plansRes.error;
+  }
+  if (routinesRes.error) {
+    logger.error("SUPABASE", "Rutinler çekilemedi (dashboard)", { table: "routines", action: "select", userId, error: routinesRes.error });
+    throw routinesRes.error;
+  }
+  if (tasksRes.error) {
+    logger.error("SUPABASE", "Görevler çekilemedi (dashboard)", { table: "tasks", action: "select", userId, error: tasksRes.error });
+    throw tasksRes.error;
+  }
 
   const routinesByPlan = {};
   for (const r of routinesRes.data || []) (routinesByPlan[r.plan_id] = routinesByPlan[r.plan_id] || []).push(r);
@@ -179,7 +207,10 @@ export async function fetchUserPlans(userId) {
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
-  if (error) throw error;
+  if (error) {
+    logger.error("SUPABASE", "Planlar çekilemedi", { table: "plans", action: "select", userId, error });
+    throw error;
+  }
   return data || [];
 }
 
@@ -190,8 +221,17 @@ export async function fetchPlanDetail(planId) {
     supabase.from("routines").select("*").eq("plan_id", planId).order("created_at", { ascending: true }),
     supabase.from("tasks").select("*").eq("plan_id", planId).order("week_number", { ascending: true }),
   ]);
-  if (pErr) throw pErr;
-  if (routinesRes.error) throw routinesRes.error;
-  if (tasksRes.error) throw tasksRes.error;
+  if (pErr) {
+    logger.error("SUPABASE", "Plan detayı çekilemedi", { table: "plans", action: "select", planId, error: pErr });
+    throw pErr;
+  }
+  if (routinesRes.error) {
+    logger.error("SUPABASE", "Plan rutinleri çekilemedi", { table: "routines", action: "select", planId, error: routinesRes.error });
+    throw routinesRes.error;
+  }
+  if (tasksRes.error) {
+    logger.error("SUPABASE", "Plan görevleri çekilemedi", { table: "tasks", action: "select", planId, error: tasksRes.error });
+    throw tasksRes.error;
+  }
   return { plan, routines: routinesRes.data || [], tasks: tasksRes.data || [] };
 }

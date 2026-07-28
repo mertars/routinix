@@ -20,6 +20,7 @@ import {
   deletePlan as deletePlanSvc,
 } from "./services/planService";
 import { setHapticsEnabled } from "./lib/haptics";
+import logger from "./utils/logger";
 
 // DB'den gelen düz tasks satırlarını haftalara/günlere gruplar.
 // [{ weekNumber, days: [{ dayNumber, tasks: [row...] }] }] (hafta & gün sıralı)
@@ -74,6 +75,10 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   // "Planlarım" — oturum açıksa DB'den çekilen kayıtlı planların özeti.
   const [savedPlans, setSavedPlans] = useState([]);
 
+  // Şablon Keşfet'ten "Şablonu Kullan" ile gelen kesin gün sayısı — AI'ın
+  // total_days tahminini ezmek için finalizeAndGenerate'de kullanılır.
+  const [templateDaysOverride, setTemplateDaysOverride] = useState(null);
+
   const mode = categoryOf(category);
 
   // Toggle değişince modül seviyesindeki haptics bayrağını senkronla.
@@ -89,7 +94,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     try {
       setSavedPlans(await fetchUserPlans(user.id));
     } catch (err) {
-      console.error("Kayıtlı planlar getirilemedi:", err);
+      logger.error("PLANS", "Kayıtlı planlar getirilemedi", { error: err?.message });
     }
   }, [user]);
 
@@ -119,7 +124,26 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     setAnswers({});
     setWizardStep(0);
     setMenuOpen(false);
+    setTemplateDaysOverride(null);
     setStage(STAGE_INTRO);
+  };
+
+  // Ortak: verilen kategori/hedef için dinamik onboarding sorularını üretip
+  // wizard'a geçer. startOnboarding (manuel "Başla") ve startFromTemplate
+  // (Şablon Keşfet) bunu paylaşır.
+  const beginOnboarding = async (cat, goalText) => {
+    setErrorMsg("");
+    setAnswers({});
+    setWizardStep(0);
+    setStage(STAGE_LOADING);
+    try {
+      const qs = await generateOnboardingQuestions({ category: cat, goal: goalText });
+      setQuestions(qs);
+    } catch (err) {
+      logger.warn("ONBOARDING", "Sorular üretilemedi, yedek anket kullanılıyor", { error: err?.message });
+      setQuestions(FALLBACK_QUESTIONS); // dead-end olmasın: güvenli yedek
+    }
+    setStage(STAGE_WIZARD);
   };
 
   // ---- ADIM 1: Intro "Devam Et" → auth gate → dinamik soruları üret → wizard ----
@@ -135,19 +159,23 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       setStage(STAGE_ERROR);
       return;
     }
+    setTemplateDaysOverride(null); // manuel akışta şablon geçersiz kılma uygulanmaz
+    await beginOnboarding(category, goal);
+  };
 
-    setErrorMsg("");
-    setAnswers({});
-    setWizardStep(0);
-    setStage(STAGE_LOADING);
-    try {
-      const qs = await generateOnboardingQuestions({ category, goal });
-      setQuestions(qs);
-    } catch (err) {
-      console.error("Sorular üretilemedi, yedek anket kullanılıyor:", err);
-      setQuestions(FALLBACK_QUESTIONS); // dead-end olmasın: güvenli yedek
+  // ---- Şablon Keşfet: "Şablonu Kullan" → hedef+kategori+gün sayısını aktarıp planı anında başlat ----
+  const startFromTemplate = async (template) => {
+    if (!user) {
+      onRequireAuth?.();
+      return;
     }
-    setStage(STAGE_WIZARD);
+    // State güncellemeleri asenkron olduğundan (kapanış closure'ı state'i geç
+    // görebilir) template değerlerini doğrudan kullanıyoruz; setGoal/setCategory
+    // yalnızca UI'ın (wizard başlığı, geri dönülürse intro) tutarlı görünmesi için.
+    setCategory(template.category);
+    setGoal(template.goal);
+    setTemplateDaysOverride(template.totalDays || null);
+    await beginOnboarding(template.category, template.goal);
   };
 
   // ---- Wizard etkileşimleri ----
@@ -173,16 +201,22 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       const answerContext = questions.map((q, i) => ({ question: q.title, answer: answers[i] || "(cevapsız)" }));
       if (extraNote.trim()) answerContext.push({ question: "Ek notlar / özel istekler", answer: extraNote.trim() });
 
+      logger.info("PLAN_CREATE", "Plan oluşturma AI isteği gönderiliyor", { category, goalLength: goal.trim().length });
       const aiOutput = await createEnrichedPlan({ category, goal, answers: answerContext });
+      // Şablon Keşfet'ten gelindiyse AI'ın total_days tahminini şablonun kesin
+      // gün sayısıyla ez — kullanıcıya vaat edilen süre ile plan birebir eşleşsin.
+      if (templateDaysOverride) aiOutput.total_days = templateDaysOverride;
+
       const { plan, routines: routineRows, tasks } = await savePlanToSupabase(aiOutput, user.id, category);
 
       setDbPlan(plan);
       setRoutines(routineRows.length ? routineRows : (aiOutput.routines || []).map((c) => ({ content: String(c) })));
       setWeeks(groupTasksToWeeks(tasks));
       setStage(STAGE_PLAN);
+      setTemplateDaysOverride(null);
       refreshSavedPlans();
     } catch (err) {
-      console.error("Plan oluşturulamadı:", err);
+      logger.error("PLAN_CREATE", "Plan oluşturulamadı", { category, error: err?.message });
       setErrorMsg(err?.message || "Plan oluşturulurken bir sorun oluştu. Lütfen tekrar dene.");
       setStage(STAGE_ERROR);
     }
@@ -205,7 +239,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       const rows = await saveWeekTasks(dbPlan.id, user.id, targetWeekNumber, week_tasks);
       setWeeks((prev) => [...prev, ...groupTasksToWeeks(rows)]);
     } catch (err) {
-      console.error("Sonraki hafta üretilemedi:", err);
+      logger.error("PLAN_WEEK", "Sonraki hafta üretilemedi", { planId: dbPlan?.id, targetWeekNumber, error: err?.message });
       setNextWeekError(err?.message || "Sonraki hafta üretilirken bir sorun oluştu.");
     } finally {
       setLoadingNextWeek(false);
@@ -223,7 +257,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
         })),
       }))
     );
-    setTaskCompletedSvc(taskId, nextVal).catch((err) => console.error("Görev durumu güncellenemedi:", err));
+    setTaskCompletedSvc(taskId, nextVal).catch((err) => logger.error("TASK", "Görev durumu güncellenemedi", { taskId, error: err?.message }));
   };
 
   // ---- Kayıtlı bir planı yeniden aç ----
@@ -237,7 +271,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       setWeeks(groupTasksToWeeks(tasks));
       setStage(STAGE_PLAN);
     } catch (err) {
-      console.error("Plan açılamadı:", err);
+      logger.error("PLAN_OPEN", "Plan açılamadı", { planId, error: err?.message });
       setErrorMsg(err?.message || "Plan açılırken bir sorun oluştu.");
       setStage(STAGE_ERROR);
     }
@@ -256,7 +290,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       }
       await refreshSavedPlans();
     } catch (err) {
-      console.error("Plan silinemedi:", err);
+      logger.error("PLAN_DELETE", "Plan silinemedi", { planId, error: err?.message });
     }
   };
 
@@ -281,6 +315,6 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     // setter/aksiyon
     setGoal, setExtraNote, setMenuOpen, setRemindersOn, setHapticsOn,
     handleCategoryChange, startOnboarding, setAnswer, goNextQuestion, goPrevQuestion, finalizeAndGenerate,
-    loadNextWeek, toggleTask, openSavedPlan, deletePlan, startNewPlan, resetToIntro,
+    loadNextWeek, toggleTask, openSavedPlan, deletePlan, startNewPlan, resetToIntro, startFromTemplate,
   };
 }

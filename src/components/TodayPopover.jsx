@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { categoryOf } from "../constants";
 import { fetchDashboardData, setTaskCompleted } from "../services/planService";
+import logger from "../utils/logger";
 
 // Bir planın "bugün"ü: ilk tamamlanmamış görev içeren gün; yoksa ilk gün.
 function todayOf(tasks) {
@@ -86,7 +87,7 @@ export default function TodayPopover({ open, userId, onClose }) {
     setLoading(true);
     fetchDashboardData(userId)
       .then((d) => !cancelled && setData(d))
-      .catch((err) => console.error("Bugünün verisi getirilemedi:", err))
+      .catch((err) => logger.error("TODAY", "Bugünün verisi getirilemedi", { userId, error: err?.message }))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -102,7 +103,7 @@ export default function TodayPopover({ open, userId, onClose }) {
         p.id !== planId ? p : { ...p, tasks: p.tasks.map((t) => (t.id === taskId ? { ...t, is_completed: next } : t)) }
       )
     );
-    setTaskCompleted(taskId, next).catch((err) => console.error("Görev güncellenemedi:", err));
+    setTaskCompleted(taskId, next).catch((err) => logger.error("TASK", "Görev güncellenemedi", { taskId, error: err?.message }));
   };
 
   return (

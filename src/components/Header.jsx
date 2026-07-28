@@ -6,6 +6,10 @@ export default function Header({
   onTodayClick,
   routinesActive,
   onRoutinesClick,
+  hubActive,
+  onHubClick,
+  plansActive,
+  onPlansClick,
   onAuthClick,
   onSignOut,
   onMenuToggle,
@@ -39,38 +43,70 @@ export default function Header({
         </div>
 
         <div className="flex items-center gap-1.5 md:gap-2">
-          {/* Bugünün Görevleri + Rutinler — iki müstakil mor neon buton (oturum açıkken) */}
-          {user && (
-            <>
-              <button
-                onClick={onTodayClick}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 md:px-3 h-9 text-[12px] font-semibold transition-all"
-                style={{
-                  background: todayActive ? "rgba(178,107,255,0.20)" : "rgba(178,107,255,0.10)",
-                  color: "#C99CFF",
-                  border: "1px solid rgba(178,107,255,0.40)",
-                  boxShadow: todayActive ? "0 0 16px -4px rgba(178,107,255,0.7)" : "0 0 10px -5px rgba(178,107,255,0.6)",
-                }}
-              >
-                <span className="text-[13px] leading-none">⚡</span>
-                <span className="hidden md:inline">Bugünün Görevleri</span>
-                <span className="md:hidden">Bugün</span>
-              </button>
-              <button
-                onClick={onRoutinesClick}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 md:px-3 h-9 text-[12px] font-semibold transition-all"
-                style={{
-                  background: routinesActive ? "rgba(46,217,163,0.18)" : "rgba(46,217,163,0.09)",
-                  color: "#7DE9C3",
-                  border: "1px solid rgba(46,217,163,0.38)",
-                  boxShadow: routinesActive ? "0 0 16px -4px rgba(46,217,163,0.65)" : "0 0 10px -5px rgba(46,217,163,0.55)",
-                }}
-              >
-                <span className="text-[13px] leading-none">🔁</span>
-                <span className="hidden md:inline">Rutinler</span>
-              </button>
-            </>
-          )}
+          {/* Aksiyon butonları — mobilde hamburger menü (Hızlı Erişim) arkasında,
+              masaüstünde navbar'da yatay sıralı. */}
+          <div className="hidden md:flex items-center gap-2">
+            {/* Şablon Keşfet — herkese açık (oturum gerektirmez, sadece "Kullan" gerektirir) */}
+            <button
+              onClick={onHubClick}
+              className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
+              style={{
+                background: hubActive ? "rgba(240,179,126,0.20)" : "rgba(240,179,126,0.10)",
+                color: "#F0B37E",
+                border: "1px solid rgba(240,179,126,0.40)",
+                boxShadow: hubActive ? "0 0 16px -4px rgba(240,179,126,0.7)" : "0 0 10px -5px rgba(240,179,126,0.6)",
+              }}
+            >
+              <span className="text-[13px] leading-none">✨</span>
+              Şablon Keşfet
+            </button>
+
+            {/* Bugünün Görevleri + Rutinler + Planlarım (oturum açıkken) */}
+            {user && (
+              <>
+                <button
+                  onClick={onTodayClick}
+                  className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
+                  style={{
+                    background: todayActive ? "rgba(178,107,255,0.20)" : "rgba(178,107,255,0.10)",
+                    color: "#C99CFF",
+                    border: "1px solid rgba(178,107,255,0.40)",
+                    boxShadow: todayActive ? "0 0 16px -4px rgba(178,107,255,0.7)" : "0 0 10px -5px rgba(178,107,255,0.6)",
+                  }}
+                >
+                  <span className="text-[13px] leading-none">⚡</span>
+                  Bugünün Görevleri
+                </button>
+                <button
+                  onClick={onRoutinesClick}
+                  className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
+                  style={{
+                    background: routinesActive ? "rgba(46,217,163,0.18)" : "rgba(46,217,163,0.09)",
+                    color: "#7DE9C3",
+                    border: "1px solid rgba(46,217,163,0.38)",
+                    boxShadow: routinesActive ? "0 0 16px -4px rgba(46,217,163,0.65)" : "0 0 10px -5px rgba(46,217,163,0.55)",
+                  }}
+                >
+                  <span className="text-[13px] leading-none">🔁</span>
+                  Rutinler
+                </button>
+                <button
+                  onClick={onPlansClick}
+                  className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
+                  style={{
+                    background: plansActive ? "rgba(143,160,255,0.20)" : "rgba(143,160,255,0.10)",
+                    color: "#8FA0FF",
+                    border: "1px solid rgba(143,160,255,0.40)",
+                    boxShadow: plansActive ? "0 0 16px -4px rgba(143,160,255,0.7)" : "0 0 10px -5px rgba(143,160,255,0.6)",
+                  }}
+                >
+                  <span className="text-[13px] leading-none">📂</span>
+                  Planlarım
+                </button>
+              </>
+            )}
+          </div>
+
           {user ? (
             <button
               onClick={onSignOut}

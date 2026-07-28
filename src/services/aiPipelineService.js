@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import logger from "../utils/logger";
 
 // AI plan üretim pipeline'ı — iki amaca hizmet eder:
 //   1) Dynamic Personas: kullanıcının kategorisine göre uzman "şapkası" (system
@@ -51,7 +52,9 @@ function taskFieldGuide(category) {
 }
 
 // Verilen system instruction ile modeli çalıştırıp katı JSON'ı parse eder.
-async function runJson(systemInstruction, userPrompt) {
+// `label`: hangi AI çağrısı olduğunu (onboarding/plan oluşturma/sonraki hafta)
+// logger çıktısında ayırt etmek için — istek atılırken INFO, başarısızlıkta ERROR.
+async function runJson(systemInstruction, userPrompt, label = "AI isteği") {
   if (!import.meta.env.VITE_GEMINI_API_KEY) {
     throw new Error("VITE_GEMINI_API_KEY bulunamadı! Lütfen .env dosyanızı kontrol edin.");
   }
@@ -62,12 +65,16 @@ async function runJson(systemInstruction, userPrompt) {
     generationConfig: { responseMimeType: "application/json" },
   });
 
+  logger.info("AI_PIPELINE", `${label} isteği gönderiliyor`, { model: MODEL });
+
   let text;
   try {
     const result = await model.generateContent(userPrompt);
     text = result.response.text();
   } catch (err) {
-    console.error("Gemini SDK Hatası:", err);
+    logger.error("AI_PIPELINE", `${label} başarısız oldu (Gemini SDK hatası)`, {
+      error: { message: err?.message, stack: err?.stack },
+    });
     throw new Error(err?.message || "Yapay zeka isteği başarısız oldu.");
   }
 
@@ -75,7 +82,11 @@ async function runJson(systemInstruction, userPrompt) {
     // responseMimeType json olsa da olası kod-bloğu sarmalarına karşı güvenli parse.
     const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
     return JSON.parse(cleaned);
-  } catch {
+  } catch (err) {
+    logger.error("AI_PIPELINE", `${label} yanıtı geçerli JSON değil`, {
+      error: err?.message,
+      rawPreview: text?.slice(0, 300),
+    });
     throw new Error("Yapay zeka yanıtı geçerli JSON değil.");
   }
 }
@@ -124,7 +135,7 @@ Yanıtın SADECE şu JSON olmalı, şema dışına metin ekleme, Türkçe:
 
   const userPrompt = `Kategori: ${category}\nKullanıcının hedefi: "${(goal || "").trim()}"`;
 
-  const parsed = await runJson(systemInstruction, userPrompt);
+  const parsed = await runJson(systemInstruction, userPrompt, "Onboarding soruları üretimi");
   const questions = parsed?.questions;
   if (!Array.isArray(questions) || questions.length === 0) {
     throw new Error("Onboarding soruları üretilemedi.");
@@ -179,7 +190,7 @@ first_week_tasks, total_days 7'den küçükse tam olarak total_days kadar gün; 
 
   const userPrompt = `${describeUserInput(userInput)}\n\nYukarıdaki bilgilere göre planın toplam süresini (total_days), genel rutinlerini ve 1. haftasını üret.`;
 
-  const parsed = await runJson(systemInstruction, userPrompt);
+  const parsed = await runJson(systemInstruction, userPrompt, "Plan oluşturma");
   if (!parsed?.plan_title || !Array.isArray(parsed?.first_week_tasks)) {
     throw new Error("Yapay zeka yanıtında beklenen plan alanları eksik.");
   }
@@ -223,7 +234,7 @@ week_tasks tam olarak 7 gün (day ${startDay}..${endDay}) içermeli.`;
 Plan özeti / genel strateji: "${planSummary || ""}"
 Üretilecek hafta: ${week}. hafta (gün ${startDay}-${endDay}).`;
 
-  const parsed = await runJson(systemInstruction, userPrompt);
+  const parsed = await runJson(systemInstruction, userPrompt, `${week}. hafta üretimi`);
   if (!Array.isArray(parsed?.week_tasks) || parsed.week_tasks.length === 0) {
     throw new Error("Yapay zeka yanıtında beklenen hafta görevleri eksik.");
   }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { categoryOf } from "../constants";
 import { fetchDashboardData } from "../services/planService";
+import logger from "../utils/logger";
 
 // Uzun rutin metnini eylem odaklı kısa etikete indirger + duruma göre emoji seçer.
 const KEYWORD_EMOJI = [
@@ -33,6 +34,25 @@ function microLabel(text) {
 const todayKey = new Date().toISOString().slice(0, 10);
 const storeKey = (id) => `routine_${id}_${todayKey}`;
 
+// localStorage private-tarama/quota gibi durumlarda throw edebilir — bu bir
+// check-in senkronizasyon hatasıdır, uygulamayı çökertmemeli (WARN yeterli).
+function readCheckin(id) {
+  try {
+    return localStorage.getItem(storeKey(id)) === "1";
+  } catch (err) {
+    logger.warn("ROUTINE_CHECKIN", "localStorage okunamadı", { routineId: id, error: err?.message });
+    return false;
+  }
+}
+function writeCheckin(id, value) {
+  try {
+    if (value) localStorage.setItem(storeKey(id), "1");
+    else localStorage.removeItem(storeKey(id));
+  } catch (err) {
+    logger.warn("ROUTINE_CHECKIN", "localStorage senkronize edilemedi", { routineId: id, value, error: err?.message });
+  }
+}
+
 // "🔁 Rutinler" popover'ı: tüm planların günlük rutinlerini kompakt tikleme
 // çipleri (2'li grid) olarak gösterir. Günlük check-in localStorage'da tutulur
 // (rutin tablosunda tarih-bazlı kolon olmadığı için sayfa yenilense de korunur).
@@ -55,10 +75,10 @@ export default function RoutinesPopover({ open, userId, onClose }) {
         setRoutines(flat);
         // localStorage'dan bugünün check-in durumları
         const init = {};
-        for (const r of flat) if (localStorage.getItem(storeKey(r.id)) === "1") init[r.id] = true;
+        for (const r of flat) if (readCheckin(r.id)) init[r.id] = true;
         setChecked(init);
       })
-      .catch((err) => console.error("Rutinler getirilemedi:", err))
+      .catch((err) => logger.error("ROUTINES", "Rutinler getirilemedi", { userId, error: err?.message }))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -70,8 +90,7 @@ export default function RoutinesPopover({ open, userId, onClose }) {
   const toggle = (id) => {
     setChecked((prev) => {
       const next = { ...prev, [id]: !prev[id] };
-      if (next[id]) localStorage.setItem(storeKey(id), "1");
-      else localStorage.removeItem(storeKey(id));
+      writeCheckin(id, next[id]);
       return next;
     });
   };
