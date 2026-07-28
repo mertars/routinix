@@ -19,7 +19,7 @@ function ToggleSwitch({ checked, onChange, accent }) {
   );
 }
 
-// Sağdan açılan cam efektli kontrol paneli — yeni pipeline modeline sadeleştirildi.
+// Sağdan açılan cam efektli, mor/kırmızı neon aksanlı kontrol paneli.
 export default function DrawerMenu({
   open,
   onClose,
@@ -29,28 +29,32 @@ export default function DrawerMenu({
   savedPlansCount,
   remindersOn,
   onToggleReminders,
-  focusSoundsOn,
-  onToggleFocusSounds,
+  hapticsOn,
+  onToggleHaptics,
   onNewPlan,
+  onDeletePlan,
   onSignOut,
 }) {
   if (!open) return null;
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease]" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm animate-[fadeIn_0.2s_ease]" onClick={onClose} />
       <div
         className="fixed top-0 right-0 z-50 h-full w-[86%] max-w-[340px] flex flex-col drawer-panel no-scrollbar"
         style={{
-          background: "rgba(15,20,27,0.78)",
+          background: "rgba(14,18,26,0.82)",
           backdropFilter: "blur(24px) saturate(160%)",
           WebkitBackdropFilter: "blur(24px) saturate(160%)",
-          borderLeft: "1px solid rgba(255,255,255,0.08)",
-          boxShadow: "-24px 0 60px -20px rgba(0,0,0,0.6)",
+          borderLeft: "1px solid rgba(178,107,255,0.20)",
+          boxShadow: "-24px 0 70px -20px rgba(0,0,0,0.7), inset 1px 0 20px -10px rgba(178,107,255,0.35)",
         }}
       >
+        {/* Üstte mor/kırmızı neon şerit */}
+        <div className="neon-strip" />
+
         {/* Header & Profil */}
-        <div className="px-5 pt-6 pb-5 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <div className="px-5 pt-5 pb-5 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <div
@@ -91,15 +95,15 @@ export default function DrawerMenu({
 
           {/* Hızlı ayarlar */}
           <div>
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#7C8894] mb-2">Hızlı Ayarlar</p>
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#7C8894] mb-2">Tercihler</p>
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between py-2">
                 <span className="text-[13px] font-medium text-[#ECF2F4]">🔔 Günlük Hatırlatıcılar</span>
                 <ToggleSwitch checked={remindersOn} onChange={onToggleReminders} accent={accent} />
               </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-[13px] font-medium text-[#ECF2F4]">🎵 Odaklanma Sesleri</span>
-                <ToggleSwitch checked={focusSoundsOn} onChange={onToggleFocusSounds} accent={accent} />
+              <div className="flex items-center justify-between py-2 gap-3">
+                <span className="text-[13px] font-medium text-[#ECF2F4] leading-snug">📳 Ses & Dokunsal Geri Bildirim</span>
+                <ToggleSwitch checked={hapticsOn} onChange={onToggleHaptics} accent={accent} />
               </div>
             </div>
           </div>
@@ -107,20 +111,32 @@ export default function DrawerMenu({
 
         {/* Aksiyonlar */}
         <div className="px-5 py-5 border-t flex flex-col gap-2.5" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-          <button
-            onClick={onNewPlan}
-            className="w-full rounded-xl py-3 text-[13.5px] font-semibold transition-opacity hover:opacity-90"
-            style={{ background: accent, color: "#0A0E13" }}
-          >
-            + Yeni Plan Oluştur
-          </button>
+          {/* Yan yana: Plan Ekle + Plan Sil */}
+          <div className="flex gap-2.5">
+            <button
+              onClick={onNewPlan}
+              className="flex-1 rounded-xl py-3 text-[13px] font-semibold transition-opacity hover:opacity-90 card-glow"
+              style={{ background: accent, color: "#0A0E13" }}
+            >
+              + Plan Ekle
+            </button>
+            <button
+              onClick={onDeletePlan}
+              disabled={!savedPlansCount}
+              className="flex-1 rounded-xl py-3 text-[13px] font-semibold transition-opacity hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none card-glow"
+              style={{ background: "rgba(244,64,107,0.12)", color: "#FF6E92", border: "1px solid rgba(244,64,107,0.30)" }}
+            >
+              🗑️ Plan Sil
+            </button>
+          </div>
+          {/* Tek parça büyük: Çıkış Yap */}
           {user && (
             <button
               onClick={onSignOut}
-              className="w-full rounded-xl py-3 text-[13.5px] font-semibold transition-opacity hover:opacity-90"
+              className="w-full rounded-xl py-3.5 text-[13.5px] font-semibold transition-opacity hover:opacity-90"
               style={{ background: "rgba(240,90,90,0.10)", color: "#F0827A", border: "1px solid rgba(240,90,90,0.25)" }}
             >
-              Çıkış Yap
+              🚪 Çıkış Yap
             </button>
           )}
         </div>

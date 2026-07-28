@@ -1,33 +1,75 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { STAGE_INTRO, STAGE_WIZARD, STAGE_LOADING, STAGE_ERROR, STAGE_PLAN } from "./constants";
 import usePlanStudio from "./usePlanStudio";
 import useAuth from "./useAuth";
+import { tapFeedback } from "./lib/haptics";
 import Header from "./components/Header";
 import AuthModal from "./components/AuthModal";
 import ConfirmModal from "./components/ConfirmModal";
 import DrawerMenu from "./components/DrawerMenu";
+import DeletePlanModal from "./components/DeletePlanModal";
+import TodayPopover from "./components/TodayPopover";
+import RoutinesPopover from "./components/RoutinesPopover";
+import PrintModal from "./components/PrintModal";
+import PrintablePlan from "./components/PrintablePlan";
 import CategoryIntro from "./components/CategoryIntro";
 import OnboardingWizard from "./components/OnboardingWizard";
 import PlanBoard from "./components/PlanBoard";
+import BackgroundScene from "./components/BackgroundScene";
 import GlobalStyles from "./components/GlobalStyles";
 
 export default function App() {
   const auth = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [todayOpen, setTodayOpen] = useState(false);
+  const [routinesOpen, setRoutinesOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printRange, setPrintRange] = useState(Infinity);
   const ps = usePlanStudio({ user: auth.user, onRequireAuth: () => setAuthOpen(true) });
   const { stage, mode } = ps;
+
+  // Dokunsal geri bildirim: herhangi bir butona basıldığında hafif mikro titreşim
+  // (haptics açıksa). Prop-drilling yerine tek bir global dinleyici.
+  useEffect(() => {
+    const onClick = (e) => {
+      if (e.target.closest("button")) tapFeedback();
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
 
   // Intro/loading/error ekranları CategoryIntro içinde, plan ekranı PlanBoard'da.
   const onIntroLike = stage === STAGE_INTRO || stage === STAGE_LOADING || stage === STAGE_ERROR;
 
   return (
-    <div className="min-h-screen w-full flex justify-center" style={{ background: "#0A0E13" }}>
-      <div className="w-full max-w-[430px] min-h-screen flex flex-col relative text-[#ECF2F4]">
+    <div className="w-full" style={{ background: "#0b0c10" }}>
+      {/* Atmosferik animasyonlu dağ/topoğrafya + neon şerit arka planı (içeriğin arkasında) */}
+      <BackgroundScene />
+
+      {/* Mobilde intro tek ekrana kilitli (h-100dvh, scroll yok); md'den itibaren serbest. */}
+      <div
+        className={`relative z-10 flex flex-col text-[#ECF2F4] ${
+          onIntroLike
+            ? "h-[100dvh] overflow-hidden md:h-auto md:min-h-screen md:overflow-visible"
+            : "min-h-[100dvh]"
+        }`}
+      >
         <Header
           modeAccent={mode.accent}
           modeAccentSoft={mode.accentSoft}
           user={auth.user}
+          todayActive={todayOpen}
+          onTodayClick={() => {
+            setRoutinesOpen(false);
+            setTodayOpen((v) => !v);
+          }}
+          routinesActive={routinesOpen}
+          onRoutinesClick={() => {
+            setTodayOpen(false);
+            setRoutinesOpen((v) => !v);
+          }}
           onAuthClick={() => setAuthOpen(true)}
           onSignOut={() => setLogoutConfirmOpen(true)}
           onMenuToggle={() => ps.setMenuOpen((v) => !v)}
@@ -42,16 +84,26 @@ export default function App() {
           savedPlansCount={ps.savedPlans.length}
           remindersOn={ps.remindersOn}
           onToggleReminders={() => ps.setRemindersOn((v) => !v)}
-          focusSoundsOn={ps.focusSoundsOn}
-          onToggleFocusSounds={() => ps.setFocusSoundsOn((v) => !v)}
+          hapticsOn={ps.hapticsOn}
+          onToggleHaptics={() => ps.setHapticsOn((v) => !v)}
           onNewPlan={ps.startNewPlan}
+          onDeletePlan={() => {
+            ps.setMenuOpen(false);
+            setDeleteOpen(true);
+          }}
           onSignOut={() => {
             ps.setMenuOpen(false);
             setLogoutConfirmOpen(true);
           }}
         />
 
-        <main className="flex-1 px-5 pt-6 pb-16">
+        <main
+          className={`flex-1 min-h-0 w-full mx-auto ${
+            onIntroLike
+              ? "max-w-7xl px-4 md:px-6 pt-4 md:pt-8 pb-4 md:pb-10 flex flex-col"
+              : "max-w-xl px-5 pt-6 pb-16"
+          }`}
+        >
           {onIntroLike && (
             <CategoryIntro
               stage={stage}
@@ -95,11 +147,16 @@ export default function App() {
               nextWeekError={ps.nextWeekError}
               onToggleTask={ps.toggleTask}
               onLoadNextWeek={ps.loadNextWeek}
+              onPrint={() => setPrintOpen(true)}
               onBack={ps.resetToIntro}
             />
           )}
         </main>
       </div>
+
+      {/* Bugünün Görevleri + Rutinler popover'ları (aynı anda yalnızca biri açık) */}
+      <TodayPopover open={todayOpen} userId={auth.user?.id} onClose={() => setTodayOpen(false)} />
+      <RoutinesPopover open={routinesOpen} userId={auth.user?.id} onClose={() => setRoutinesOpen(false)} />
 
       <AuthModal
         open={authOpen}
@@ -125,6 +182,30 @@ export default function App() {
         }}
         onCancel={() => setLogoutConfirmOpen(false)}
       />
+
+      <DeletePlanModal
+        open={deleteOpen}
+        plans={ps.savedPlans}
+        onDelete={ps.deletePlan}
+        onClose={() => setDeleteOpen(false)}
+      />
+
+      {/* PDF / Yazdır — aralık seçimi + yazdır */}
+      <PrintModal
+        open={printOpen}
+        accent={mode.accent}
+        maxDays={ps.weeks.reduce((n, w) => n + (w.days?.length || 0), 0)}
+        onExport={(days) => {
+          setPrintRange(days);
+          setPrintOpen(false);
+          // DOM güncellensin, sonra yazdır.
+          setTimeout(() => window.print(), 60);
+        }}
+        onClose={() => setPrintOpen(false)}
+      />
+
+      {/* Baskı şablonu — ekranda gizli, yalnızca yazdırmada görünür */}
+      <PrintablePlan plan={ps.dbPlan} routines={ps.routines} weeks={ps.weeks} days={printRange} />
 
       <GlobalStyles />
     </div>

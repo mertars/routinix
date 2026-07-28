@@ -63,7 +63,7 @@ export default function OnboardingWizard({
             onChange={(e) => onSetAnswer(e.target.value)}
             placeholder="Cevabını buraya yaz... (opsiyonel)"
             rows={3}
-            className="w-full rounded-xl border p-3.5 bg-transparent resize-none outline-none text-[14px] text-[#ECF2F4] placeholder:text-[#4A5761] leading-relaxed"
+            className="input-glow w-full rounded-xl border p-3.5 bg-transparent resize-none outline-none text-[14px] text-[#ECF2F4] placeholder:text-[#4A5761] leading-relaxed"
             style={{ borderColor: "#232C36", background: "#0F151B" }}
           />
         ) : (
@@ -99,8 +99,8 @@ export default function OnboardingWizard({
         )}
       </div>
 
-      {/* Navigasyon */}
-      <div className="flex gap-3">
+      {/* Navigasyon — mobilde alta sabitlenen flu bar */}
+      <div className="sticky-actions flex gap-3">
         <button
           onClick={onPrev}
           className="flex-1 rounded-2xl py-3.5 text-[14.5px] font-semibold border border-[#232C36] text-[#C5D0D8] hover:bg-[#141B23] transition-colors"

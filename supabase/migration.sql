@@ -28,6 +28,7 @@ create table public.plans (
   summary    text,
   mode       text not null default 'general'
              check (mode in ('software', 'fitness', 'vacation', 'general')),
+  total_days int,
   created_at timestamptz not null default now()
 );
 
@@ -60,6 +61,8 @@ create table public.tasks (
   day_number       int  not null default 1,
   title            text not null,
   detail           text,
+  duration_min     int,
+  priority         text,
   estimated_cost   text,
   map_search_query text,
   is_completed     boolean not null default false,
@@ -113,3 +116,13 @@ create policy "tasks_delete_own" on public.tasks
 -- =====================================================================
 -- Bitti. plans / routines / tasks tabloları RLS açık şekilde hazır.
 -- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- ALTERNATİF: Tabloları YENİDEN OLUŞTURMAK (yukarıdaki DROP'lar) yerine,
+-- mevcut tasks tablosuna sadece yeni kolonları eklemek istersen aşağıyı
+-- tek başına çalıştır (veriyi korur):
+--
+--   alter table public.plans add column if not exists total_days int;
+--   alter table public.tasks add column if not exists duration_min int;
+--   alter table public.tasks add column if not exists priority text;
+-- ---------------------------------------------------------------------

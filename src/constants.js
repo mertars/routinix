@@ -59,6 +59,17 @@ export const STAGE_PLAN = "plan";
 
 export const MIN_GOAL_LENGTH = 5;
 
+// Hedef girişinin üstünde gösterilen hazır şablon çipleri. Tıklanınca hem
+// kategori hem hedef metni otomatik dolar.
+export const TEMPLATE_CHIPS = [
+  { emoji: "🏖️", label: "6 Günlük Kaş Tatili", category: "vacation", goal: "6 günlük Kaş tatili — koylar, tekne turu ve gastronomi rotası" },
+  { emoji: "🏋️‍♂️", label: "4 Günlük Üst Vücut", category: "fitness", goal: "4 günlük üst vücut hipertrofi (Push/Pull) antrenman programı" },
+  { emoji: "💻", label: "14 Günlük Docker", category: "software", goal: "14 günde Docker ve konteyner temellerini sıfırdan öğrenmek" },
+  { emoji: "🗣️", label: "30 Günlük İngilizce", category: "general", goal: "30 günde İngilizce konuşma pratiğini akıcı seviyeye taşımak" },
+  { emoji: "🏃", label: "21 Günlük Koşu", category: "fitness", goal: "21 günde kesintisiz 5K koşabilecek kondisyona ulaşmak" },
+  { emoji: "🎸", label: "45 Günlük Gitar", category: "general", goal: "45 günde temel akorlarla 3 şarkı çalabilecek gitar seviyesi" },
+];
+
 // Dinamik soru üretimi başarısız olursa kullanılan güvenli, genel yedek anket.
 export const FALLBACK_QUESTIONS = [
   {
@@ -80,9 +91,9 @@ export const FALLBACK_QUESTIONS = [
 
 export const LOADING_MESSAGES = [
   "Hedefin analiz ediliyor...",
-  "Uzman şapkası giyiliyor...",
-  "Rutinler ve ilk hafta hazırlanıyor...",
-  "Planın oluşturuluyor...",
+  "Routinix odağını yapılandırıyor...",
+  "Rutinlerin ve ilk haftan hazırlanıyor...",
+  "Performans çerçeven oluşturuluyor...",
 ];
 
 // Basit, istemci-taraflı bir "anlamsız metin" sezgiseli — gerçek bir NLP/AI

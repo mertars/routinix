@@ -17,7 +17,9 @@ import {
   setTaskCompleted as setTaskCompletedSvc,
   fetchUserPlans,
   fetchPlanDetail,
+  deletePlan as deletePlanSvc,
 } from "./services/planService";
+import { setHapticsEnabled } from "./lib/haptics";
 
 // DB'den gelen düz tasks satırlarını haftalara/günlere gruplar.
 // [{ weekNumber, days: [{ dayNumber, tasks: [row...] }] }] (hafta & gün sıralı)
@@ -53,7 +55,9 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   const [errorMsg, setErrorMsg] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [remindersOn, setRemindersOn] = useState(true);
-  const [focusSoundsOn, setFocusSoundsOn] = useState(true);
+  // Ses & dokunsal geri bildirim — varsayılan AÇIK. Modül seviyesindeki
+  // haptics bayrağıyla senkron tutulur.
+  const [hapticsOn, setHapticsOn] = useState(true);
 
   // Dinamik onboarding — kategori+hedefe göre üretilen sorular + cevaplar.
   const [questions, setQuestions] = useState([]); // [{ title, type, options }]
@@ -71,6 +75,11 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   const [savedPlans, setSavedPlans] = useState([]);
 
   const mode = categoryOf(category);
+
+  // Toggle değişince modül seviyesindeki haptics bayrağını senkronla.
+  useEffect(() => {
+    setHapticsEnabled(hapticsOn);
+  }, [hapticsOn]);
 
   const refreshSavedPlans = useCallback(async () => {
     if (!user) {
@@ -234,6 +243,23 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     }
   };
 
+  // ---- Bir planı sil (menüdeki "Plan Sil" akışı) ----
+  const deletePlan = async (planId) => {
+    try {
+      await deletePlanSvc(planId);
+      // Silinen plan o an açıksa aktif ekranı temizleyip intro'ya dön.
+      if (dbPlan?.id === planId) {
+        setDbPlan(null);
+        setRoutines([]);
+        setWeeks([]);
+        setStage(STAGE_INTRO);
+      }
+      await refreshSavedPlans();
+    } catch (err) {
+      console.error("Plan silinemedi:", err);
+    }
+  };
+
   // Aktif planın ilerlemesi (tüm haftalar).
   const allTasks = weeks.flatMap((w) => w.days.flatMap((d) => d.tasks));
   const totalTasks = allTasks.length;
@@ -245,7 +271,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   return {
     // durum
     category, mode, goal, extraNote, stage, errorMsg, menuOpen, savedPlans,
-    remindersOn, focusSoundsOn,
+    remindersOn, hapticsOn,
     goalTrimmed, goalTooShort, canStart,
     // onboarding wizard
     questions, answers, wizardStep, currentAnswer,
@@ -253,8 +279,8 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     dbPlan, routines, weeks, loadingNextWeek, nextWeekError,
     totalTasks, completedTasks, overallPct,
     // setter/aksiyon
-    setGoal, setExtraNote, setMenuOpen, setRemindersOn, setFocusSoundsOn,
+    setGoal, setExtraNote, setMenuOpen, setRemindersOn, setHapticsOn,
     handleCategoryChange, startOnboarding, setAnswer, goNextQuestion, goPrevQuestion, finalizeAndGenerate,
-    loadNextWeek, toggleTask, openSavedPlan, startNewPlan, resetToIntro,
+    loadNextWeek, toggleTask, openSavedPlan, deletePlan, startNewPlan, resetToIntro,
   };
 }

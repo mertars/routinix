@@ -160,6 +160,8 @@ export async function createEnrichedPlan(userInput = {}) {
 
 ÇOK ÖNEMLİ — TOKEN TASARRUFU: Kullanıcının hedefi uzun vadeli (haftalar/aylar) olsa bile ŞU AN sadece genel rutinleri ve YALNIZCA 1. HAFTANIN (7 gün) görevlerini üret. Sonraki haftalar ayrı isteklerle üretilecek, bu yüzden ileri haftaların görevlerini ÜRETME.
 
+TOPLAM SÜRE: Hedefte belirtilen ya da hedefe uygun toplam plan süresini GÜN cinsinden hesapla ve "total_days" olarak ver. Kullanıcı açık bir süre belirttiyse ona sadık kal (örn. "6 gün" → 6, "3 hafta" → 21, "6 ay" → ~180, "1 yıl" → ~365). Belirtmemişse hedefe uygun gerçekçi bir toplam gün sayısı seç. total_days pozitif bir tam sayı olmalı.
+
 ${taskFieldGuide(category)}
 
 Yanıtın SADECE ve KESİNLİKLE aşağıdaki JSON yapısında olmalı, şema dışına hiçbir açıklama/metin ekleme. Tüm metinler Türkçe olmalı:
@@ -167,14 +169,15 @@ Yanıtın SADECE ve KESİNLİKLE aşağıdaki JSON yapısında olmalı, şema d�
   "plan_title": "kısa plan başlığı",
   "plan_summary": "planın 1-2 cümlelik özeti ve genel stratejisi (sonraki haftalar bu özete göre üretilecek)",
   "category": "${category}",
+  "total_days": 30,
   "routines": ["genel rutin/prensip 1", "..."],
   "first_week_tasks": [
     { "day": 1, "title": "günün teması", "tasks": [ { } ] }
   ]
 }
-first_week_tasks tam olarak 7 gün (day 1..7) içermeli; dinlenme günleri de bir gündür (fitness'ta boş bırakma, "dinlenme" görevi ver).`;
+first_week_tasks, total_days 7'den küçükse tam olarak total_days kadar gün; değilse tam olarak 7 gün (day 1..7) içermeli. Dinlenme günleri de bir gündür (fitness'ta boş bırakma, "dinlenme" görevi ver).`;
 
-  const userPrompt = `${describeUserInput(userInput)}\n\nYukarıdaki bilgilere göre planın genel rutinlerini ve 1. haftasını üret.`;
+  const userPrompt = `${describeUserInput(userInput)}\n\nYukarıdaki bilgilere göre planın toplam süresini (total_days), genel rutinlerini ve 1. haftasını üret.`;
 
   const parsed = await runJson(systemInstruction, userPrompt);
   if (!parsed?.plan_title || !Array.isArray(parsed?.first_week_tasks)) {

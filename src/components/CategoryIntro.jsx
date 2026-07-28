@@ -1,4 +1,5 @@
-import { CATEGORIES, CATEGORY_KEYS, MIN_GOAL_LENGTH, LOADING_MESSAGES } from "../constants";
+import { useState } from "react";
+import { CATEGORIES, CATEGORY_KEYS, MIN_GOAL_LENGTH, TEMPLATE_CHIPS } from "../constants";
 
 // Giriş ekranı: kategori (persona) seçimi + hedef, "Planlarım" listesi ve
 // yükleme/hata durumları. "Devam Et" ile dinamik onboarding sihirbazına geçilir.
@@ -17,6 +18,16 @@ export default function CategoryIntro({
   onBackToIntro,
 }) {
   const mode = CATEGORIES[category] || CATEGORIES.general;
+  const [pulse, setPulse] = useState(false);
+
+  // Şablon çipi: kategori + hedefi doldurur, kısa bir parıltı animasyonu tetikler.
+  const applyTemplate = (chip) => {
+    onCategoryChange(chip.category);
+    onGoalChange(chip.goal);
+    setPulse(false);
+    requestAnimationFrame(() => setPulse(true));
+    setTimeout(() => setPulse(false), 650);
+  };
 
   if (stage === "loading") {
     return (
@@ -30,8 +41,8 @@ export default function CategoryIntro({
           <span className="text-2xl">{mode.emoji}</span>
         </div>
         <div>
-          <h2 className="text-[16.5px] font-bold tracking-tight mb-1.5 text-[#ECF2F4]">{LOADING_MESSAGES[2]}</h2>
-          <p className="text-[12.5px] text-[#55636F]">Uzman şapkası giyiliyor, biraz sürebilir...</p>
+          <h2 className="text-[16.5px] font-bold tracking-tight mb-1.5 text-[#ECF2F4]">Routinix odağını yapılandırıyor...</h2>
+          <p className="text-[12.5px] text-[#55636F]">Sana özel performans çerçeven hazırlanıyor, biraz sürebilir.</p>
         </div>
       </div>
     );
@@ -58,107 +69,128 @@ export default function CategoryIntro({
     );
   }
 
-  // stage === "intro"
+  // stage === "intro" — mobilde tek ekrana kilitli (justify-between), md'den serbest.
   return (
-    <div className="flex flex-col gap-7 animate-[fadeIn_0.35s_ease]">
-      {/* Kayıtlı planlar */}
-      {savedPlans.length > 0 && (
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#55636F] mb-3">Planlarım</p>
-          <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col h-full md:h-auto md:gap-8 animate-[fadeIn_0.35s_ease]">
+      {/* ÜST GRUP: kayıtlı planlar (kompakt strip) + hero başlık */}
+      <div className="shrink-0 flex flex-col gap-4 md:gap-6">
+        {savedPlans.length > 0 && (
+          <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 flex gap-2 overflow-x-auto no-scrollbar">
             {savedPlans.map((p) => {
               const cat = CATEGORIES[p.mode] || CATEGORIES.general;
               return (
                 <button
                   key={p.id}
                   onClick={() => onOpenSavedPlan(p.id)}
-                  className="w-full text-left rounded-2xl border p-4 flex items-center gap-3 transition-colors hover:bg-[#141B23]"
-                  style={{ borderColor: "#232C36", background: "#12181F" }}
+                  className="glass shrink-0 flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 hover:border-white/20 transition-colors card-glow"
                 >
-                  <span className="text-lg shrink-0">{cat.emoji}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[13.5px] font-semibold text-[#ECF2F4] truncate">{p.title || "Plan"}</div>
-                    <div className="text-[11.5px] text-[#8695A3] truncate">{cat.label}</div>
-                  </div>
-                  <span className="text-[15px] shrink-0" style={{ color: "#55636F" }}>›</span>
+                  <span className="text-[13px]">{cat.emoji}</span>
+                  <span className="text-[11.5px] font-medium text-[#C5D0D8] max-w-[130px] truncate">{p.title || "Plan"}</span>
                 </button>
               );
             })}
           </div>
-        </div>
-      )}
+        )}
 
-      <div>
-        <h1 className="text-[26px] font-bold leading-tight tracking-tight text-balance text-[#ECF2F4]">
-          Hedefini söyle, uzman
-          <br />
-          planını çıkarsın.
-        </h1>
-        <p className="mt-2 text-sm text-[#8695A3] leading-relaxed">Önce bir alan seç, sonra hedefini yaz.</p>
-      </div>
-
-      {/* Kategori kartları */}
-      <div className="grid grid-cols-2 gap-3">
-        {CATEGORY_KEYS.map((key) => {
-          const c = CATEGORIES[key];
-          const active = key === category;
-          return (
-            <button
-              key={key}
-              onClick={() => onCategoryChange(key)}
-              className="relative flex flex-col items-start gap-2 rounded-2xl p-4 text-left border transition-all duration-200"
+        <div>
+          <h1 className="text-2xl md:text-5xl font-bold leading-[1.12] tracking-tight text-balance">
+            <span
               style={{
-                borderColor: active ? c.accent : "#232C36",
-                background: active ? c.accentSoft : "#12181F",
-                boxShadow: active ? `0 0 0 1px ${c.accent}` : "none",
+                background: "linear-gradient(120deg, #EAF2FF 0%, #C99CFF 55%, #B26BFF 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
               }}
             >
-              <span className="text-2xl">{c.emoji}</span>
-              <span className="text-[13px] font-semibold leading-snug text-[#ECF2F4]">{c.label}</span>
-              <span className="text-[11px] text-[#8695A3] leading-snug">{c.tagline}</span>
-              {active && <span className="absolute top-3 right-3 w-2 h-2 rounded-full" style={{ background: c.accent }} />}
-            </button>
-          );
-        })}
+              Hedefini tanımla, disiplinini yapılandıralım.
+            </span>
+          </h1>
+          <p className="mt-2 md:mt-3 text-sm md:text-lg text-[#8695A3] leading-relaxed md:max-w-2xl">
+            Önce odak alanını seç, sonra hedefini net bir şekilde yaz.
+          </p>
+        </div>
       </div>
 
-      {/* Hedef */}
-      <div>
-        <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#55636F] mb-2">Hedefin</label>
+      {/* ORTA GRUP: 4'lü odak kartları — mobilde dikey alanı doldurur */}
+      <div className="flex-1 min-h-0 flex items-center md:flex-none md:block py-3 md:py-0">
+        <div className="w-full grid grid-cols-2 gap-2.5 md:gap-5">
+          {CATEGORY_KEYS.map((key) => {
+            const c = CATEGORIES[key];
+            const active = key === category;
+            return (
+              <button
+                key={key}
+                onClick={() => onCategoryChange(key)}
+                className="glass group relative flex flex-col items-start gap-1.5 md:gap-3 rounded-2xl p-3.5 md:p-6 text-left transition-all duration-200 card-glow"
+                style={{
+                  borderColor: active ? c.accent : "rgba(255,255,255,0.10)",
+                  boxShadow: active ? `0 0 0 1px ${c.accent}, 0 10px 40px -18px ${c.accent}` : "none",
+                }}
+              >
+                <span className="text-2xl md:text-3xl">{c.emoji}</span>
+                <span className="text-sm md:text-lg font-semibold leading-snug text-[#ECF2F4]">{c.label}</span>
+                <span className="text-[11px] md:text-sm text-[#8695A3] leading-snug line-clamp-2 md:line-clamp-none">
+                  {c.tagline}
+                </span>
+                {active && (
+                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full" style={{ background: c.accent, boxShadow: `0 0 8px ${c.accent}` }} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ALT GRUP: şablon çipleri + hedef giriş çubuğu + Başla */}
+      <div className="shrink-0 pt-2 md:pt-0">
+        {/* Akıllı şablon çipleri — yatay kaydırılabilir */}
+        <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 mb-2.5 flex gap-2 overflow-x-auto no-scrollbar">
+          {TEMPLATE_CHIPS.map((chip) => {
+            const c = CATEGORIES[chip.category] || CATEGORIES.general;
+            return (
+              <button
+                key={chip.label}
+                onClick={() => applyTemplate(chip)}
+                className="glass shrink-0 flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 text-[11.5px] font-medium text-[#C5D0D8] hover:text-[#ECF2F4] transition-colors card-glow"
+                style={{ borderColor: `${c.accent}33` }}
+              >
+                <span className="text-[12px]">{chip.emoji}</span>
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <label className="block text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.14em] text-[#55636F] mb-1.5 md:mb-2">
+          Hedefin
+        </label>
         <div
-          className="rounded-2xl border p-4 transition-colors duration-200"
-          style={{ borderColor: goalTooShort ? "#F0B37E" : "#232C36", background: "#12181F" }}
+          className={`input-glow glass flex items-center gap-2 rounded-2xl p-2 md:p-2.5 ${pulse ? "chip-fill-pulse" : ""}`}
+          style={{ borderColor: goalTooShort ? "#F0B37E" : "rgba(255,255,255,0.10)" }}
         >
-          <textarea
+          <input
+            type="text"
             value={goal}
             onChange={(e) => onGoalChange(e.target.value)}
-            placeholder={mode.placeholder}
-            rows={3}
-            className="w-full bg-transparent resize-none outline-none text-[15px] text-[#ECF2F4] placeholder:text-[#4A5761] leading-relaxed"
+            onKeyDown={(e) => e.key === "Enter" && canStart && onStart()}
+            placeholder="Örn: 3 ayda full-stack geliştirici ol..."
+            className="flex-1 min-w-0 bg-transparent outline-none text-sm md:text-base text-[#ECF2F4] placeholder:text-[#4A5761] px-2.5"
           />
+          <button
+            onClick={onStart}
+            disabled={!canStart}
+            className="shrink-0 rounded-xl px-5 md:px-7 py-2.5 md:py-3 text-sm md:text-base font-semibold transition-all duration-200 disabled:opacity-40"
+            style={{ background: canStart ? mode.accent : "#1A222B", color: canStart ? "#0b0c10" : "#55636F" }}
+          >
+            Başla
+          </button>
         </div>
         {goalTooShort && (
-          <p className="mt-2 text-[11.5px] font-medium" style={{ color: "#F0B37E" }}>
+          <p className="mt-1.5 text-[11px] font-medium" style={{ color: "#F0B37E" }}>
             Hedefini biraz daha açık yaz — en az {MIN_GOAL_LENGTH} karakter gerekli.
           </p>
         )}
-        <p className="mt-2.5 flex items-start gap-1.5 text-xs leading-relaxed text-slate-400">
-          <span className="shrink-0">💡</span>
-          <span>
-            Devam edince yapay zeka sana <b>hedefine özel birkaç soru</b> soracak; cevaplarına göre kişiselleştirilmiş
-            bir plan üretecek.
-          </span>
-        </p>
       </div>
-
-      <button
-        onClick={onStart}
-        disabled={!canStart}
-        className="w-full rounded-2xl py-3.5 text-[15px] font-semibold transition-all duration-200 disabled:opacity-40"
-        style={{ background: canStart ? mode.accent : "#1A222B", color: canStart ? "#0A0E13" : "#55636F" }}
-      >
-        Devam Et
-      </button>
     </div>
   );
 }

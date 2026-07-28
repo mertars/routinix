@@ -11,6 +11,7 @@ import { supabase } from "../lib/supabaseClient";
 //     title text,
 //     summary text,
 //     mode text,                       -- "software" | "fitness" | "vacation" | "general"
+//     total_days int,                  -- planın kullanıcı hedefine göre toplam gün sayısı
 //     created_at timestamptz default now()
 //   );
 //
@@ -31,6 +32,8 @@ import { supabase } from "../lib/supabaseClient";
 //     day_number int not null,
 //     title text not null,
 //     detail text,
+//     duration_min int,               -- görevin tahmini süresi (dk)
+//     priority text,                  -- "Yüksek" | "Orta" | "Düşük"
 //     estimated_cost text,
 //     map_search_query text,
 //     is_completed boolean default false,
@@ -52,6 +55,8 @@ function flattenWeek(weekDays, { planId, userId, weekNumber }) {
         // title NOT NULL olabilir — asla boş bırakma.
         title: (t.title ?? "").toString().trim() || "İsimsiz görev",
         detail: t.detail ?? t.description ?? null,
+        duration_min: t.duration_min ?? t.minutes ?? null,
+        priority: t.priority ?? null,
         estimated_cost: t.estimated_cost ?? null,
         map_search_query: t.map_search_query ?? null,
         is_completed: false,
@@ -77,6 +82,7 @@ export async function savePlanToSupabase(aiOutput, userId, mode) {
       // title NOT NULL olabilir — güvenli varsayılan ver.
       title: (aiOutput.plan_title ?? aiOutput.title ?? "").toString().trim() || "İsimsiz Plan",
       summary: aiOutput.plan_summary ?? aiOutput.summary ?? null,
+      total_days: Number.isFinite(Number(aiOutput.total_days)) ? Number(aiOutput.total_days) : null,
     })
     .select()
     .single();
@@ -132,6 +138,38 @@ export async function saveWeekTasks(planId, userId, weekNumber, weekTasks) {
 export async function setTaskCompleted(taskId, isCompleted) {
   const { error } = await supabase.from("tasks").update({ is_completed: isCompleted }).eq("id", taskId);
   if (error) throw error;
+}
+
+// Bir planı siler. FK'lar ON DELETE CASCADE olduğu için ilgili routines/tasks
+// satırları da otomatik silinir.
+export async function deletePlan(planId) {
+  const { error } = await supabase.from("plans").delete().eq("id", planId);
+  if (error) throw error;
+}
+
+// "Bugünün Görevleri" popover'ı için: kullanıcının TÜM planlarını + tüm
+// rutinlerini + tüm görevlerini 3 sorguda çekip plana göre gruplar.
+// Döner: [{ ...plan, routines: [...], tasks: [...] }]
+export async function fetchDashboardData(userId) {
+  const [plansRes, routinesRes, tasksRes] = await Promise.all([
+    supabase.from("plans").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+    supabase.from("routines").select("*").eq("user_id", userId),
+    supabase.from("tasks").select("*").eq("user_id", userId).order("week_number", { ascending: true }),
+  ]);
+  if (plansRes.error) throw plansRes.error;
+  if (routinesRes.error) throw routinesRes.error;
+  if (tasksRes.error) throw tasksRes.error;
+
+  const routinesByPlan = {};
+  for (const r of routinesRes.data || []) (routinesByPlan[r.plan_id] = routinesByPlan[r.plan_id] || []).push(r);
+  const tasksByPlan = {};
+  for (const t of tasksRes.data || []) (tasksByPlan[t.plan_id] = tasksByPlan[t.plan_id] || []).push(t);
+
+  return (plansRes.data || []).map((p) => ({
+    ...p,
+    routines: routinesByPlan[p.id] || [],
+    tasks: tasksByPlan[p.id] || [],
+  }));
 }
 
 // Kullanıcının kayıtlı planlarını (özet) getirir — "Planlarım" listesi için.

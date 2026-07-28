@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { MONO_FONT, categoryOf } from "../constants";
+import Accordion from "./Accordion";
 
-// Rutin sıklık anahtarını (frequency) minik ikon + Türkçe etikete çevirir.
-// "weekly" gibi teknik metni ham göstermek yerine döngü ikonuyla görselleştirir.
+// Rutin sıklık anahtarını minik ikon + Türkçe etikete çevirir.
 const FREQUENCY_META = {
   daily: { icon: "🔆", label: "Günlük" },
   weekly: { icon: "🔁", label: "Haftalık" },
@@ -13,9 +14,50 @@ function frequencyMeta(freq) {
   return FREQUENCY_META[key] || { icon: "🔁", label: freq || "Düzenli" };
 }
 
-// Aktif plan ekranı: üstte sabit başlık + genel ilerleme, altında genel
-// rutinler ve hafta hafta (gün → görev) tam açık liste. Görevler checkbox ile
-// tamamlanır (DB'ye yansır); en altta "Sonraki Haftayı Oluştur" ile lazy-load.
+const PRIORITY_STYLE = {
+  Yüksek: { color: "#FF6E92", bg: "rgba(244,64,107,0.14)" },
+  Orta: { color: "#F0B37E", bg: "rgba(240,179,126,0.14)" },
+  Düşük: { color: "#6FCF97", bg: "rgba(111,207,151,0.14)" },
+};
+
+function openInMaps(query) {
+  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+// Dairesel ilerleme halkalı gün rozeti (conic-gradient mor→kırmızı dolum).
+function DayCircle({ day, pct, active, accent, accentSoft, onClick }) {
+  return (
+    <button onClick={onClick} className="shrink-0 flex flex-col items-center gap-1.5 card-glow" aria-label={`${day}. gün`}>
+      <div
+        className="w-[54px] h-[54px] rounded-full p-[3px]"
+        style={{ background: `conic-gradient(from -90deg, #B26BFF, #F4406B ${pct}%, #23262F ${pct}% 100%)` }}
+      >
+        <div
+          className="w-full h-full rounded-full flex items-center justify-center transition-colors"
+          style={{
+            background: active ? accentSoft : "#12181F",
+            border: active ? `1px solid ${accent}` : "1px solid transparent",
+            boxShadow: active ? `0 0 14px -4px ${accent}` : "none",
+          }}
+        >
+          <span
+            className="text-[15px] font-bold"
+            style={{ color: active ? "#ECF2F4" : "#C5D0D8", fontFamily: MONO_FONT }}
+          >
+            {day}
+          </span>
+        </div>
+      </div>
+      <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: active ? accent : "#55636F" }}>
+        Gün
+      </span>
+    </button>
+  );
+}
+
+// Aktif plan ekranı: sabit başlık + genel ilerleme, rutinler (accordion), takvim
+// rozet şeridi (dolum halkalı + kilitli günler) ve seçili günün görev kartları.
 export default function PlanBoard({
   plan,
   routines,
@@ -27,26 +69,65 @@ export default function PlanBoard({
   nextWeekError,
   onToggleTask,
   onLoadNextWeek,
+  onPrint,
   onBack,
 }) {
+  const [activeDay, setActiveDay] = useState(null);
   if (!plan) return null;
+
   const cat = categoryOf(plan.mode);
   const accent = cat.accent;
   const soft = cat.accentSoft;
   const isVacation = plan.mode === "vacation";
 
-  const openInMaps = (query) => {
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+  // Yüklü (AI/DB) günleri gün no → gün verisi eşlemesine çevir.
+  const loadedDays = weeks
+    .flatMap((w) => w.days.map((d) => ({ ...d, weekNumber: w.weekNumber })))
+    .sort((a, b) => a.dayNumber - b.dayNumber);
+  const loadedByDay = new Map(loadedDays.map((d) => [d.dayNumber, d]));
+  const maxLoadedDay = loadedDays.length ? loadedDays[loadedDays.length - 1].dayNumber : 0;
+
+  // Kullanıcının hedefine göre toplam gün sayısı — takvim TAM olarak bu kadar
+  // kutucuk üretir. Sabit "8 gün / +7 kilitli" mantığı yok. total_days yoksa
+  // (eski planlar) yüklü son güne düşer, o da yoksa 7.
+  const targetDays = Number(plan.total_days) || Math.max(maxLoadedDay, 7);
+
+  // Tam targetDays kadar hücre: yüklüyse gerçek veri, değilse kilitli placeholder.
+  // (Veri fazladan gün içeriyorsa Map araması targetDays'i aşmadığı için doğal kesilir.)
+  const calendar = Array.from({ length: targetDays }, (_, i) => {
+    const dayNumber = i + 1;
+    const loaded = loadedByDay.get(dayNumber);
+    return loaded ? { ...loaded, locked: false } : { dayNumber, tasks: [], locked: true };
+  });
+  const firstLockedDay = maxLoadedDay + 1; // yükleme göstergesi için
+
+  // Aktif gün: seçili olan hâlâ yüklüyse onu, değilse ilk yüklü günü kullan.
+  const effectiveActiveDay =
+    loadedDays.find((d) => d.dayNumber === activeDay)?.dayNumber ?? loadedDays[0]?.dayNumber ?? null;
+  const activeDayObj = loadedDays.find((d) => d.dayNumber === effectiveActiveDay) || null;
+
+  const dayPct = (d) => {
+    const total = d.tasks.length;
+    if (!total) return 0;
+    return Math.round((d.tasks.filter((t) => t.is_completed).length / total) * 100);
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-[fadeIn_0.4s_ease]">
+    <div className="flex flex-col gap-5 animate-[fadeIn_0.4s_ease]">
       {/* Başlık + genel ilerleme */}
-      <div>
-        <button onClick={onBack} className="text-[12px] font-medium text-[#8695A3] hover:text-[#ECF2F4] transition-colors mb-3">
-          ‹ Ana Sayfa
-        </button>
+      <div className="glass rounded-2xl p-5" style={{ borderColor: `${accent}33` }}>
+        <div className="flex items-center justify-between mb-3">
+          <button onClick={onBack} className="text-[12px] font-medium text-[#8695A3] hover:text-[#ECF2F4] transition-colors">
+            ‹ Ana Sayfa
+          </button>
+          <button
+            onClick={onPrint}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 h-8 text-[11.5px] font-semibold transition-colors"
+            style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}44` }}
+          >
+            🖨️ PDF / Yazdır
+          </button>
+        </div>
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">{cat.emoji}</span>
           <h1 className="text-[18px] font-bold leading-snug text-balance text-[#ECF2F4]">{plan.title || "Planım"}</h1>
@@ -62,138 +143,188 @@ export default function PlanBoard({
           </span>
         </div>
         <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#1A222B" }}>
-          <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${overallPct}%`, background: accent }} />
+          <div
+            className="h-full rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${overallPct}%`, background: "linear-gradient(90deg, #B26BFF, #F4406B)" }}
+          />
         </div>
       </div>
 
-      {/* Genel rutinler — modern ikonlu kartlar */}
+      {/* Genel rutinler — accordion */}
       {routines.length > 0 && (
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] mb-3" style={{ color: accent }}>
-            Genel Rutinler
-          </p>
+        <Accordion title="Genel Rutinler" icon="🔁" accent={accent} defaultOpen>
           <div className="flex flex-col gap-2.5">
             {routines.map((r, i) => {
               const fm = frequencyMeta(r.frequency);
               return (
                 <div
                   key={r.id || i}
-                  className="rounded-2xl border p-3.5 flex items-start gap-3"
-                  style={{ borderColor: `${accent}33`, background: "#12181F" }}
+                  className="rounded-xl border p-3 flex items-start gap-3"
+                  style={{ borderColor: `${accent}22`, background: "#0F151B" }}
                 >
-                  {/* Süreklilik ikonu (döngü) */}
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-[15px] shrink-0"
-                    style={{ background: soft }}
-                    aria-hidden="true"
-                  >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[14px] shrink-0" style={{ background: soft }}>
                     {fm.icon}
                   </div>
                   <div className="flex-1 min-w-0">
                     <span
-                      className="inline-flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-[0.06em] px-2 py-0.5 rounded-full mb-1.5"
+                      className="inline-block text-[9px] font-bold uppercase tracking-[0.06em] px-2 py-0.5 rounded-full mb-1"
                       style={{ background: soft, color: accent }}
                     >
                       {fm.label}
                     </span>
-                    <p className="text-[13px] text-[#C5D0D8] leading-relaxed">{r.content}</p>
+                    <p className="text-[12.5px] text-[#C5D0D8] leading-relaxed">{r.content}</p>
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
+        </Accordion>
       )}
 
-      {/* Haftalar */}
-      {weeks.map((w) => (
-        <div key={w.weekNumber} className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <span
-              className="text-[10.5px] font-bold px-2.5 py-1 rounded-full"
-              style={{ background: soft, color: accent, fontFamily: MONO_FONT }}
-            >
-              {w.weekNumber}. HAFTA
+      {/* Takvim rozet şeridi */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#55636F]">
+            Performans Çerçevesi · {targetDays} gün
+          </p>
+          {nextWeekError && (
+            <span className="text-[10.5px] font-medium" style={{ color: "#F0827A" }}>
+              {nextWeekError}
             </span>
-          </div>
+          )}
+        </div>
+        {/* Tam olarak targetDays kadar kutucuk: yüklü günler dolu, kalanlar kilitli. */}
+        <div className="edge-fade-x flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-5 px-5" style={{ scrollSnapType: "x proximity" }}>
+          {calendar.map((cell) =>
+            cell.locked ? (
+              <button
+                key={`lock-${cell.dayNumber}`}
+                onClick={onLoadNextWeek}
+                disabled={loadingNextWeek}
+                className="shrink-0 flex flex-col items-center gap-1.5 disabled:opacity-70"
+                aria-label={`${cell.dayNumber}. gün kilitli — sonraki haftayı aç`}
+              >
+                <div className="frost-lock w-[54px] h-[54px] rounded-full flex items-center justify-center">
+                  <span className="text-[15px]" style={{ filter: "grayscale(0.3)", opacity: 0.85 }}>
+                    {loadingNextWeek && cell.dayNumber === firstLockedDay ? "⏳" : "🔒"}
+                  </span>
+                </div>
+                <span className="text-[9px] font-semibold" style={{ color: "#55636F", fontFamily: MONO_FONT }}>
+                  {cell.dayNumber}
+                </span>
+              </button>
+            ) : (
+              <DayCircle
+                key={cell.dayNumber}
+                day={cell.dayNumber}
+                pct={dayPct(cell)}
+                active={cell.dayNumber === effectiveActiveDay}
+                accent={accent}
+                accentSoft={soft}
+                onClick={() => setActiveDay(cell.dayNumber)}
+              />
+            )
+          )}
+        </div>
+        <p className="mt-2.5 text-[11px] text-[#55636F] leading-relaxed">
+          🔒 Kilitli güne dokunarak bir sonraki haftanın stratejisini aç.
+        </p>
+      </div>
 
-          {w.days.map((d) => (
-            <div key={d.dayNumber} className="rounded-2xl border p-4" style={{ borderColor: "#232C36", background: "#12181F" }}>
-              <p className="text-[12px] font-semibold uppercase tracking-[0.06em] mb-3" style={{ color: "#55636F" }}>
-                {d.dayNumber}. Gün
-              </p>
-              <div className="flex flex-col gap-2.5">
-                {d.tasks.map((t) => (
-                  <div
-                    key={t.id}
-                    className="rounded-xl border p-3.5"
-                    style={{ borderColor: t.is_completed ? "#1E2731" : "#232C36", background: "#0F151B" }}
+      {/* Günün Stratejik Adımları */}
+      {activeDayObj && (
+        <div key={effectiveActiveDay} className="day-reveal flex flex-col gap-2.5">
+          {/* Aktif günün arkasından sızan hafif neon aura */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span
+                className="text-[10.5px] font-bold px-2.5 py-1 rounded-full"
+                style={{ background: soft, color: accent, fontFamily: MONO_FONT }}
+              >
+                {effectiveActiveDay}. GÜN
+              </span>
+              <span className="text-[11px] text-[#55636F]" style={{ fontFamily: MONO_FONT }}>
+                {activeDayObj.weekNumber}. hafta
+              </span>
+            </div>
+          </div>
+          <h2 className="text-[15px] font-bold tracking-tight text-[#ECF2F4] -mt-0.5">Günün Stratejik Adımları</h2>
+
+          {activeDayObj.tasks.length > 0 && activeDayObj.tasks.every((t) => t.is_completed) && (
+            <div
+              className="rounded-xl border px-4 py-3 text-[12.5px] font-medium leading-relaxed"
+              style={{ borderColor: "rgba(46,217,163,0.3)", background: "rgba(46,217,163,0.08)", color: "#7DE9C3" }}
+            >
+              ✅ Bugünkü disiplin halkan tamamlandı. Zarif bir tutarlılık — devam et.
+            </div>
+          )}
+
+          {activeDayObj.tasks.map((t) => {
+            const pr = t.priority ? PRIORITY_STYLE[t.priority] : null;
+            return (
+              <div
+                key={t.id}
+                className="rounded-2xl border p-3.5 card-glow"
+                style={{ borderColor: t.is_completed ? "#1E2731" : `${accent}44`, background: "#12181F" }}
+              >
+                <div className="flex items-start gap-3">
+                  <button
+                    onClick={() => onToggleTask(t.id, !t.is_completed)}
+                    className="w-6 h-6 rounded-full border flex items-center justify-center text-[11px] shrink-0 mt-0.5"
+                    style={{
+                      borderColor: t.is_completed ? "#2ED9A3" : "#3A4653",
+                      background: t.is_completed ? "rgba(46,217,163,0.16)" : "transparent",
+                      color: "#2ED9A3",
+                    }}
+                    aria-label="Tamamlandı olarak işaretle"
                   >
-                    <div className="flex items-start gap-3">
-                      <button
-                        onClick={() => onToggleTask(t.id, !t.is_completed)}
-                        className="w-6 h-6 rounded-full border flex items-center justify-center text-[11px] shrink-0 mt-0.5"
-                        style={{
-                          borderColor: t.is_completed ? "#2ED9A3" : "#3A4653",
-                          background: t.is_completed ? "rgba(46,217,163,0.16)" : "transparent",
-                          color: "#2ED9A3",
-                        }}
-                        aria-label="Tamamlandı olarak işaretle"
-                      >
-                        {t.is_completed ? "✓" : ""}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className="text-[14px] font-semibold leading-snug text-balance"
-                          style={{ color: t.is_completed ? "#55636F" : "#ECF2F4", textDecoration: t.is_completed ? "line-through" : "none" }}
-                        >
-                          {t.title}
-                        </p>
-                        {t.detail && <p className="text-[12px] text-[#8695A3] leading-relaxed mt-1">{t.detail}</p>}
-                        {(t.estimated_cost || (isVacation && t.map_search_query)) && (
-                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                            {t.estimated_cost && (
-                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#1A222B", color: "#F0B37E" }}>
-                                💰 {t.estimated_cost}
-                              </span>
-                            )}
-                          </div>
+                    {t.is_completed ? "✓" : ""}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="text-[14px] font-semibold leading-snug text-balance"
+                      style={{ color: t.is_completed ? "#55636F" : "#ECF2F4", textDecoration: t.is_completed ? "line-through" : "none" }}
+                    >
+                      {t.title}
+                    </p>
+                    {t.detail && <p className="text-[12px] text-[#8695A3] leading-relaxed mt-1">{t.detail}</p>}
+
+                    {/* Şık rozetler: süre / öncelik / bütçe */}
+                    {(t.duration_min || pr || t.estimated_cost) && (
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        {t.duration_min ? (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#1A222B", color: "#9BB0C0" }}>
+                            ⏱ {t.duration_min} dk
+                          </span>
+                        ) : null}
+                        {pr && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: pr.bg, color: pr.color }}>
+                            {t.priority}
+                          </span>
+                        )}
+                        {t.estimated_cost && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#1A222B", color: "#F0B37E" }}>
+                            💰 {t.estimated_cost}
+                          </span>
                         )}
                       </div>
-                    </div>
-                    {isVacation && t.map_search_query && (
-                      <button
-                        onClick={() => openInMaps(t.map_search_query)}
-                        className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-semibold transition-colors"
-                        style={{ background: soft, color: accent }}
-                      >
-                        📍 Konumu Haritada Aç
-                      </button>
                     )}
                   </div>
-                ))}
+                </div>
+                {isVacation && t.map_search_query && (
+                  <button
+                    onClick={() => openInMaps(t.map_search_query)}
+                    className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-semibold transition-colors"
+                    style={{ background: soft, color: accent }}
+                  >
+                    📍 Konumu Haritada Aç
+                  </button>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      ))}
-
-      {/* Lazy-load: sonraki hafta */}
-      <div className="flex flex-col gap-2">
-        {nextWeekError && (
-          <p className="text-[12px] font-medium text-center" style={{ color: "#F0827A" }}>
-            {nextWeekError}
-          </p>
-        )}
-        <button
-          onClick={onLoadNextWeek}
-          disabled={loadingNextWeek}
-          className="w-full rounded-2xl py-3.5 text-[14px] font-semibold border transition-colors disabled:opacity-50"
-          style={{ borderColor: accent, color: accent, background: soft }}
-        >
-          {loadingNextWeek ? "Sonraki hafta hazırlanıyor..." : `+ ${weeks.length + 1}. Haftayı Oluştur`}
-        </button>
-      </div>
+      )}
     </div>
   );
 }
