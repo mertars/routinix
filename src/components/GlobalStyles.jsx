@@ -15,9 +15,25 @@ export default function GlobalStyles() {
         from { transform: translateX(100%); }
         to { transform: translateX(0); }
       }
+      @keyframes slideInDrawerLeft {
+        from { transform: translateX(-100%); }
+        to { transform: translateX(0); }
+      }
       @keyframes slideUpSheet {
         from { transform: translateY(100%); }
         to { transform: translateY(0); }
+      }
+      @keyframes slideDownSheet {
+        from { transform: translateY(0); opacity: 1; }
+        to { transform: translateY(100%); opacity: 0.4; }
+      }
+      @keyframes modalPopIn {
+        from { opacity: 0; transform: scale(0.96) translateY(8px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      @keyframes modalPopOut {
+        from { opacity: 1; transform: scale(1) translateY(0); }
+        to { opacity: 0; transform: scale(0.96) translateY(8px); }
       }
       @keyframes auraPulse {
         0%, 100% { opacity: 0.55; }
@@ -29,6 +45,7 @@ export default function GlobalStyles() {
       }
 
       .drawer-panel { animation: slideInDrawer 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
+      .drawer-panel-left { animation: slideInDrawerLeft 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
       .focus-sheet { animation: slideUpSheet 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
       .day-reveal { animation: dayReveal 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
 
@@ -113,6 +130,61 @@ export default function GlobalStyles() {
       .typing-dot:nth-child(2) { animation-delay: 0.15s; }
       .typing-dot:nth-child(3) { animation-delay: 0.3s; }
 
+      /* --- Duyarlı panel (FocusSidePanel.jsx): mobilde alttan açılan "Bottom
+         Sheet", md'den itibaren sol/sağ kenardan açılan yan "Drawer/Sidebar"a
+         dönüşür. Konum + animasyon aynı anda breakpoint'e göre değişir. --- */
+      .focus-panel {
+        position: fixed;
+        z-index: 95;
+        display: flex;
+        flex-direction: column;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-radius: 1.5rem 1.5rem 0 0;
+        max-height: 75vh;
+        animation: slideUpSheet 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+      }
+      @media (min-width: 768px) {
+        .focus-panel {
+          left: auto;
+          right: auto;
+          top: 0;
+          bottom: 0;
+          height: 100%;
+          max-height: none;
+          width: 340px;
+          border-radius: 0;
+        }
+        .focus-panel--right {
+          right: 0;
+          animation: slideInDrawer 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        .focus-panel--left {
+          left: 0;
+          animation: slideInDrawerLeft 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+      }
+
+      /* --- Görev Seçim Penceresi (TaskPickerModal.jsx): mobilde alttan açılan
+         Bottom Sheet, md'den itibaren ekranın ORTASINDA açılan merkezi Modal
+         (yan panel DEĞİL). Giriş + çıkış (otomatik kapanma) animasyonu ikisi
+         de breakpoint'e duyarlı. --- */
+      .task-picker-modal {
+        animation: slideUpSheet 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      }
+      .task-picker-modal-exit {
+        animation: slideDownSheet 0.2s ease-in forwards;
+      }
+      @media (min-width: 768px) {
+        .task-picker-modal {
+          animation: modalPopIn 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        .task-picker-modal-exit {
+          animation: modalPopOut 0.18s ease-in forwards;
+        }
+      }
+
       /* --- Karta tıklayınca (aktif) hafif neon glow --- */
       .card-glow { transition: box-shadow 0.2s ease, transform 0.12s ease; }
       .card-glow:active {
@@ -192,7 +264,7 @@ export default function GlobalStyles() {
 
       @media (prefers-reduced-motion: reduce) {
         .motion-safe\\:animate-spin { animation: none !important; }
-        .drawer-panel, .focus-sheet, .day-reveal, .neon-strip, .pop-in, .chip-fill-pulse, .check-glow { animation: none !important; }
+        .drawer-panel, .drawer-panel-left, .focus-sheet, .focus-panel, .task-picker-modal, .task-picker-modal-exit, .day-reveal, .neon-strip, .pop-in, .chip-fill-pulse, .check-glow { animation: none !important; }
         .bg-blob--violet, .bg-blob--orange { animation: none !important; }
         .accordion-body { transition: none !important; }
       }

@@ -1,3 +1,4 @@
+import { Timer } from "lucide-react";
 import { MONO_FONT } from "../constants";
 
 // Sadece bu menüde kullanılan küçük toggle atomu.
@@ -38,6 +39,7 @@ export default function DrawerMenu({
   onOpenToday,
   onOpenRoutines,
   onOpenPlans,
+  onOpenPomodoro,
 }) {
   if (!open) return null;
 
@@ -48,6 +50,7 @@ export default function DrawerMenu({
     { key: "today", emoji: "⚡", label: "Bugünün Görevleri", color: "#C99CFF", onClick: onOpenToday, always: false },
     { key: "routines", emoji: "🔁", label: "Rutinler", color: "#7DE9C3", onClick: onOpenRoutines, always: false },
     { key: "plans", emoji: "📂", label: "Planlarım", color: "#8FA0FF", onClick: onOpenPlans, always: false },
+    { key: "pomodoro", icon: <Timer className="w-4 h-4" strokeWidth={2.25} />, label: "Pomodoro & Focus", color: "#FB7185", onClick: onOpenPomodoro, always: true },
   ].filter((b) => b.always || user);
 
   return (
@@ -106,7 +109,13 @@ export default function DrawerMenu({
                   className="flex flex-col items-start gap-1 rounded-xl p-3 text-left transition-colors card-glow"
                   style={{ background: `${b.color}14`, border: `1px solid ${b.color}40` }}
                 >
-                  <span className="text-[16px]">{b.emoji}</span>
+                  {b.icon ? (
+                    <span className="text-[16px]" style={{ color: b.color }}>
+                      {b.icon}
+                    </span>
+                  ) : (
+                    <span className="text-[16px]">{b.emoji}</span>
+                  )}
                   <span className="text-[11.5px] font-semibold leading-snug" style={{ color: b.color }}>
                     {b.label}
                   </span>

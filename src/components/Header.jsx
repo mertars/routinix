@@ -1,3 +1,4 @@
+import { Timer } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 // ☀️/🌙 Animasyonlu tema değiştirici — güneş/ay ikonu kayarak/dönerek geçiş yapar.
@@ -40,6 +41,8 @@ export default function Header({
   onHubClick,
   plansActive,
   onPlansClick,
+  pomodoroActive,
+  onPomodoroClick,
   onAuthClick,
   onSignOut,
   onMenuToggle,
@@ -138,6 +141,21 @@ export default function Header({
                 </button>
               </>
             )}
+
+            {/* Pomodoro & Focus Studio — herkese açık (Şablon Keşfet gibi, oturum gerektirmez) */}
+            <button
+              onClick={onPomodoroClick}
+              className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
+              style={{
+                background: pomodoroActive ? "rgba(251,113,133,0.20)" : "rgba(251,113,133,0.10)",
+                color: "#FB7185",
+                border: "1px solid rgba(251,113,133,0.40)",
+                boxShadow: pomodoroActive ? "0 0 16px -4px rgba(251,113,133,0.7)" : "0 0 10px -5px rgba(251,113,133,0.6)",
+              }}
+            >
+              <Timer className="w-[13px] h-[13px]" strokeWidth={2.25} />
+              Pomodoro
+            </button>
           </div>
 
           {user ? (

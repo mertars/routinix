@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Bot } from "lucide-react";
 import { categoryOf } from "../constants";
 import { fetchDashboardData } from "../services/planService";
 import { callCoachAction } from "../services/coachActionService";
@@ -57,7 +58,8 @@ function TypingBubble() {
   );
 }
 
-// 🔮 Yüzen AI Koç widget'ı — sağ alt köşede sabit tetikleyici + sağdan açılan
+// Yüzen AI Koç widget'ı (lucide "Bot" ikonu, mor→indigo→cyan gradient) — sağ
+// alt köşede sabit tetikleyici + sağdan açılan
 // glassmorphism sohbet çekmecesi. Hazır aksiyon çipleri VE serbest metin
 // ikisi de usePlanStudio üzerinden gerçek Supabase mutasyonları tetikler.
 // Kullanıcının TÜM planları arasında bir "hedef plan" seçilebilir (dropdown);
@@ -180,8 +182,13 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
 
   return (
     <>
-      {/* Yüzen tetikleyici baloncuk */}
-      <div className="fixed bottom-6 right-6 z-50">
+      {/* Yüzen tetikleyici baloncuk — z-40: DrawerMenu (z-50) açıkken onun
+          altında kalsın (üstüne binip tıklamayı engellemesin); alt boşluk
+          safe-area'ya duyarlı (iOS home-indicator/gesture bar payı). */}
+      <div
+        className="fixed z-40"
+        style={{ right: "1.5rem", bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
+      >
         <div className="group relative flex items-center justify-end">
           <div
             className="mr-3 pointer-events-none opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap rounded-xl px-3.5 py-2 text-[12.5px] font-semibold"
@@ -202,10 +209,10 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
           <button
             onClick={() => setOpen((v) => !v)}
             aria-label="AI Koç'u aç"
-            className="relative w-14 h-14 rounded-full flex items-center justify-center bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-500 ring-2 ring-violet-500/50 animate-pulse"
-            style={{ boxShadow: "0 10px 34px -10px rgba(124,58,237,0.75)" }}
+            className="relative w-14 h-14 rounded-full flex items-center justify-center bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-500 ring-2 ring-violet-500/50 animate-pulse transition-transform duration-200 hover:scale-105 active:scale-95"
+            style={{ boxShadow: "0 10px 34px -10px rgba(124,58,237,0.75), 0 0 24px -6px rgba(124,58,237,0.55)" }}
           >
-            <span className="text-[22px] leading-none">🔮</span>
+            <Bot className="w-6 h-6 text-white drop-shadow-sm" strokeWidth={2.25} />
             {/* Canlı durum noktası */}
             <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60" style={{ background: "#2ED9A3" }} />
@@ -238,7 +245,7 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
                   className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-500"
                   style={{ boxShadow: "0 0 14px -4px rgba(124,58,237,0.7)" }}
                 >
-                  <span className="text-[16px]">🔮</span>
+                  <Bot className="w-[18px] h-[18px] text-white" strokeWidth={2.25} />
                 </div>
                 <div className="text-[14px] font-bold text-slate-900 dark:text-slate-100 shrink-0">AI Koç</div>
               </div>

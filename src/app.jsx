@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Timer } from "lucide-react";
 import { STAGE_INTRO, STAGE_WIZARD, STAGE_LOADING, STAGE_ERROR, STAGE_PLAN } from "./constants";
 import usePlanStudio from "./usePlanStudio";
 import useAuth from "./useAuth";
@@ -16,6 +17,7 @@ import PrintablePlan from "./components/PrintablePlan";
 import TemplateHub from "./components/TemplateHub";
 import MyPlansHub from "./components/MyPlansHub";
 import AiCoachWidget from "./components/AiCoachWidget";
+import PomodoroStudio from "./components/PomodoroStudio";
 import CategoryIntro from "./components/CategoryIntro";
 import OnboardingWizard from "./components/OnboardingWizard";
 import PlanBoard from "./components/PlanBoard";
@@ -31,41 +33,51 @@ export default function App() {
   const [routinesOpen, setRoutinesOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
   const [plansOpen, setPlansOpen] = useState(false);
+  const [pomodoroOpen, setPomodoroOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [printRange, setPrintRange] = useState(Infinity);
   const ps = usePlanStudio({ user: auth.user, onRequireAuth: () => setAuthOpen(true) });
   const { stage, mode } = ps;
 
-  // Bugün / Rutinler / Şablon Keşfet / Planlarım panellerinden aynı anda yalnızca
-  // biri açık olur; tetiklendiklerinde hamburger menüsü de kapanır (mobilde
-  // Hızlı Erişim'den açılan paneller için gerekli, masaüstünde zararsız).
-  const toggleToday = () => {
+  // Bugün / Rutinler / Şablon Keşfet / Planlarım / Pomodoro panellerinden aynı
+  // anda yalnızca biri açık olur; tetiklendiklerinde hamburger menüsü de kapanır
+  // (mobilde Hızlı Erişim'den açılan paneller için gerekli, masaüstünde zararsız).
+  const closeAllPanels = () => {
+    setTodayOpen(false);
     setRoutinesOpen(false);
     setHubOpen(false);
     setPlansOpen(false);
+    setPomodoroOpen(false);
+  };
+  const toggleToday = () => {
+    const next = !todayOpen;
+    closeAllPanels();
     ps.setMenuOpen(false);
-    setTodayOpen((v) => !v);
+    setTodayOpen(next);
   };
   const toggleRoutines = () => {
-    setTodayOpen(false);
-    setHubOpen(false);
-    setPlansOpen(false);
+    const next = !routinesOpen;
+    closeAllPanels();
     ps.setMenuOpen(false);
-    setRoutinesOpen((v) => !v);
+    setRoutinesOpen(next);
   };
   const toggleHub = () => {
-    setTodayOpen(false);
-    setRoutinesOpen(false);
-    setPlansOpen(false);
+    const next = !hubOpen;
+    closeAllPanels();
     ps.setMenuOpen(false);
-    setHubOpen((v) => !v);
+    setHubOpen(next);
   };
   const togglePlans = () => {
-    setTodayOpen(false);
-    setRoutinesOpen(false);
-    setHubOpen(false);
+    const next = !plansOpen;
+    closeAllPanels();
     ps.setMenuOpen(false);
-    setPlansOpen((v) => !v);
+    setPlansOpen(next);
+  };
+  const togglePomodoro = () => {
+    const next = !pomodoroOpen;
+    closeAllPanels();
+    ps.setMenuOpen(false);
+    setPomodoroOpen(next);
   };
 
   // Dokunsal geri bildirim: herhangi bir butona basıldığında hafif mikro titreşim
@@ -112,6 +124,8 @@ export default function App() {
           onHubClick={toggleHub}
           plansActive={plansOpen}
           onPlansClick={togglePlans}
+          pomodoroActive={pomodoroOpen}
+          onPomodoroClick={togglePomodoro}
           onAuthClick={() => setAuthOpen(true)}
           onSignOut={() => setLogoutConfirmOpen(true)}
           onMenuToggle={() => ps.setMenuOpen((v) => !v)}
@@ -137,6 +151,7 @@ export default function App() {
           onOpenToday={toggleToday}
           onOpenRoutines={toggleRoutines}
           onOpenPlans={togglePlans}
+          onOpenPomodoro={togglePomodoro}
           onSignOut={() => {
             ps.setMenuOpen(false);
             setLogoutConfirmOpen(true);
@@ -249,8 +264,14 @@ export default function App() {
         onClose={() => setPlansOpen(false)}
       />
 
-      {/* AI Koç — yalnızca aktif bir plan açıkken (aksiyonları o planın görevlerini günceller) */}
-      {ps.dbPlan && (
+      {/* Pomodoro & Focus Studio — herkese açık (Şablon Keşfet gibi) */}
+      <PomodoroStudio open={pomodoroOpen} userId={auth.user?.id} onClose={() => setPomodoroOpen(false)} />
+
+      {/* AI Koç — yalnızca PlanBoard ekranındayken (yalnızca `dbPlan` kontrolü
+          yetersizdi: "‹ Ana Sayfa" ile intro'ya dönünce dbPlan temizlenmediği
+          için widget CategoryIntro/OnboardingWizard'ın alt sticky "Başla" /
+          "Planı Oluştur" butonunun üzerine biniyordu). */}
+      {stage === STAGE_PLAN && ps.dbPlan && (
         <AiCoachWidget
           plan={ps.dbPlan}
           userId={auth.user?.id}
@@ -258,6 +279,25 @@ export default function App() {
           onSendMessage={ps.sendCoachMessage}
           onJumpToPlan={ps.openSavedPlan}
         />
+      )}
+
+      {/* Pomodoro'nun mobil "alt menü" erişim noktası — AiCoachWidget ile aynı
+          çakışma riskini taşımaması için yalnızca PlanBoard'dayken (sticky CTA'sız
+          ekran) ve sol altta (sağ alt AiCoachWidget'a ait) gösterilir. */}
+      {stage === STAGE_PLAN && (
+        <button
+          onClick={togglePomodoro}
+          aria-label="Pomodoro & Focus Studio"
+          className="md:hidden fixed z-40 flex items-center justify-center w-14 h-14 rounded-full transition-transform hover:scale-105 active:scale-95"
+          style={{
+            left: "1.5rem",
+            bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))",
+            background: "linear-gradient(135deg, #FB7185, #F43F5E)",
+            boxShadow: "0 10px 34px -10px rgba(251,113,133,0.75)",
+          }}
+        >
+          <Timer className="w-6 h-6 text-white" strokeWidth={2.25} />
+        </button>
       )}
 
       {/* PDF / Yazdır — aralık seçimi + yazdır */}
