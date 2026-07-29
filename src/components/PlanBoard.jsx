@@ -2,45 +2,68 @@ import { useState, memo } from "react";
 import { MONO_FONT, categoryOf } from "../constants";
 import Accordion from "./Accordion";
 import TaskCard from "./TaskCard";
+import { routineEmoji, routineMicroLabel } from "../utils/routineText";
+import { isRoutineChecked, setRoutineChecked } from "../utils/routineCheckin";
 
-// Rutin sıklık anahtarını minik ikon + Türkçe etikete çevirir.
-const FREQUENCY_META = {
-  daily: { icon: "🔆", label: "Günlük" },
-  weekly: { icon: "🔁", label: "Haftalık" },
-  biweekly: { icon: "🔁", label: "2 Haftada" },
-  monthly: { icon: "🗓️", label: "Aylık" },
-};
-function frequencyMeta(freq) {
-  const key = String(freq || "weekly").toLowerCase();
-  return FREQUENCY_META[key] || { icon: "🔁", label: freq || "Düzenli" };
+// Kompakt, tiklenebilir rutin hap rozeti — günlük check-in durumu
+// (RoutinesPopover.jsx ile PAYLAŞILAN localStorage anahtarı üzerinden, bkz.
+// utils/routineCheckin.js) her iki yüzeyde de tutarlı kalır. Tamamlanan rutin
+// soluklaşır + üzeri çizilir.
+function RoutinePill({ routine, accent, soft }) {
+  const [on, setOn] = useState(() => isRoutineChecked(routine.id));
+  const toggle = () => {
+    setOn((prev) => {
+      const next = !prev;
+      setRoutineChecked(routine.id, next);
+      return next;
+    });
+  };
+  return (
+    <button
+      onClick={toggle}
+      className="flex items-center gap-1.5 rounded-full pl-1.5 pr-3 py-1.5 transition-all card-glow"
+      style={{ background: on ? "rgba(46,217,163,0.12)" : soft, opacity: on ? 0.6 : 1 }}
+    >
+      <span
+        className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] shrink-0"
+        style={{ background: on ? "rgba(46,217,163,0.2)" : "rgba(var(--overlay-rgb),0.08)", color: on ? "#2ED9A3" : accent }}
+      >
+        {on ? "✓" : routineEmoji(routine.content)}
+      </span>
+      <span
+        className="text-[11.5px] font-semibold"
+        style={{ color: on ? "var(--text-faint)" : accent, textDecoration: on ? "line-through" : "none" }}
+      >
+        {routineMicroLabel(routine.content)}
+      </span>
+    </button>
+  );
 }
 
-// Dairesel ilerleme halkalı gün rozeti (conic-gradient mor→kırmızı dolum).
-// React.memo + `onSelect` (setActiveDay, referansı sabit) + `day` (primitif)
-// sayesinde, aktif olmayan bir gün rozetinin tıklanması diğer gün rozetlerini
-// yeniden render ETMEZ. Karşılaştırıcı bilinçli olarak nokta atışı: yalnızca bu
-// bileşenin görselini etkileyen 5 prop kontrol edilir.
-function DayCircleImpl({ day, pct, active, accent, accentSoft, onSelect }) {
+// "Pill Calendar" — minimalist, dikey hap biçimli gün rozeti. Aktif gün
+// aksan renkle dolu/fosforlu bir dolgu + glow taşır; diğerleri sade tonal
+// zemin. Alttaki ince çubuk günün tamamlanma yüzdesini gösterir (halka yerine
+// düz bir dolgu — daha sakin, daha "Apple/Linear" bir okuma). React.memo +
+// `onSelect` (setActiveDay, referansı sabit) + `day` (primitif) sayesinde,
+// aktif olmayan bir gün rozetinin tıklanması diğer rozetleri yeniden render ETMEZ.
+function DayPillImpl({ day, pct, active, accent, onSelect }) {
   return (
     <button onClick={() => onSelect(day)} className="shrink-0 flex flex-col items-center gap-1.5 card-glow" aria-label={`${day}. gün`}>
       <div
-        className="w-[54px] h-[54px] rounded-full p-[3px]"
-        style={{ background: `conic-gradient(from -90deg, #B26BFF, #F4406B ${pct}%, #23262F ${pct}% 100%)` }}
+        className="w-11 h-16 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-300"
+        style={{
+          background: active ? `linear-gradient(160deg, ${accent}, ${accent}CC)` : "rgba(var(--overlay-rgb),0.05)",
+          boxShadow: active ? `0 0 22px -4px ${accent}, 0 6px 16px -8px ${accent}` : "none",
+        }}
       >
-        <div
-          className="w-full h-full rounded-full flex items-center justify-center transition-colors"
-          style={{
-            background: active ? accentSoft : "var(--bg-card)",
-            border: active ? `1px solid ${accent}` : "1px solid transparent",
-            boxShadow: active ? `0 0 14px -4px ${accent}` : "none",
-          }}
+        <span
+          className="text-[16px] font-bold leading-none"
+          style={{ color: active ? "#04040a" : "var(--text-primary)", fontFamily: MONO_FONT }}
         >
-          <span
-            className="text-[15px] font-bold"
-            style={{ color: active ? "var(--text-primary)" : "var(--text-secondary)", fontFamily: MONO_FONT }}
-          >
-            {day}
-          </span>
+          {day}
+        </span>
+        <div className="w-5 h-[3px] rounded-full overflow-hidden" style={{ background: active ? "rgba(4,4,10,0.25)" : "rgba(var(--overlay-rgb),0.12)" }}>
+          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: active ? "#04040a" : accent }} />
         </div>
       </div>
       <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: active ? accent : "var(--text-faint)" }}>
@@ -49,15 +72,10 @@ function DayCircleImpl({ day, pct, active, accent, accentSoft, onSelect }) {
     </button>
   );
 }
-const DayCircle = memo(
-  DayCircleImpl,
+const DayPill = memo(
+  DayPillImpl,
   (prev, next) =>
-    prev.day === next.day &&
-    prev.pct === next.pct &&
-    prev.active === next.active &&
-    prev.accent === next.accent &&
-    prev.accentSoft === next.accentSoft &&
-    prev.onSelect === next.onSelect
+    prev.day === next.day && prev.pct === next.pct && prev.active === next.active && prev.accent === next.accent && prev.onSelect === next.onSelect
 );
 
 // Aktif plan ekranı: sabit başlık + genel ilerleme, rutinler (accordion), takvim
@@ -84,6 +102,9 @@ export default function PlanBoard({
   const accent = cat.accent;
   const soft = cat.accentSoft;
   const isVacation = plan.mode === "vacation";
+  // Pomodoro rozeti YALNIZCA odak/çalışma gerektiren içerikte anlamlı —
+  // tatil/fitness/genel rutinde zamanlama kavramı yok, zorunlu göstermiyoruz.
+  const showPomodoro = plan.mode === "software";
 
   // Yüklü (AI/DB) günleri gün no → gün verisi eşlemesine çevir.
   const loadedDays = weeks
@@ -137,7 +158,20 @@ export default function PlanBoard({
           <span className="text-lg">{cat.emoji}</span>
           <h1 className="text-[18px] font-bold leading-snug text-balance text-[var(--text-primary)]">{plan.title || "Planım"}</h1>
         </div>
-        {plan.summary && <p className="text-[12.5px] text-[var(--text-muted)] leading-relaxed">{plan.summary}</p>}
+        {/* Akıllı Başlık: bu planın NEDEN/NASIL böyle kurgulandığını tek
+            bakışta anlatan mikro-açıklama — plana özel özet + kategorinin
+            metodolojisi (tagline). Sol aksan şerit + yumuşak zemin + ikon. */}
+        <div className="flex items-start gap-3 rounded-xl px-3.5 py-3 mt-1" style={{ background: "rgba(var(--overlay-rgb),0.05)", borderLeft: `3px solid ${accent}` }}>
+          <span className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[13px] mt-0.5" style={{ background: soft }}>
+            {cat.emoji}
+          </span>
+          <div className="min-w-0 flex flex-col gap-1.5">
+            {plan.summary && <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">{plan.summary}</p>}
+            <p className="text-[11px] font-medium leading-relaxed" style={{ color: accent }}>
+              🧭 Yaklaşım: {cat.tagline}
+            </p>
+          </div>
+        </div>
 
         <div className="flex items-center justify-between mt-4 mb-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-[0.07em]" style={{ color: accent, fontFamily: MONO_FONT }}>
@@ -147,41 +181,27 @@ export default function PlanBoard({
             %{overallPct} tamamlandı
           </span>
         </div>
-        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--disabled-bg)" }}>
+        {/* Mikro ilerleme çizgisi — 3px, hafifçe içbükey (neomorfik) iz üzerinde
+            ince bir dolgu; kalın bir "bar" değil, minimalist bir çizgi. */}
+        <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "var(--disabled-bg)", boxShadow: "inset 0 1px 2px rgba(0,0,0,0.18)" }}>
           <div
             className="h-full rounded-full transition-all duration-500 ease-out"
-            style={{ width: `${overallPct}%`, background: "linear-gradient(90deg, #B26BFF, #F4406B)" }}
+            style={{
+              width: `${overallPct}%`,
+              background: "linear-gradient(90deg, #B26BFF, #F4406B)",
+              boxShadow: overallPct > 0 ? "0 0 6px -1px rgba(178,107,255,0.7)" : "none",
+            }}
           />
         </div>
       </div>
 
-      {/* Genel rutinler — accordion */}
+      {/* Genel rutinler — kompakt, tiklenebilir hap rozetleri (accordion içinde) */}
       {routines.length > 0 && (
         <Accordion title="Genel Rutinler" icon="🔁" accent={accent} defaultOpen>
-          <div className="flex flex-col gap-2.5">
-            {routines.map((r, i) => {
-              const fm = frequencyMeta(r.frequency);
-              return (
-                <div
-                  key={r.id || i}
-                  className="rounded-xl border p-3 flex items-start gap-3"
-                  style={{ borderColor: `${accent}22`, background: "var(--bg-input)" }}
-                >
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[14px] shrink-0" style={{ background: soft }}>
-                    {fm.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span
-                      className="inline-block text-[9px] font-bold uppercase tracking-[0.06em] px-2 py-0.5 rounded-full mb-1"
-                      style={{ background: soft, color: accent }}
-                    >
-                      {fm.label}
-                    </span>
-                    <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">{r.content}</p>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex flex-wrap gap-2">
+            {routines.map((r, i) => (
+              <RoutinePill key={r.id || i} routine={r} accent={accent} soft={soft} />
+            ))}
           </div>
         </Accordion>
       )}
@@ -209,7 +229,7 @@ export default function PlanBoard({
                 className="shrink-0 flex flex-col items-center gap-1.5 disabled:opacity-70"
                 aria-label={`${cell.dayNumber}. gün kilitli — sonraki haftayı aç`}
               >
-                <div className="frost-lock w-[54px] h-[54px] rounded-full flex items-center justify-center">
+                <div className="frost-lock w-11 h-16 rounded-2xl flex items-center justify-center">
                   <span className="text-[15px]" style={{ filter: "grayscale(0.3)", opacity: 0.85 }}>
                     {loadingNextWeek && cell.dayNumber === firstLockedDay ? "⏳" : "🔒"}
                   </span>
@@ -219,13 +239,12 @@ export default function PlanBoard({
                 </span>
               </button>
             ) : (
-              <DayCircle
+              <DayPill
                 key={cell.dayNumber}
                 day={cell.dayNumber}
                 pct={dayPct(cell)}
                 active={cell.dayNumber === effectiveActiveDay}
                 accent={accent}
-                accentSoft={soft}
                 onSelect={setActiveDay}
               />
             )
@@ -270,7 +289,16 @@ export default function PlanBoard({
               bir tık sırasında hiç render edilmez (bkz. usePlanStudio.toggleTask). */}
           <div className="task-grid flex flex-col gap-2.5">
             {activeDayObj.tasks.map((t) => (
-              <TaskCard key={t.id} task={t} accent={accent} soft={soft} isVacation={isVacation} onToggle={onToggleTask} onStartPomodoro={onStartPomodoro} />
+              <TaskCard
+                key={t.id}
+                task={t}
+                accent={accent}
+                soft={soft}
+                isVacation={isVacation}
+                showPomodoro={showPomodoro}
+                onToggle={onToggleTask}
+                onStartPomodoro={onStartPomodoro}
+              />
             ))}
           </div>
         </div>

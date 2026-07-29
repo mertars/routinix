@@ -46,14 +46,25 @@ export default function Header({
   onAuthClick,
   onSignOut,
   onMenuToggle,
+  onLogoClick,
 }) {
   return (
-    <div className="sticky top-0 z-20">
-      <header
-        className="flex items-center justify-between gap-3 px-4 md:px-6 py-3.5 backdrop-blur-md max-w-7xl mx-auto w-full"
-        style={{ background: "rgba(var(--glass-rgb), var(--alpha-chrome))", borderBottom: "1px solid var(--border-header)" }}
-      >
-        <div className="flex items-center gap-2.5">
+    // Kroma (arka plan/blur/alt çizgi) TAM GENİŞLİKTE — geniş masaüstü
+    // ekranlarda içerik max-w-7xl'de ortalanırken kroma dar kalırsa, kenarlarda
+    // arkadaki mor glow blob'u (BackgroundScene) sol üst köşede "sivri" bir
+    // çıkıntı gibi dışarı sızıyordu. İçerik satırı (<header>) ayrı, yalnızca O
+    // max-w-7xl'de ortalanır.
+    <div
+      className="sticky top-0 z-20 backdrop-blur-md"
+      style={{ background: "rgba(var(--glass-rgb), var(--alpha-chrome))", borderBottom: "1px solid var(--border-header)" }}
+    >
+      <header className="flex items-center justify-between gap-3 px-4 md:px-6 py-3.5 max-w-7xl mx-auto w-full">
+        {/* Logo + marka yazısı: Ana Sayfa'ya döner, basılınca hafifçe küçülür */}
+        <button
+          onClick={onLogoClick}
+          aria-label="Ana Sayfa'ya dön"
+          className="flex items-center gap-2.5 transition-transform duration-150 active:scale-95"
+        >
           {/* Geometrik çerçeveli "R" logosu */}
           <div
             className="relative w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
@@ -76,7 +87,7 @@ export default function Header({
             </span>
           </div>
           <span className="font-bold tracking-tight text-[16px] text-[var(--text-primary)]">Routinix</span>
-        </div>
+        </button>
 
         <div className="flex items-center gap-1.5 md:gap-2">
           {/* Aksiyon butonları — mobilde hamburger menü (Hızlı Erişim) arkasında,

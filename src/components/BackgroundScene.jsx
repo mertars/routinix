@@ -1,3 +1,15 @@
+// Kategoriye göre ambiyans ışığı rengi — plan/görev türüne özgü, kendi başına
+// bir renk sistemi (uygulamanın diğer yerlerindeki kategori "accent" rozet
+// renklerinden BİLİNÇLİ OLARAK bağımsız — buradaki istek belirli bir "doğa/
+// enerji/odak/sakin" ruh hali eşlemesiydi, chip/badge renkleriyle karışmasın).
+const GLOW_BY_CATEGORY = {
+  vacation: { violet: "#2ED9A3", orange: "#22D3EE" }, // Doğa/Deniz — yeşil + cyan
+  fitness: { violet: "#F4406B", orange: "#FB923C" }, // Enerjik — crimson + turuncu
+  software: { violet: "#B26BFF", orange: "#6E7BFF" }, // Derin Odak — mor + indigo (varsayılan)
+  general: { violet: "#7DA2FF", orange: "#64748B" }, // Sakin — soft mavi + slate
+};
+const DEFAULT_GLOW = GLOW_BY_CATEGORY.software;
+
 // Atmosferik arka plan — iki temaya özgü katman + her iki temada da ortak
 // süzülen glow blob'lar:
 //   Koyu tema : çok soluk monokrom antrasit dağ/topoğrafik silüet + sırt
@@ -5,21 +17,26 @@
 //   Açık tema : aynı topoğrafik kontur çizgilerinin sedef/gümüş, %8-12
 //               opaklıktaki versiyonu (dağ dolgusu ve neon şerit koyu temaya
 //               özgü olduğundan açık temada gizli kalır).
-// Her iki temada: yavaşça süzülen bulanık mor + koyu turuncu glow blob'lar
-// (--blob-opacity ile temaya göre ayarlanır). Tamamen dekoratif ve
-// etkileşimsiz; sabit (fixed) olarak tüm ekranı kaplar, içeriğin arkasında
-// durur. prefers-reduced-motion'da hareket durur.
-export default function BackgroundScene() {
+// Her iki temada: yavaşça süzülen bulanık glow blob'lar — rengi `category`
+// prop'una göre değişir (bkz. GLOW_BY_CATEGORY), --glow-violet/--glow-orange
+// CSS custom property'leri + @property (GlobalStyles.jsx) sayesinde 0.8s'lik
+// yumuşak bir geçişle; plan seçilmemişse/tanınmayan kategoride varsayılan
+// mor/indigo'ya döner. Tamamen dekoratif ve etkileşimsiz; sabit (fixed)
+// olarak tüm ekranı kaplar, içeriğin arkasında durur.
+// prefers-reduced-motion'da hareket durur (renk geçişi buna dahil değil,
+// zararsız/statik bir stil değişimi sayılır).
+export default function BackgroundScene({ category }) {
+  const glow = GLOW_BY_CATEGORY[category] || DEFAULT_GLOW;
   return (
     <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
-      {/* --- Süzülen glow blob'lar (mor + koyu turuncu) — her iki temada --- */}
+      {/* --- Süzülen glow blob'lar — her iki temada, kategoriye duyarlı renk --- */}
       <div
         className="bg-blob bg-blob--violet"
-        style={{ width: 520, height: 520, top: "-8%", left: "-10%", background: "radial-gradient(circle, #B26BFF 0%, transparent 70%)" }}
+        style={{ width: 520, height: 520, top: "-8%", left: "-10%", "--glow-violet": glow.violet }}
       />
       <div
         className="bg-blob bg-blob--orange"
-        style={{ width: 480, height: 480, bottom: "-12%", right: "-8%", background: "radial-gradient(circle, #C2410C 0%, transparent 70%)" }}
+        style={{ width: 480, height: 480, bottom: "-12%", right: "-8%", "--glow-orange": glow.orange }}
       />
 
       <svg

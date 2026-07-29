@@ -227,7 +227,7 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
         <>
           <div className="fixed inset-0 z-[95] bg-black/55 backdrop-blur-sm animate-[fadeIn_0.2s_ease]" onClick={() => setOpen(false)} />
           <div
-            className="fixed top-0 right-0 z-[96] h-full w-[92%] max-w-[400px] flex flex-col drawer-panel"
+            className="fixed top-0 right-0 z-[96] h-full w-[92%] max-w-[400px] flex flex-col drawer-panel overflow-hidden"
             style={{
               background: "rgba(var(--glass-rgb), var(--alpha-modal))",
               backdropFilter: "blur(28px) saturate(160%)",
@@ -312,8 +312,22 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
               </div>
             </div>
 
-            {/* Girdi alanı / Paywall */}
-            <div className="sticky-actions">
+            {/* Girdi alanı / Paywall — bu drawer'ın kendi px-4 dolgu düzenine
+                sadık kalır. (.sticky-actions'ı KULLANMIYORUZ: o sınıf -20px
+                negatif kenar boşluğuyla 20px'lik bir üst dolguyu iptal etmek
+                üzere tasarlanmış — bu drawer'da öyle bir üst dolgu yok, o
+                yüzden negatif kenar boşluğu input çubuğunu drawer'ın kendi
+                sağ kenarının DIŞINA taşırıyordu.) */}
+            <div
+              className="sticky bottom-0 z-20 shrink-0 px-4 pt-3.5"
+              style={{
+                paddingBottom: "calc(0.875rem + env(safe-area-inset-bottom, 0px))",
+                background: "rgba(var(--glass-rgb), var(--alpha-chrome))",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                borderTop: "1px solid var(--border-header)",
+              }}
+            >
               {locked ? (
                 <div
                   className="rounded-2xl p-4 text-center"

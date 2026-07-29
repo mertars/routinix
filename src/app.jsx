@@ -110,8 +110,10 @@ export default function App() {
 
   return (
     <div className="w-full" style={{ background: "var(--bg-app)" }}>
-      {/* Atmosferik animasyonlu dağ/topoğrafya + neon şerit arka planı (içeriğin arkasında) */}
-      <BackgroundScene />
+      {/* Atmosferik animasyonlu dağ/topoğrafya + neon şerit arka planı (içeriğin
+          arkasında) — ambient glow rengi aktif kategoriye göre (intro'da seçili
+          sekme, plan içindeyken planın kendi kategorisi) yumuşakça değişir. */}
+      <BackgroundScene category={ps.category} />
 
       {/* Mobilde intro tek ekrana kilitli (h-100dvh, scroll yok); md'den itibaren serbest. */}
       <div
@@ -138,6 +140,11 @@ export default function App() {
           onAuthClick={() => setAuthOpen(true)}
           onSignOut={() => setLogoutConfirmOpen(true)}
           onMenuToggle={() => ps.setMenuOpen((v) => !v)}
+          onLogoClick={() => {
+            closeAllPanels();
+            ps.setMenuOpen(false);
+            ps.resetToIntro();
+          }}
         />
 
         <DrawerMenu

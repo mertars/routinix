@@ -20,25 +20,30 @@ function estimatePomodoros(durationMin) {
   return Math.max(1, Math.round(durationMin / 25));
 }
 
-// "Mikro-Arayüz": görev kartı artık tek satır — görev adı, tahmini Pomodoro
-// sayısı ve bir Başlat butonundan ibaret. Etiket/açıklama/bütçe gibi detaylar
-// varsayılan olarak GİZLİ; satıra dokununca (checkbox/Başlat HARİÇ) mobilde
-// alttan açılan Bottom Sheet, masaüstünde sağdan süzülen Drawer ile açılır
-// (bkz. FocusSidePanel.jsx — genel amaçlı duyarlı Drawer/Bottom Sheet
-// primitifi). Sert çerçeve yerine ton farkı: tamamlanmamış görev biraz daha
-// belirgin bir zemin tonu taşır, tamamlanmış görev soluklaşır.
-function TaskCard({ task, accent, soft, isVacation, onToggle, onStartPomodoro }) {
+// "Mikro-Arayüz": görev kartı artık tek satır — görev adı ve bir Başlat
+// butonundan ibaret; Pomodoro rozeti YALNIZCA `showPomodoro` (odak/çalışma
+// kategorisi) true olduğunda ve süre verisi varsa görünür — tatil/fitness/genel
+// rutin gibi zamanlama gerektirmeyen içeriklerde tamamen gizlenir, zorunlu
+// değildir. Etiket/açıklama/bütçe gibi detaylar varsayılan olarak GİZLİ; satıra
+// dokununca (checkbox/Başlat HARİÇ) mobilde alttan açılan Bottom Sheet,
+// masaüstünde sağdan süzülen Drawer ile açılır (bkz. FocusSidePanel.jsx).
+// Sert çerçeve yerine hafif ton farkı + tek incelik `--glass-border` hairline.
+function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onStartPomodoro }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const pr = task.priority ? PRIORITY_STYLE[task.priority] : null;
-  const pomodoros = estimatePomodoros(task.duration_min);
+  const pomodoros = showPomodoro ? estimatePomodoros(task.duration_min) : null;
   const hasDetails = Boolean(task.detail || task.duration_min || pr || task.estimated_cost || (isVacation && task.map_search_query));
+  // Önceliğe göre renklendirilir; öncelik yoksa planın kategori aksanına düşer.
+  const stripColor = pr?.color || accent;
 
   return (
     <>
       <div
-        className="task-card rounded-2xl card-glow flex items-center gap-3 pl-3.5 pr-2.5 py-3"
-        style={{ background: task.is_completed ? "rgba(var(--overlay-rgb),0.03)" : "rgba(var(--overlay-rgb),0.05)" }}
+        className="task-card rounded-2xl card-glow flex items-center gap-3.5 pl-0 pr-3 py-3.5 overflow-hidden"
+        style={{ background: task.is_completed ? "rgba(var(--overlay-rgb),0.03)" : "rgba(var(--overlay-rgb),0.05)", border: "1px solid var(--glass-border)" }}
       >
+        <div className="self-stretch w-[3px] shrink-0 rounded-r-full" style={{ background: task.is_completed ? "var(--border-strong)" : stripColor }} />
+
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -61,7 +66,7 @@ function TaskCard({ task, accent, soft, isVacation, onToggle, onStartPomodoro })
           disabled={!hasDetails}
         >
           <span
-            className="flex-1 min-w-0 truncate text-[13.5px] font-semibold"
+            className="flex-1 min-w-0 truncate text-[14px] font-bold"
             style={{ color: task.is_completed ? "var(--text-faint)" : "var(--text-primary)", textDecoration: task.is_completed ? "line-through" : "none" }}
           >
             {task.title}
@@ -141,6 +146,7 @@ export default memo(
     prev.accent === next.accent &&
     prev.soft === next.soft &&
     prev.isVacation === next.isVacation &&
+    prev.showPomodoro === next.showPomodoro &&
     prev.onToggle === next.onToggle &&
     prev.onStartPomodoro === next.onStartPomodoro
 );

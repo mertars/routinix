@@ -284,9 +284,26 @@ export default function GlobalStyles() {
       }
       .chip-fill-pulse { animation: chipFill 0.6s ease-out; }
 
-      /* --- Yavaşça süzülen bulanık glow blob'lar (BackgroundScene) — mor ve
-         koyu turuncu dairesel parıltılar; hem koyu hem açık temada mevcut,
-         yalnızca opaklık (--blob-opacity) temaya göre ayarlanır. --- */
+      /* --- Yavaşça süzülen bulanık glow blob'lar (BackgroundScene) — hem koyu
+         hem açık temada mevcut, opaklık (--blob-opacity) temaya göre ayarlanır.
+         Renk artık SABİT değil: aktif planın/kategori seçiminin türüne göre
+         değişir (bkz. BackgroundScene.jsx GLOW_BY_CATEGORY). Rengi bir CSS
+         custom property'de (--glow-violet/--glow-orange) tutup @property ile
+         renk tipinde tanımlıyoruz — bu, "transition" ile YUMUŞAK bir renk
+         geçişi almanın tek CSS-only yolu (düz "background" gradient'ini
+         browser'lar interpolate ETMEZ). Yalnızca renk (compositor-dışı ama
+         çok ucuz bir paint) değişir; transform/opacity animasyonlarına
+         DOKUNULMAZ, performansı etkilemez. */
+      @property --glow-violet {
+        syntax: '<color>';
+        inherits: true;
+        initial-value: #B26BFF;
+      }
+      @property --glow-orange {
+        syntax: '<color>';
+        inherits: true;
+        initial-value: #C2410C;
+      }
       @keyframes blobFloatA {
         0%, 100% { transform: translate(0, 0) scale(1); }
         33% { transform: translate(4%, 6%) scale(1.08); }
@@ -303,8 +320,16 @@ export default function GlobalStyles() {
         opacity: var(--blob-opacity);
         will-change: transform;
       }
-      .bg-blob--violet { animation: blobFloatA 26s ease-in-out infinite; }
-      .bg-blob--orange { animation: blobFloatB 32s ease-in-out infinite; }
+      .bg-blob--violet {
+        background: radial-gradient(circle, var(--glow-violet) 0%, transparent 70%);
+        transition: --glow-violet 0.8s ease;
+        animation: blobFloatA 26s ease-in-out infinite;
+      }
+      .bg-blob--orange {
+        background: radial-gradient(circle, var(--glow-orange) 0%, transparent 70%);
+        transition: --glow-orange 0.8s ease;
+        animation: blobFloatB 32s ease-in-out infinite;
+      }
 
       @media (prefers-reduced-motion: reduce) {
         .motion-safe\\:animate-spin { animation: none !important; }
