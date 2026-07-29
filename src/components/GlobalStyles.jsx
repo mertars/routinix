@@ -145,7 +145,8 @@ export default function GlobalStyles() {
 
       /* --- Duyarlı panel (FocusSidePanel.jsx): mobilde alttan açılan "Bottom
          Sheet", md'den itibaren sol/sağ kenardan açılan yan "Drawer/Sidebar"a
-         dönüşür. Konum + animasyon aynı anda breakpoint'e göre değişir. --- */
+         dönüşür. Görev kartı detayları (TaskCard → "Mikro-Arayüz" açılımı) bu
+         primitifi kullanır. --- */
       .focus-panel {
         position: fixed;
         z-index: 95;
@@ -179,23 +180,12 @@ export default function GlobalStyles() {
         }
       }
 
-      /* --- Görev Seçim Penceresi (TaskPickerModal.jsx): mobilde alttan açılan
-         Bottom Sheet, md'den itibaren ekranın ORTASINDA açılan merkezi Modal
-         (yan panel DEĞİL). Giriş + çıkış (otomatik kapanma) animasyonu ikisi
-         de breakpoint'e duyarlı. --- */
-      .task-picker-modal {
-        animation: slideUpSheet 0.3s cubic-bezier(0.32, 0.72, 0, 1);
-      }
-      .task-picker-modal-exit {
-        animation: slideDownSheet 0.2s ease-in forwards;
-      }
-      @media (min-width: 768px) {
-        .task-picker-modal {
-          animation: modalPopIn 0.22s cubic-bezier(0.32, 0.72, 0, 1);
-        }
-        .task-picker-modal-exit {
-          animation: modalPopOut 0.18s ease-in forwards;
-        }
+      /* --- Pomodoro Studio: yüzen alt sekme çubuğu (mobil, md'den itibaren
+         gizli — masaüstünde sabit 2 sütun düzeni kullanılıyor, sekmeye gerek
+         yok). Odak Modu'na girildiğinde (sayaç çalışırken ya da Işıklar
+         Söndü'ndeyken) yukarı kayıp soluklaşarak kaybolur. --- */
+      .pomo-tabbar {
+        animation: slideUpSheet 0.32s cubic-bezier(0.32, 0.72, 0, 1);
       }
 
       /* --- Karta tıklayınca (aktif) hafif neon glow ---
@@ -318,7 +308,7 @@ export default function GlobalStyles() {
 
       @media (prefers-reduced-motion: reduce) {
         .motion-safe\\:animate-spin { animation: none !important; }
-        .drawer-panel, .drawer-panel-left, .focus-sheet, .focus-panel, .task-picker-modal, .task-picker-modal-exit, .day-reveal, .neon-strip, .pop-in, .chip-fill-pulse, .check-glow { animation: none !important; }
+        .drawer-panel, .drawer-panel-left, .focus-sheet, .focus-panel, .pomo-tabbar, .day-reveal, .neon-strip, .pop-in, .chip-fill-pulse, .check-glow { animation: none !important; }
         .bg-blob--violet, .bg-blob--orange { animation: none !important; }
         .accordion-body { transition: none !important; }
       }

@@ -2,8 +2,8 @@
 // çekmece (Drawer/Sidebar), mobilde ekranın altından yukarı kayan "Bottom
 // Sheet"e dönüşür. Konumlandırma + animasyon `.focus-panel` (GlobalStyles.jsx)
 // içinde tek bir CSS media query ile yönetilir — burada yalnızca içerik/iskelet var.
-// PomodoroStudio.jsx bunu hem Görevler (side="left") hem Müzik (side="right")
-// panelleri için kullanır.
+// TaskCard.jsx bunu, tek satıra indirgenmiş görev kartının detaylarını
+// (açıklama/etiketler/harita) göstermek için kullanır (side="right").
 export default function FocusSidePanel({ open, onClose, side = "right", title, icon, children }) {
   if (!open) return null;
 

@@ -73,6 +73,7 @@ export default function PlanBoard({
   nextWeekError,
   onToggleTask,
   onLoadNextWeek,
+  onStartPomodoro,
   onPrint,
   onBack,
 }) {
@@ -117,7 +118,7 @@ export default function PlanBoard({
   };
 
   return (
-    <div className="flex flex-col gap-5 animate-[fadeIn_0.4s_ease]">
+    <div className="flex flex-col gap-6 animate-[fadeIn_0.4s_ease]">
       {/* Başlık + genel ilerleme */}
       <div className="glass rounded-2xl p-5" style={{ borderColor: `${accent}33` }}>
         <div className="flex items-center justify-between mb-3">
@@ -237,7 +238,7 @@ export default function PlanBoard({
 
       {/* Günün Stratejik Adımları */}
       {activeDayObj && (
-        <div key={effectiveActiveDay} className="day-reveal flex flex-col gap-3">
+        <div key={effectiveActiveDay} className="day-reveal flex flex-col gap-4">
           {/* Aktif günün arkasından sızan hafif neon aura */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -263,12 +264,13 @@ export default function PlanBoard({
             </div>
           )}
 
-          {/* Masaüstünde 2/3/4'lü grid — mobilde tek sütun. Her kart memoized
-              TaskCard — dokunulmayan görevler, bir tık sırasında hiç render
-              edilmez (bkz. TaskCard.jsx + usePlanStudio.toggleTask). */}
-          <div className="task-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {/* Tek sütun, minimalist tek-satır liste (mikro-arayüz) — detaylar
+              varsayılan gizli, karta dokununca Drawer/Bottom Sheet ile açılır
+              (bkz. TaskCard.jsx). Her satır memoized — dokunulmayan görevler
+              bir tık sırasında hiç render edilmez (bkz. usePlanStudio.toggleTask). */}
+          <div className="task-grid flex flex-col gap-2.5">
             {activeDayObj.tasks.map((t) => (
-              <TaskCard key={t.id} task={t} accent={accent} soft={soft} isVacation={isVacation} onToggle={onToggleTask} />
+              <TaskCard key={t.id} task={t} accent={accent} soft={soft} isVacation={isVacation} onToggle={onToggleTask} onStartPomodoro={onStartPomodoro} />
             ))}
           </div>
         </div>

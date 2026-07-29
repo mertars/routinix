@@ -34,6 +34,7 @@ export default function App() {
   const [hubOpen, setHubOpen] = useState(false);
   const [plansOpen, setPlansOpen] = useState(false);
   const [pomodoroOpen, setPomodoroOpen] = useState(false);
+  const [pomodoroInitialTaskId, setPomodoroInitialTaskId] = useState("");
   const [printOpen, setPrintOpen] = useState(false);
   const [printRange, setPrintRange] = useState(Infinity);
   const ps = usePlanStudio({ user: auth.user, onRequireAuth: () => setAuthOpen(true) });
@@ -78,6 +79,14 @@ export default function App() {
     closeAllPanels();
     ps.setMenuOpen(false);
     setPomodoroOpen(next);
+  };
+  // Görev kartındaki "Başlat" — Pomodoro Studio'yu bu görev seçiliyken açar
+  // (bkz. PomodoroStudio.jsx `initialTaskId` prop'u).
+  const startPomodoroForTask = (taskId) => {
+    setPomodoroInitialTaskId(taskId);
+    closeAllPanels();
+    ps.setMenuOpen(false);
+    setPomodoroOpen(true);
   };
 
   // Dokunsal geri bildirim: herhangi bir butona basıldığında hafif mikro titreşim
@@ -210,6 +219,7 @@ export default function App() {
               nextWeekError={ps.nextWeekError}
               onToggleTask={ps.toggleTask}
               onLoadNextWeek={ps.loadNextWeek}
+              onStartPomodoro={startPomodoroForTask}
               onPrint={() => setPrintOpen(true)}
               onBack={ps.resetToIntro}
             />
@@ -265,7 +275,7 @@ export default function App() {
       />
 
       {/* Pomodoro & Focus Studio — herkese açık (Şablon Keşfet gibi) */}
-      <PomodoroStudio open={pomodoroOpen} userId={auth.user?.id} onClose={() => setPomodoroOpen(false)} />
+      <PomodoroStudio open={pomodoroOpen} userId={auth.user?.id} initialTaskId={pomodoroInitialTaskId} onClose={() => setPomodoroOpen(false)} />
 
       {/* AI Koç — yalnızca PlanBoard ekranındayken (yalnızca `dbPlan` kontrolü
           yetersizdi: "‹ Ana Sayfa" ile intro'ya dönünce dbPlan temizlenmediği
