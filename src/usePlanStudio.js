@@ -248,18 +248,30 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   };
 
   // ---- Görev tamamlama (checkbox) — lokal + DB ----
-  const toggleTask = (taskId, nextVal) => {
-    setWeeks((prev) =>
-      prev.map((w) => ({
-        ...w,
-        days: w.days.map((d) => ({
-          ...d,
-          tasks: d.tasks.map((t) => (t.id === taskId ? { ...t, is_completed: nextVal } : t)),
-        })),
-      }))
-    );
+  // Yalnızca dokunulan görevin ait olduğu hafta/gün nesnesi yeniden oluşturulur;
+  // diğer hafta/gün/görev referansları AYNEN korunur. Bu sayede PlanBoard'daki
+  // memoized TaskCard/DayCircle bileşenleri, değişmeyen kartlar için re-render'ı
+  // (props referansı sabit kaldığından) atlayabilir — mobilde tik atma/kart
+  // seçme anındaki FPS düşüşünün kök nedeni buradaki gereksiz tüm-ağaç kopyasıydı.
+  const toggleTask = useCallback((taskId, nextVal) => {
+    setWeeks((prev) => {
+      for (const w of prev) {
+        const dayIdx = w.days.findIndex((d) => d.tasks.some((t) => t.id === taskId));
+        if (dayIdx === -1) continue;
+        const day = w.days[dayIdx];
+        const taskIdx = day.tasks.findIndex((t) => t.id === taskId);
+        const nextTasks = day.tasks.slice();
+        nextTasks[taskIdx] = { ...nextTasks[taskIdx], is_completed: nextVal };
+        const nextDay = { ...day, tasks: nextTasks };
+        const nextDays = w.days.slice();
+        nextDays[dayIdx] = nextDay;
+        const nextWeek = { ...w, days: nextDays };
+        return prev.map((ww) => (ww === w ? nextWeek : ww));
+      }
+      return prev;
+    });
     setTaskCompletedSvc(taskId, nextVal).catch((err) => logger.error("TASK", "Görev durumu güncellenemedi", { taskId, error: err?.message }));
-  };
+  }, []);
 
   // ---- Kayıtlı bir planı yeniden aç ----
   const openSavedPlan = async (planId) => {

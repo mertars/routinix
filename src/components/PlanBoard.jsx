@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { MONO_FONT, categoryOf } from "../constants";
 import Accordion from "./Accordion";
+import TaskCard from "./TaskCard";
 
 // Rutin sıklık anahtarını minik ikon + Türkçe etikete çevirir.
 const FREQUENCY_META = {
@@ -14,21 +15,13 @@ function frequencyMeta(freq) {
   return FREQUENCY_META[key] || { icon: "🔁", label: freq || "Düzenli" };
 }
 
-const PRIORITY_STYLE = {
-  Yüksek: { color: "#FF6E92", bg: "rgba(244,64,107,0.14)" },
-  Orta: { color: "var(--amber-accent)", bg: "rgba(240,179,126,0.14)" },
-  Düşük: { color: "#6FCF97", bg: "rgba(111,207,151,0.14)" },
-};
-
-function openInMaps(query) {
-  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-  window.open(url, "_blank", "noopener,noreferrer");
-}
-
 // Dairesel ilerleme halkalı gün rozeti (conic-gradient mor→kırmızı dolum).
-function DayCircle({ day, pct, active, accent, accentSoft, onClick }) {
+// React.memo + `onSelect` (setActiveDay, referansı sabit) + `day` (primitif)
+// sayesinde, aktif olmayan bir gün rozetinin tıklanması diğer gün rozetlerini
+// yeniden render ETMEZ.
+const DayCircle = memo(function DayCircle({ day, pct, active, accent, accentSoft, onSelect }) {
   return (
-    <button onClick={onClick} className="shrink-0 flex flex-col items-center gap-1.5 card-glow" aria-label={`${day}. gün`}>
+    <button onClick={() => onSelect(day)} className="shrink-0 flex flex-col items-center gap-1.5 card-glow" aria-label={`${day}. gün`}>
       <div
         className="w-[54px] h-[54px] rounded-full p-[3px]"
         style={{ background: `conic-gradient(from -90deg, #B26BFF, #F4406B ${pct}%, #23262F ${pct}% 100%)` }}
@@ -54,7 +47,7 @@ function DayCircle({ day, pct, active, accent, accentSoft, onClick }) {
       </span>
     </button>
   );
-}
+});
 
 // Aktif plan ekranı: sabit başlık + genel ilerleme, rutinler (accordion), takvim
 // rozet şeridi (dolum halkalı + kilitli günler) ve seçili günün görev kartları.
@@ -221,7 +214,7 @@ export default function PlanBoard({
                 active={cell.dayNumber === effectiveActiveDay}
                 accent={accent}
                 accentSoft={soft}
-                onClick={() => setActiveDay(cell.dayNumber)}
+                onSelect={setActiveDay}
               />
             )
           )}
@@ -259,72 +252,13 @@ export default function PlanBoard({
             </div>
           )}
 
-          {/* Masaüstünde 2/3/4'lü grid — mobilde tek sütun */}
+          {/* Masaüstünde 2/3/4'lü grid — mobilde tek sütun. Her kart memoized
+              TaskCard — dokunulmayan görevler, bir tık sırasında hiç render
+              edilmez (bkz. TaskCard.jsx + usePlanStudio.toggleTask). */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {activeDayObj.tasks.map((t) => {
-            const pr = t.priority ? PRIORITY_STYLE[t.priority] : null;
-            return (
-              <div
-                key={t.id}
-                className="rounded-2xl border p-3.5 card-glow"
-                style={{ borderColor: t.is_completed ? "var(--border-header)" : `${accent}44`, background: "var(--bg-card)" }}
-              >
-                <div className="flex items-start gap-3">
-                  <button
-                    onClick={() => onToggleTask(t.id, !t.is_completed)}
-                    className="w-6 h-6 rounded-full border flex items-center justify-center text-[11px] shrink-0 mt-0.5"
-                    style={{
-                      borderColor: t.is_completed ? "#2ED9A3" : "var(--border-strong)",
-                      background: t.is_completed ? "rgba(46,217,163,0.16)" : "transparent",
-                      color: "#2ED9A3",
-                    }}
-                    aria-label="Tamamlandı olarak işaretle"
-                  >
-                    {t.is_completed ? "✓" : ""}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="text-[14px] font-semibold leading-snug text-balance"
-                      style={{ color: t.is_completed ? "var(--text-faint)" : "var(--text-primary)", textDecoration: t.is_completed ? "line-through" : "none" }}
-                    >
-                      {t.title}
-                    </p>
-                    {t.detail && <p className="text-[12px] text-[var(--text-muted)] leading-relaxed mt-1">{t.detail}</p>}
-
-                    {/* Şık rozetler: süre / öncelik / bütçe */}
-                    {(t.duration_min || pr || t.estimated_cost) && (
-                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        {t.duration_min ? (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--disabled-bg)", color: "#9BB0C0" }}>
-                            ⏱ {t.duration_min} dk
-                          </span>
-                        ) : null}
-                        {pr && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: pr.bg, color: pr.color }}>
-                            {t.priority}
-                          </span>
-                        )}
-                        {t.estimated_cost && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--disabled-bg)", color: "var(--amber-accent)" }}>
-                            💰 {t.estimated_cost}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {isVacation && t.map_search_query && (
-                  <button
-                    onClick={() => openInMaps(t.map_search_query)}
-                    className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-semibold transition-colors"
-                    style={{ background: soft, color: accent }}
-                  >
-                    📍 Konumu Haritada Aç
-                  </button>
-                )}
-              </div>
-            );
-          })}
+            {activeDayObj.tasks.map((t) => (
+              <TaskCard key={t.id} task={t} accent={accent} soft={soft} isVacation={isVacation} onToggle={onToggleTask} />
+            ))}
           </div>
         </div>
       )}

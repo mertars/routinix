@@ -59,9 +59,13 @@ export default function DrawerMenu({
       <div
         className="fixed top-0 right-0 z-50 h-full w-[86%] max-w-[340px] flex flex-col drawer-panel no-scrollbar"
         style={{
-          background: "rgba(var(--glass-rgb), var(--alpha-chrome))",
-          backdropFilter: "blur(24px) saturate(160%)",
-          WebkitBackdropFilter: "blur(24px) saturate(160%)",
+          // Okunabilirlik önceliği: yoğun "buzlu cam" yerine büyük ölçüde OPAK bir
+          // zemin + hafif blur. --alpha-chrome (Header'ın şeffaf ambient katmanı)
+          // yerine bilinçli olarak --alpha-modal kullanılıyor — bu, uygulamadaki
+          // "yüksek okunabilirlik" katmanı (AI Koç, dropdown'lar) ile aynı token.
+          background: "rgba(var(--glass-rgb), var(--alpha-modal))",
+          backdropFilter: "blur(12px) saturate(140%)",
+          WebkitBackdropFilter: "blur(12px) saturate(140%)",
           borderLeft: "1px solid var(--sidebar-border)",
           boxShadow: "-24px 0 70px -20px rgba(0,0,0,0.7), inset 1px 0 20px -10px rgba(178,107,255,0.35)",
         }}
@@ -116,7 +120,7 @@ export default function DrawerMenu({
                   ) : (
                     <span className="text-[16px]">{b.emoji}</span>
                   )}
-                  <span className="text-[11.5px] font-semibold leading-snug" style={{ color: b.color }}>
+                  <span className="text-[11.5px] font-bold tracking-wide leading-snug" style={{ color: b.color }}>
                     {b.label}
                   </span>
                 </button>
@@ -140,11 +144,11 @@ export default function DrawerMenu({
             <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--text-faint)] mb-2">Tercihler</p>
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between py-2">
-                <span className="text-[13px] font-medium text-[var(--text-primary)]">🔔 Günlük Hatırlatıcılar</span>
+                <span className="text-[13px] font-semibold text-[var(--text-primary)]">🔔 Günlük Hatırlatıcılar</span>
                 <ToggleSwitch checked={remindersOn} onChange={onToggleReminders} accent={accent} />
               </div>
               <div className="flex items-center justify-between py-2 gap-3">
-                <span className="text-[13px] font-medium text-[var(--text-primary)] leading-snug">📳 Ses & Dokunsal Geri Bildirim</span>
+                <span className="text-[13px] font-semibold text-[var(--text-primary)] leading-snug">📳 Ses & Dokunsal Geri Bildirim</span>
                 <ToggleSwitch checked={hapticsOn} onChange={onToggleHaptics} accent={accent} />
               </div>
             </div>

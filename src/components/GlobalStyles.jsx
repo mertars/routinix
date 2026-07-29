@@ -185,11 +185,29 @@ export default function GlobalStyles() {
         }
       }
 
-      /* --- Karta tıklayınca (aktif) hafif neon glow --- */
-      .card-glow { transition: box-shadow 0.2s ease, transform 0.12s ease; }
+      /* --- Karta tıklayınca (aktif) hafif neon glow ---
+         "transition: all" KULLANILMIYOR — yalnızca box-shadow + transform (ucuz,
+         compositor'da çalışan özellikler). translateZ(0) + will-change,
+         tarayıcıya kartı kendi GPU katmanına alması için erken sinyal verir;
+         böylece :active'deki scale dönüşümü ana thread'i tıkamaz — mobilde
+         tik atma/kart seçme anındaki FPS düşüşünün CSS tarafındaki düzeltmesi. */
+      .card-glow {
+        transition: box-shadow 0.2s ease, transform 0.12s ease;
+        transform: translateZ(0);
+        will-change: transform;
+      }
       .card-glow:active {
-        transform: scale(0.985);
+        transform: translateZ(0) scale(0.985);
         box-shadow: 0 0 0 1px rgba(178,107,255,0.4), 0 8px 26px -8px rgba(244,64,107,0.45);
+      }
+
+      /* --- Mobilde ağır backdrop-blur/saturate maliyetini azalt: aynı katman
+         hiyerarşisi (chrome < card < modal) korunur, yalnızca piksel maliyeti
+         düşer. Masaüstünde (≥768px) tam efekt aynen kalır. --- */
+      @media (max-width: 767px) {
+        .glass { backdrop-filter: blur(8px) saturate(130%); -webkit-backdrop-filter: blur(8px) saturate(130%); }
+        .category-card { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+        .frost-lock { backdrop-filter: blur(4px) saturate(110%); -webkit-backdrop-filter: blur(4px) saturate(110%); }
       }
 
       /* --- Accordion (grid-rows tekniği ile yumuşak aç/kapa) --- */
