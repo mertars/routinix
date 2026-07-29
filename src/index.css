@@ -1,14 +1,147 @@
 @import "tailwindcss";
+/* Tailwind v4 CSS-first dark mode: .dark class herhangi bir atadaki elemente
+   eklendiğinde dark: varyantı devreye girer (bkz. ThemeContext.jsx). */
+@custom-variant dark (&:where(.dark, .dark *));
 
-/* OLED-dostu koyu zemin — html/body/#root'a set edilir ki iOS Safari'nin
-   alt/üst toolbar'ı (overscroll dahil) beyaz kalmasın, koyu rengi örneklesin. */
+/* =====================================================================
+   Routinix Tema Token'ları (Light/Dark)
+   Varsayılan (:root) = koyu tema (OLED, mevcut kimliğimiz) — JS çalışmadan
+   önce de doğru görünsün diye fallback. :root[data-theme="light"] açık
+   temada geçersiz kılar. ThemeContext <html>'e hem .dark/.light class'ını
+   (Tailwind dark: variant'ı için) hem de data-theme attribute'unu (bu
+   değişkenler için) yazar.
+   ===================================================================== */
 :root {
   color-scheme: dark;
+
+  --bg-app: #0b0c10;
+  --bg-card: #12181f;
+  --bg-elevated: #161d25;
+  --bg-input: #0f151b;
+  --disabled-bg: #1a222b;
+
+  --text-primary: #ecf2f4;
+  --text-secondary: #c5d0d8;
+  --text-muted: #8695a3;
+  --text-faint: #55636f;
+  --placeholder: #4a5761;
+  --text-on-accent: #0b0c10;
+
+  --border-default: #232c36;
+  --border-strong: #3a4653;
+  --border-header: #1e2731;
+
+  /* rgba(var(--x-rgb), alpha) tekniği: bileşenler kendi alpha değerini korur,
+     yalnızca renk tabanı temaya göre değişir. */
+  --glass-rgb: 15, 20, 27; /* popover/modal/drawer koyu cam zemini */
+  --overlay-rgb: 255, 255, 255; /* ince beyaz overlay border/hover tonu */
+  --lock-rgb: 20, 24, 32; /* kilitli gün rozetlerinin buzlu cam zemini */
+  --lock-border: rgba(255, 255, 255, 0.06);
+
+  /* --- Katmanlı Glassmorphism: 3 derinlik kademesi (Chrome < Card < Modal) ---
+     Her kademe rgba(var(--glass-rgb), var(--alpha-X)) şeklinde kullanılır;
+     böylece hem taban rengi hem saydamlık temaya göre bağımsız ayarlanabilir. */
+  --alpha-chrome: 0.85; /* Header + Sidebar (DrawerMenu) — en saydam/ambient */
+  --alpha-card: 0.7; /* Board/Task kartları (.glass) — orta saydamlık */
+  --alpha-modal: 0.95; /* Modal/Popover/Drawer (AI Koç, dropdown'lar) — yüksek okunabilirlik */
+
+  --glass-border: rgba(255, 255, 255, 0.06); /* .glass kart kenarlığı */
+  --modal-border: rgba(255, 255, 255, 0.1); /* modal/popover kenarlığı */
+  --sidebar-border: rgba(178, 107, 255, 0.2); /* DrawerMenu sol kenarlık (koyu: neon mor şerit) */
+  --glass-shadow: none;
+
+  --scene-opacity: 1; /* Koyu temaya özgü dağ silüeti + neon sırt taraması */
+  --topo-opacity: 0; /* Açık temaya özgü sedef/gümüş topoğrafik çizgiler */
+  --blob-opacity: 0.32; /* Süzülen mor/turuncu glow blob'ların opaklığı */
+
+  /* AI Koç: mor-tint yüzeyler üzerindeki metin/nokta rengi — düşük-alfa
+     rengin kendisi temayla değişmiyor (violet/rose tint her iki temada da
+     mantıklı), ama üzerindeki YAZI kontrastı için ayrı okunurluk tonu gerekir. */
+  --coach-text: #ece7ff;
+  --coach-error-text: #ffb4c4;
+
+  /* Beyaz zeminde soluklaşan turuncu/amber vurgu (Şablon Keşfet, öncelik/bütçe
+     rozetleri) için ayrı, temaya duyarlı ton. */
+  --amber-accent: #f0b37e;
+
+  /* Hero başlığı ("Hedefini tanımla...") gradient'i — koyu temada soluk
+     beyaz→mor; açık temada solda okunaklı koyu indigo/mor ile başlayıp sağa
+     doğru canlı mor/magenta'ya geçer (bkz. :root[data-theme="light"]). */
+  --hero-gradient: linear-gradient(120deg, #eaf2ff 0%, #c99cff 55%, #b26bff 100%);
+
+  /* 4'lü odak kartları (Yazılım/Fitness/Seyahat/Öğrenme) — .glass'tan daha
+     belirgin, "pırlanta gibi öne çıkan" özel kademe. Koyu temada .glass ile
+     aynı (mevcut görünüm korunur). */
+  --category-card-bg: rgba(var(--glass-rgb), var(--alpha-card));
+  --category-card-border: var(--glass-border);
+  --category-card-shadow: var(--glass-shadow);
 }
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Yumuşak, göz dinlendirici mat zemin — parlak/düz beyaz yerine tok bir
+     slate 100/200 arası ton; kartların (bg-card: saf beyaz) üzerinde net bir
+     "cam" derinliği hissi versin diye bilerek kartlardan biraz farklı/koyu. */
+  --bg-app: #ebf0f5;
+  --bg-card: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-input: #f1f5f9; /* slate-100 */
+  --disabled-bg: #e2e8f0; /* slate-200 */
+
+  --text-primary: #0f172a; /* slate-900 */
+  --text-secondary: #334155; /* slate-700 */
+  --text-muted: #64748b; /* slate-500 */
+  --text-faint: #94a3b8; /* slate-400 */
+  --placeholder: #94a3b8;
+  --text-on-accent: #0b0c10;
+
+  --border-default: #e2e8f0; /* slate-200 */
+  --border-strong: #cbd5e1; /* slate-300 */
+  --border-header: #e2e8f0;
+
+  --glass-rgb: 255, 255, 255;
+  --overlay-rgb: 15, 23, 42; /* slate-900 tabanlı koyu overlay */
+  --lock-rgb: 226, 232, 240; /* slate-200 */
+  --lock-border: #cbd5e1; /* slate-300 */
+
+  /* --- Katmanlı Glassmorphism: açık temada kademe başına düşen saydamlık --- */
+  --alpha-chrome: 0.4; /* bg-white/40 — Header + Sidebar */
+  --alpha-card: 0.6; /* bg-white/60 — Board kartları */
+  --alpha-modal: 0.85; /* bg-white/85 — Modal/Popover/AI Koç */
+
+  --glass-border: rgba(255, 255, 255, 0.8); /* border-white/80 — camsı parlak kenar */
+  --modal-border: rgba(255, 255, 255, 0.9); /* border-white/90 */
+  --sidebar-border: rgba(226, 232, 240, 0.6); /* border-slate-200/60 */
+  --glass-shadow: 0 1px 2px rgba(148, 163, 184, 0.5); /* shadow-sm shadow-slate-200/50 eşleniği */
+
+  --scene-opacity: 0; /* koyu temaya özgü dağ silüeti + neon sırt gizli */
+  --topo-opacity: 0.1; /* sedef/gümüş topoğrafik çizgiler — %8-12 opaklık */
+  --blob-opacity: 0.18; /* blob'lar krem zeminde daha az baskın olsun */
+
+  --coach-text: #4c1d95; /* violet-900 — açık mor zemin üzerinde okunur koyu metin */
+  --coach-error-text: #9f1239; /* rose-800 — açık pembe zemin üzerinde okunur koyu metin */
+
+  --amber-accent: #c2410c; /* orange-700 — beyaz zeminde doygun/okunur turuncu */
+
+  /* Solda okunaklı koyu indigo/mor (indigo-900), sağda canlı mor→magenta
+     (purple-700 → pink-600) — beyaz zeminde sol kelimeler artık %100 okunur. */
+  --hero-gradient: linear-gradient(120deg, #312e81 0%, #7e22ce 55%, #db2777 100%);
+
+  /* 4'lü odak kartları: bembeyaz + belirgin yumuşak gölge + net kenarlık —
+     mat slate zeminden "pırlanta gibi" öne çıksın. */
+  --category-card-bg: rgba(255, 255, 255, 0.9);
+  --category-card-border: rgba(226, 232, 240, 0.8); /* border-slate-200/80 */
+  --category-card-shadow: 0 4px 6px -1px rgba(203, 213, 225, 0.5), 0 2px 4px -2px rgba(203, 213, 225, 0.5); /* shadow-md shadow-slate-300/50 */
+}
+
+/* OLED-dostu koyu zemin — html/body/#root'a set edilir ki iOS Safari'nin
+   alt/üst toolbar'ı (overscroll dahil) tema rengini örneklesin. */
 html,
 body,
 #root {
-  background-color: #0b0c10;
+  background-color: var(--bg-app);
+  transition: background-color 0.25s ease;
 }
 body {
   margin: 0;

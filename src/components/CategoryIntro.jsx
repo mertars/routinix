@@ -41,8 +41,8 @@ export default function CategoryIntro({
           <span className="text-2xl">{mode.emoji}</span>
         </div>
         <div>
-          <h2 className="text-[16.5px] font-bold tracking-tight mb-1.5 text-[#ECF2F4]">Routinix odağını yapılandırıyor...</h2>
-          <p className="text-[12.5px] text-[#55636F]">Sana özel performans çerçeven hazırlanıyor, biraz sürebilir.</p>
+          <h2 className="text-[16.5px] font-bold tracking-tight mb-1.5 text-[var(--text-primary)]">Routinix odağını yapılandırıyor...</h2>
+          <p className="text-[12.5px] text-[var(--text-faint)]">Sana özel performans çerçeven hazırlanıyor, biraz sürebilir.</p>
         </div>
       </div>
     );
@@ -55,8 +55,8 @@ export default function CategoryIntro({
           🤔
         </div>
         <div>
-          <h2 className="text-[19px] font-bold text-[#ECF2F4] mb-2 text-balance">Bir şeyler ters gitti</h2>
-          <p className="text-sm text-[#8695A3] max-w-[300px] leading-relaxed mx-auto">{errorMsg}</p>
+          <h2 className="text-[19px] font-bold text-[var(--text-primary)] mb-2 text-balance">Bir şeyler ters gitti</h2>
+          <p className="text-sm text-[var(--text-muted)] max-w-[300px] leading-relaxed mx-auto">{errorMsg}</p>
         </div>
         <button
           onClick={onBackToIntro}
@@ -82,10 +82,10 @@ export default function CategoryIntro({
                 <button
                   key={p.id}
                   onClick={() => onOpenSavedPlan(p.id)}
-                  className="glass shrink-0 flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 hover:border-white/20 transition-colors card-glow"
+                  className="glass shrink-0 flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 hover:border-slate-300 dark:hover:border-white/20 transition-colors card-glow"
                 >
                   <span className="text-[13px]">{cat.emoji}</span>
-                  <span className="text-[11.5px] font-medium text-[#C5D0D8] max-w-[130px] truncate">{p.title || "Plan"}</span>
+                  <span className="text-[11.5px] font-medium text-[var(--text-secondary)] max-w-[130px] truncate">{p.title || "Plan"}</span>
                 </button>
               );
             })}
@@ -96,7 +96,7 @@ export default function CategoryIntro({
           <h1 className="text-2xl md:text-5xl font-bold leading-[1.12] tracking-tight text-balance">
             <span
               style={{
-                background: "linear-gradient(120deg, #EAF2FF 0%, #C99CFF 55%, #B26BFF 100%)",
+                background: "var(--hero-gradient)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
@@ -105,7 +105,7 @@ export default function CategoryIntro({
               Hedefini tanımla, disiplinini yapılandıralım.
             </span>
           </h1>
-          <p className="mt-2 md:mt-3 text-sm md:text-lg text-[#8695A3] leading-relaxed md:max-w-2xl">
+          <p className="mt-2 md:mt-3 text-sm md:text-lg text-[var(--text-muted)] leading-relaxed md:max-w-2xl">
             Önce odak alanını seç, sonra hedefini net bir şekilde yaz.
           </p>
         </div>
@@ -121,15 +121,16 @@ export default function CategoryIntro({
               <button
                 key={key}
                 onClick={() => onCategoryChange(key)}
-                className="glass group relative flex flex-col items-start gap-1.5 md:gap-3 rounded-2xl p-3.5 md:p-6 text-left transition-all duration-200 card-glow"
+                className="category-card group relative flex flex-col items-start gap-1.5 md:gap-3 rounded-2xl p-3.5 md:p-6 text-left transition-all duration-200 card-glow"
                 style={{
-                  borderColor: active ? c.accent : "rgba(255,255,255,0.10)",
-                  boxShadow: active ? `0 0 0 1px ${c.accent}, 0 10px 40px -18px ${c.accent}` : "none",
+                  borderColor: active ? c.accent : undefined,
+                  background: active ? `${c.accent}1f` : undefined,
+                  boxShadow: active ? `0 0 0 2px ${c.accent}, 0 10px 40px -18px ${c.accent}` : undefined,
                 }}
               >
                 <span className="text-2xl md:text-3xl">{c.emoji}</span>
-                <span className="text-sm md:text-lg font-semibold leading-snug text-[#ECF2F4]">{c.label}</span>
-                <span className="text-[11px] md:text-sm text-[#8695A3] leading-snug line-clamp-2 md:line-clamp-none">
+                <span className="text-sm md:text-lg font-semibold leading-snug text-[var(--text-primary)]">{c.label}</span>
+                <span className="text-[11px] md:text-sm text-[var(--text-muted)] leading-snug line-clamp-2 md:line-clamp-none">
                   {c.tagline}
                 </span>
                 {active && (
@@ -151,7 +152,7 @@ export default function CategoryIntro({
               <button
                 key={chip.label}
                 onClick={() => applyTemplate(chip)}
-                className="glass shrink-0 flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 text-[11.5px] font-medium text-[#C5D0D8] hover:text-[#ECF2F4] transition-colors card-glow"
+                className="glass shrink-0 flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 text-[11.5px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors card-glow"
                 style={{ borderColor: `${c.accent}33` }}
               >
                 <span className="text-[12px]">{chip.emoji}</span>
@@ -161,12 +162,12 @@ export default function CategoryIntro({
           })}
         </div>
 
-        <label className="block text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.14em] text-[#55636F] mb-1.5 md:mb-2">
+        <label className="block text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 dark:text-[var(--text-faint)] mb-1.5 md:mb-2">
           Hedefin
         </label>
         <div
           className={`input-glow glass flex items-center gap-2 rounded-2xl p-2 md:p-2.5 ${pulse ? "chip-fill-pulse" : ""}`}
-          style={{ borderColor: goalTooShort ? "#F0B37E" : "rgba(255,255,255,0.10)" }}
+          style={{ borderColor: goalTooShort ? "var(--amber-accent)" : "rgba(var(--overlay-rgb),0.10)" }}
         >
           <input
             type="text"
@@ -174,19 +175,19 @@ export default function CategoryIntro({
             onChange={(e) => onGoalChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && canStart && onStart()}
             placeholder="Örn: 3 ayda full-stack geliştirici ol..."
-            className="flex-1 min-w-0 bg-transparent outline-none text-sm md:text-base text-[#ECF2F4] placeholder:text-[#4A5761] px-2.5"
+            className="flex-1 min-w-0 bg-transparent outline-none text-sm md:text-base text-[var(--text-primary)] placeholder:text-[var(--placeholder)] px-2.5"
           />
           <button
             onClick={onStart}
             disabled={!canStart}
             className="shrink-0 rounded-xl px-5 md:px-7 py-2.5 md:py-3 text-sm md:text-base font-semibold transition-all duration-200 disabled:opacity-40"
-            style={{ background: canStart ? mode.accent : "#1A222B", color: canStart ? "#0b0c10" : "#55636F" }}
+            style={{ background: canStart ? mode.accent : "var(--disabled-bg)", color: canStart ? "#0b0c10" : "var(--text-faint)" }}
           >
             Başla
           </button>
         </div>
         {goalTooShort && (
-          <p className="mt-1.5 text-[11px] font-medium" style={{ color: "#F0B37E" }}>
+          <p className="mt-1.5 text-[11px] font-medium" style={{ color: "var(--amber-accent)" }}>
             Hedefini biraz daha açık yaz — en az {MIN_GOAL_LENGTH} karakter gerekli.
           </p>
         )}

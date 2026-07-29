@@ -87,25 +87,25 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-[360px] rounded-3xl p-6 animate-[fadeIn_0.2s_ease]"
         style={{
-          background: "rgba(15,20,27,0.92)",
+          background: "rgba(var(--glass-rgb), var(--alpha-modal))",
           backdropFilter: "blur(24px) saturate(160%)",
           WebkitBackdropFilter: "blur(24px) saturate(160%)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          border: "1px solid var(--modal-border)",
           boxShadow: "0 24px 60px -20px rgba(0,0,0,0.7)",
         }}
       >
         <div className="flex items-start justify-between mb-5">
           <div>
-            <h2 className="text-[18px] font-bold text-[#ECF2F4]">
+            <h2 className="text-[18px] font-bold text-[var(--text-primary)]">
               {tab === "signin" ? "Giriş Yap" : "Kayıt Ol"}
             </h2>
-            <p className="text-[12px] text-[#8695A3] mt-1">Planlarını kaydetmek için hesabına bağlan.</p>
+            <p className="text-[12px] text-[var(--text-muted)] mt-1">Planlarını kaydetmek için hesabına bağlan.</p>
           </div>
           <button
             onClick={onClose}
             aria-label="Kapat"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#8695A3] hover:text-[#ECF2F4] transition-colors shrink-0"
-            style={{ background: "rgba(255,255,255,0.05)" }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+            style={{ background: "rgba(var(--overlay-rgb),0.05)" }}
           >
             ✕
           </button>
@@ -114,7 +114,7 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
         {/* Sekme kontrolü */}
         <div
           className="flex rounded-xl p-1 gap-1 mb-4"
-          style={{ background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.08)" }}
+          style={{ background: "rgba(var(--overlay-rgb),0.045)", border: "1px solid rgba(var(--overlay-rgb),0.08)" }}
         >
           {[
             ["signin", "Giriş Yap"],
@@ -132,7 +132,7 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
                 className="flex-1 rounded-lg py-2 text-[12.5px] font-semibold transition-all duration-150"
                 style={{
                   background: active ? `${accentColor}22` : "transparent",
-                  color: active ? accentColor : "#8695A3",
+                  color: active ? accentColor : "var(--text-muted)",
                 }}
               >
                 {label}
@@ -172,9 +172,9 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
 
         {/* Ayraç */}
         <div className="flex items-center gap-3 my-4">
-          <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.08)" }} />
-          <span className="text-[11px] font-medium text-[#55636F]">veya</span>
-          <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.08)" }} />
+          <div className="flex-1 h-px" style={{ background: "rgba(var(--overlay-rgb),0.08)" }} />
+          <span className="text-[11px] font-medium text-[var(--text-faint)]">veya</span>
+          <div className="flex-1 h-px" style={{ background: "rgba(var(--overlay-rgb),0.08)" }} />
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -184,8 +184,8 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
             autoComplete="email"
-            className="w-full rounded-xl border px-4 py-3 bg-transparent outline-none text-[14px] text-[#ECF2F4] placeholder:text-[#4A5761]"
-            style={{ borderColor: "#232C36", background: "#12181F" }}
+            className="w-full rounded-xl border px-4 py-3 bg-transparent outline-none text-[14px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)]"
+            style={{ borderColor: "var(--border-default)", background: "var(--bg-card)" }}
           />
           <input
             type="password"
@@ -193,8 +193,8 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Şifre (en az 6 karakter)"
             autoComplete={tab === "signin" ? "current-password" : "new-password"}
-            className="w-full rounded-xl border px-4 py-3 bg-transparent outline-none text-[14px] text-[#ECF2F4] placeholder:text-[#4A5761]"
-            style={{ borderColor: "#232C36", background: "#12181F" }}
+            className="w-full rounded-xl border px-4 py-3 bg-transparent outline-none text-[14px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)]"
+            style={{ borderColor: "var(--border-default)", background: "var(--bg-card)" }}
           />
 
           {error && (

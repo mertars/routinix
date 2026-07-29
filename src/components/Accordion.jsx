@@ -24,7 +24,7 @@ export default function Accordion({ title, icon, accent, defaultOpen = false, ch
           {title}
         </span>
         {right}
-        <span className={`accordion-chevron text-[#8695A3] text-[12px] ${open ? "open" : ""}`}>▾</span>
+        <span className={`accordion-chevron text-[var(--text-muted)] text-[12px] ${open ? "open" : ""}`}>▾</span>
       </button>
       <div className={`accordion-body ${open ? "open" : ""}`}>
         <div className="accordion-inner">

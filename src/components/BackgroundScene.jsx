@@ -1,10 +1,27 @@
-// Atmosferik arka plan: çok soluk, monokrom antrasit dağ/topoğrafik silüet
-// katmanları + sırt çizgileri üzerinde yumuşakça süzülen neon (beyaz/mor) ışık
-// şeridi. Tamamen dekoratif ve etkileşimsiz; sabit (fixed) olarak tüm ekranı
-// kaplar ve içeriğin arkasında durur. prefers-reduced-motion'da hareket durur.
+// Atmosferik arka plan — iki temaya özgü katman + her iki temada da ortak
+// süzülen glow blob'lar:
+//   Koyu tema : çok soluk monokrom antrasit dağ/topoğrafik silüet + sırt
+//               çizgileri üzerinde süzülen neon (beyaz/mor) ışık şeridi.
+//   Açık tema : aynı topoğrafik kontur çizgilerinin sedef/gümüş, %8-12
+//               opaklıktaki versiyonu (dağ dolgusu ve neon şerit koyu temaya
+//               özgü olduğundan açık temada gizli kalır).
+// Her iki temada: yavaşça süzülen bulanık mor + koyu turuncu glow blob'lar
+// (--blob-opacity ile temaya göre ayarlanır). Tamamen dekoratif ve
+// etkileşimsiz; sabit (fixed) olarak tüm ekranı kaplar, içeriğin arkasında
+// durur. prefers-reduced-motion'da hareket durur.
 export default function BackgroundScene() {
   return (
     <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
+      {/* --- Süzülen glow blob'lar (mor + koyu turuncu) — her iki temada --- */}
+      <div
+        className="bg-blob bg-blob--violet"
+        style={{ width: 520, height: 520, top: "-8%", left: "-10%", background: "radial-gradient(circle, #B26BFF 0%, transparent 70%)" }}
+      />
+      <div
+        className="bg-blob bg-blob--orange"
+        style={{ width: 480, height: 480, bottom: "-12%", right: "-8%", background: "radial-gradient(circle, #C2410C 0%, transparent 70%)" }}
+      />
+
       <svg
         className="absolute inset-0 w-full h-full"
         viewBox="0 0 1440 800"
@@ -12,12 +29,12 @@ export default function BackgroundScene() {
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          {/* Dağ dolgusu — antrasit, aşağı doğru zemine karışır */}
+          {/* Dağ dolgusu — antrasit, aşağı doğru zemine karışır (yalnızca koyu tema) */}
           <linearGradient id="bgMountain" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#161A22" />
             <stop offset="100%" stopColor="#0b0c10" />
           </linearGradient>
-          {/* Üstte hafif sisli mor perde */}
+          {/* Üstte hafif sisli mor perde (yalnızca koyu tema) */}
           <radialGradient id="bgHaze" cx="50%" cy="18%" r="70%">
             <stop offset="0%" stopColor="rgba(178,107,255,0.10)" />
             <stop offset="55%" stopColor="rgba(178,107,255,0.03)" />
@@ -33,65 +50,89 @@ export default function BackgroundScene() {
           </filter>
         </defs>
 
-        {/* Sisli mor perde */}
-        <rect x="0" y="0" width="1440" height="800" fill="url(#bgHaze)" />
+        {/* ================= KOYU TEMA KATMANI ================= */}
+        <g style={{ opacity: "var(--scene-opacity)" }}>
+          {/* Sisli mor perde */}
+          <rect x="0" y="0" width="1440" height="800" fill="url(#bgHaze)" />
 
-        {/* --- Dağ silüet katmanları (uzaktan yakına, opaklık artar) --- */}
-        <path
-          d="M0,470 L180,430 L320,485 L470,378 L620,452 L780,360 L940,442 L1100,392 L1260,462 L1440,408 L1440,800 L0,800 Z"
-          fill="url(#bgMountain)"
-          opacity="0.35"
-        />
-        <path
-          d="M0,600 L150,558 L300,624 L460,520 L640,602 L820,508 L1000,592 L1180,540 L1440,600 L1440,800 L0,800 Z"
-          fill="url(#bgMountain)"
-          opacity="0.55"
-        />
-        <path
-          d="M0,700 L200,658 L400,722 L600,648 L820,712 L1040,660 L1260,722 L1440,678 L1440,800 L0,800 Z"
-          fill="url(#bgMountain)"
-          opacity="0.8"
-        />
+          {/* Dağ silüet katmanları (uzaktan yakına, opaklık artar) */}
+          <path
+            d="M0,470 L180,430 L320,485 L470,378 L620,452 L780,360 L940,442 L1100,392 L1260,462 L1440,408 L1440,800 L0,800 Z"
+            fill="url(#bgMountain)"
+            opacity="0.35"
+          />
+          <path
+            d="M0,600 L150,558 L300,624 L460,520 L640,602 L820,508 L1000,592 L1180,540 L1440,600 L1440,800 L0,800 Z"
+            fill="url(#bgMountain)"
+            opacity="0.55"
+          />
+          <path
+            d="M0,700 L200,658 L400,722 L600,648 L820,712 L1040,660 L1260,722 L1440,678 L1440,800 L0,800 Z"
+            fill="url(#bgMountain)"
+            opacity="0.8"
+          />
 
-        {/* --- Topoğrafik ince kontur çizgileri (çok soluk) --- */}
-        <path
-          d="M0,510 L180,472 L320,524 L470,420 L620,492 L780,402 L940,482 L1100,432 L1260,500 L1440,450"
-          fill="none"
-          stroke="#232935"
-          strokeWidth="1"
-          opacity="0.5"
-        />
-        <path
-          d="M0,648 L150,608 L300,668 L460,566 L640,648 L820,556 L1000,636 L1180,586 L1440,646"
-          fill="none"
-          stroke="#232935"
-          strokeWidth="1"
-          opacity="0.45"
-        />
+          {/* Topoğrafik ince kontur çizgileri (çok soluk) */}
+          <path
+            d="M0,510 L180,472 L320,524 L470,420 L620,492 L780,402 L940,482 L1100,432 L1260,500 L1440,450"
+            fill="none"
+            stroke="#232935"
+            strokeWidth="1"
+            opacity="0.5"
+          />
+          <path
+            d="M0,648 L150,608 L300,668 L460,566 L640,648 L820,556 L1000,636 L1180,586 L1440,646"
+            fill="none"
+            stroke="#232935"
+            strokeWidth="1"
+            opacity="0.45"
+          />
 
-        {/* --- Neon ışık şeritleri: sırt çizgileri boyunca süzülen dash --- */}
-        {/* Uzak sırt: mor */}
-        <path
-          className="ridge-sweep ridge-sweep--far"
-          d="M0,470 L180,430 L320,485 L470,378 L620,452 L780,360 L940,442 L1100,392 L1260,462 L1440,408"
-          fill="none"
-          stroke="#B26BFF"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          filter="url(#bgGlow)"
-        />
-        {/* Orta sırt: neon beyaz */}
-        <path
-          className="ridge-sweep ridge-sweep--mid"
-          d="M0,600 L150,558 L300,624 L460,520 L640,602 L820,508 L1000,592 L1180,540 L1440,600"
-          fill="none"
-          stroke="#EAF2FF"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          filter="url(#bgGlow)"
-        />
+          {/* Neon ışık şeritleri: sırt çizgileri boyunca süzülen dash */}
+          <path
+            className="ridge-sweep ridge-sweep--far"
+            d="M0,470 L180,430 L320,485 L470,378 L620,452 L780,360 L940,442 L1100,392 L1260,462 L1440,408"
+            fill="none"
+            stroke="#B26BFF"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            filter="url(#bgGlow)"
+          />
+          <path
+            className="ridge-sweep ridge-sweep--mid"
+            d="M0,600 L150,558 L300,624 L460,520 L640,602 L820,508 L1000,592 L1180,540 L1440,600"
+            fill="none"
+            stroke="#EAF2FF"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            filter="url(#bgGlow)"
+          />
+        </g>
+
+        {/* ================= AÇIK TEMA KATMANI ================= */}
+        {/* Sedef/gümüş topoğrafik kontur çizgileri — %8-12 opaklık (--topo-opacity) */}
+        <g style={{ opacity: "var(--topo-opacity)" }}>
+          <path
+            d="M0,510 L180,472 L320,524 L470,420 L620,492 L780,402 L940,482 L1100,432 L1260,500 L1440,450"
+            fill="none"
+            stroke="#94A3A0"
+            strokeWidth="1.2"
+          />
+          <path
+            d="M0,600 L150,558 L300,624 L460,520 L640,602 L820,508 L1000,592 L1180,540 L1440,600"
+            fill="none"
+            stroke="#B7C0B4"
+            strokeWidth="1.2"
+          />
+          <path
+            d="M0,700 L200,658 L400,722 L600,648 L820,712 L1040,660 L1260,722 L1440,678"
+            fill="none"
+            stroke="#94A3A0"
+            strokeWidth="1"
+          />
+        </g>
       </svg>
 
       <style>{`

@@ -88,13 +88,13 @@ export default function App() {
   const onIntroLike = stage === STAGE_INTRO || stage === STAGE_LOADING || stage === STAGE_ERROR;
 
   return (
-    <div className="w-full" style={{ background: "#0b0c10" }}>
+    <div className="w-full" style={{ background: "var(--bg-app)" }}>
       {/* Atmosferik animasyonlu dağ/topoğrafya + neon şerit arka planı (içeriğin arkasında) */}
       <BackgroundScene />
 
       {/* Mobilde intro tek ekrana kilitli (h-100dvh, scroll yok); md'den itibaren serbest. */}
       <div
-        className={`relative z-10 flex flex-col text-[#ECF2F4] ${
+        className={`relative z-10 flex flex-col text-[var(--text-primary)] ${
           onIntroLike
             ? "h-[100dvh] overflow-hidden md:h-auto md:min-h-screen md:overflow-visible"
             : "min-h-[100dvh]"
@@ -250,7 +250,15 @@ export default function App() {
       />
 
       {/* AI Koç — yalnızca aktif bir plan açıkken (aksiyonları o planın görevlerini günceller) */}
-      {ps.dbPlan && <AiCoachWidget plan={ps.dbPlan} userId={auth.user?.id} onApplyAction={ps.applyCoachAction} />}
+      {ps.dbPlan && (
+        <AiCoachWidget
+          plan={ps.dbPlan}
+          userId={auth.user?.id}
+          onApplyAction={ps.applyCoachAction}
+          onSendMessage={ps.sendCoachMessage}
+          onJumpToPlan={ps.openSavedPlan}
+        />
+      )}
 
       {/* PDF / Yazdır — aralık seçimi + yazdır */}
       <PrintModal

@@ -18,9 +18,8 @@ import {
   fetchUserPlans,
   fetchPlanDetail,
   deletePlan as deletePlanSvc,
-  updateTasksBulk,
 } from "./services/planService";
-import { lightenTasks, intensifyTasks, postponeDayTasks, findTodayDay, analyzeProgress } from "./services/aiCoachService";
+import { callCoachAction } from "./services/coachActionService";
 import { setHapticsEnabled } from "./lib/haptics";
 import logger from "./utils/logger";
 
@@ -296,60 +295,58 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     }
   };
 
-  // ---- AI Koç: hazır aksiyon çipleri (Planı Hafiflet / Tempoyu Sıkılaştır /
-  // Bugün Çok Yoruldum / Gidişatımı Analiz Et) ----
-  // Önce local `weeks` state'i optimistic olarak günceller (task'ları yeniden
-  // gruplayarak — day_number değişen görevler doğru gün kovasına taşınsın diye),
-  // sonra Supabase'e kalıcılaştırır. Döner: { ok, message } — sohbet baloncuğuna basılır.
-  const applyCoachAction = async (actionKey) => {
-    if (!dbPlan) return { ok: false, message: "Önce bir plan açman gerekiyor." };
-
-    if (actionKey === "analyze") {
-      return { ok: true, message: analyzeProgress(weeks) };
-    }
-
-    let patches = [];
-    let message = "";
-
-    if (actionKey === "lighten") {
-      patches = lightenTasks(allTasks);
-      message = "Anlaşıldı! Bugünkü görev yükünü %30 hafifletip süreleri güncelledim 🌿";
-    } else if (actionKey === "intensify") {
-      patches = intensifyTasks(allTasks);
-      message = "Tempoyu sıkılaştırdım — görev süreleri kısaldı, öncelikler yükseldi. Hadi bakalım 🔥";
-    } else if (actionKey === "postponeToday") {
-      const todayDay = findTodayDay(weeks);
-      if (!todayDay || !todayDay.tasks.some((t) => !t.is_completed)) {
-        return { ok: true, message: "Bugün için bekleyen görevin yok, harika gidiyorsun! ✅" };
-      }
-      patches = postponeDayTasks(todayDay);
-      message = "Bugünün kalan görevlerini yarına kaydırdım — kendine iyi bak, yarın devam ederiz ☕";
-    } else {
-      return { ok: false, message: "Bu aksiyonu tanımıyorum." };
-    }
-
-    if (patches.length === 0) {
-      return { ok: true, message: "Şu an güncellenecek aktif bir görev bulamadım — plan zaten tamamlanmış görünüyor 🎉" };
-    }
-
-    // Optimistic UI: task'ları düz listeye indirip yamaları uygula, sonra
-    // week_number/day_number'a göre yeniden grupla (postpone gün taşırsa doğru
-    // kovaya düşsün diye groupTasksToWeeks'ten geçirmek şart).
-    const patchMap = new Map(patches.map((p) => [p.id, p.fields]));
+  // Sunucudan (api/coach-action.js) dönen — zaten Supabase'e kalıcılaşmış —
+  // task değişikliklerini local `weeks` state'ine optimistic olarak yansıtır.
+  // Yalnızca ekranda AÇIK olan plan için çağrılır (başka bir plan mutasyona
+  // uğradıysa board'u rahatsız etmeyiz — kullanıcı isterse "Görüntüle" ile geçer).
+  const applyServerTaskChanges = (mutatedTasks = [], newTasks = []) => {
+    if (!mutatedTasks.length && !newTasks.length) return;
     setWeeks((prev) => {
       const flat = prev.flatMap((w) => w.days.flatMap((d) => d.tasks));
-      const patched = flat.map((t) => (patchMap.has(t.id) ? { ...t, ...patchMap.get(t.id) } : t));
-      return groupTasksToWeeks(patched);
+      const byId = new Map(flat.map((t) => [t.id, t]));
+      for (const mt of mutatedTasks) byId.set(mt.id, mt);
+      for (const nt of newTasks) byId.set(nt.id, nt);
+      return groupTasksToWeeks([...byId.values()]);
     });
+  };
 
-    try {
-      await updateTasksBulk(patches.map((p) => ({ id: p.id, ...p.fields })));
-    } catch (err) {
-      logger.error("AI_COACH", "Plan güncellemesi kaydedilemedi", { planId: dbPlan.id, actionKey, error: err?.message });
-      return { ok: false, message: "Değişiklikleri uyguladım ama kaydederken bir sorun oluştu — bağlantını kontrol edip tekrar dener misin?" };
+  // ---- AI Koç: hazır aksiyon çipleri (Planı Hafiflet / Tempoyu Sıkılaştır /
+  // Bugün Çok Yoruldum / Gidişatımı Analiz Et) ----
+  // Artık TAMAMEN sunucuda (api/coach-action.js, service_role): hak kontrolü/
+  // düşümü ve gerçek Supabase mutasyonu orada olur. Client yalnızca sonucu
+  // local state'e optimistic olarak uygular. Döner: { ok, consumed, message }.
+  const applyCoachAction = async (actionKey) => {
+    if (!dbPlan) return { ok: false, consumed: false, message: "Önce bir plan açman gerekiyor." };
+
+    const result = await callCoachAction({ action: actionKey, targetPlanId: dbPlan.id });
+    if (result?.ok) {
+      applyServerTaskChanges(result.mutatedTasks, result.newTasks);
+      if (result.mutatedTasks?.length || result.newTasks?.length) refreshSavedPlans();
+    }
+    return result;
+  };
+
+  // ---- AI Koç: serbest metin (Multi-Plan Awareness) ----
+  // Sunucu, AI'ın tespit ettiği hedef planı (ya da widget'ın dropdown'dan
+  // seçilenini) kendi çözer ve mutasyonu orada yapar. Ekranda açık olan
+  // plansa sonucu optimistic yansıtırız; başka bir plansa board'u değiştirmeyiz.
+  // Döner: { ok, consumed, message, targetPlanId }.
+  const sendCoachMessage = async (message, { targetPlanId } = {}) => {
+    const text = (message || "").trim();
+    if (!text) return { ok: true, consumed: false, message: "" };
+    if (!user) {
+      onRequireAuth?.();
+      return { ok: false, consumed: false, message: "Devam etmek için giriş yapmalısın." };
     }
 
-    return { ok: true, message };
+    const result = await callCoachAction({ action: "freeText", message: text, targetPlanId: targetPlanId || dbPlan?.id });
+
+    if (result?.ok && result.targetPlanId && result.targetPlanId === dbPlan?.id) {
+      applyServerTaskChanges(result.mutatedTasks, result.newTasks);
+      if (result.mutatedTasks?.length || result.newTasks?.length) refreshSavedPlans();
+    }
+
+    return result;
   };
 
   // Aktif planın ilerlemesi (tüm haftalar).
@@ -373,6 +370,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     // setter/aksiyon
     setGoal, setExtraNote, setMenuOpen, setRemindersOn, setHapticsOn,
     handleCategoryChange, startOnboarding, setAnswer, goNextQuestion, goPrevQuestion, finalizeAndGenerate,
-    loadNextWeek, toggleTask, openSavedPlan, deletePlan, startNewPlan, resetToIntro, startFromTemplate, applyCoachAction,
+    loadNextWeek, toggleTask, openSavedPlan, deletePlan, startNewPlan, resetToIntro, startFromTemplate,
+    applyCoachAction, sendCoachMessage,
   };
 }

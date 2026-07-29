@@ -26,10 +26,10 @@ export default class ErrorBoundary extends Component {
     if (!this.state.hasError) return this.props.children;
 
     return (
-      <div className="min-h-screen w-full flex items-center justify-center px-6 text-center" style={{ background: "#0b0c10", color: "#ECF2F4" }}>
+      <div className="min-h-screen w-full flex items-center justify-center px-6 text-center" style={{ background: "var(--bg-app)", color: "var(--text-primary)" }}>
         <div className="max-w-sm">
           <p className="text-[17px] font-bold mb-2">Bir şeyler ters gitti.</p>
-          <p className="text-[13px] text-slate-400 leading-relaxed mb-5">
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
             Beklenmedik bir hata oluştu. Sayfayı yenilemeyi dene; sorun devam ederse bize bildir.
           </p>
           <button

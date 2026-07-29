@@ -26,14 +26,14 @@ function PlanAccordion({ plan, onToggle }) {
   const done = tasks.filter((t) => t.is_completed).length;
 
   return (
-    <div className="rounded-xl border overflow-hidden" style={{ borderColor: `${cat.accent}30`, background: "rgba(255,255,255,0.03)" }}>
+    <div className="rounded-xl border overflow-hidden" style={{ borderColor: `${cat.accent}30`, background: "rgba(var(--overlay-rgb),0.03)" }}>
       <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center gap-2 px-3 py-2.5 text-left">
         <span className="text-[14px] shrink-0">{cat.emoji}</span>
-        <span className="flex-1 min-w-0 text-[12.5px] font-semibold text-[#ECF2F4] truncate">{plan.title || "Plan"}</span>
+        <span className="flex-1 min-w-0 text-[12.5px] font-semibold text-[var(--text-primary)] truncate">{plan.title || "Plan"}</span>
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: cat.accentSoft, color: cat.accent }}>
           {done}/{tasks.length}
         </span>
-        <span className={`accordion-chevron text-[#8695A3] text-[11px] ${open ? "open" : ""}`}>▾</span>
+        <span className={`accordion-chevron text-[var(--text-muted)] text-[11px] ${open ? "open" : ""}`}>▾</span>
       </button>
       <div className={`accordion-body ${open ? "open" : ""}`}>
         <div className="accordion-inner">
@@ -46,12 +46,12 @@ function PlanAccordion({ plan, onToggle }) {
                 <button
                   key={t.id}
                   onClick={() => onToggle(plan.id, t.id, !t.is_completed)}
-                  className="w-full text-left flex items-start gap-2.5 rounded-lg px-2 py-1.5 hover:bg-white/5 transition-colors"
+                  className="w-full text-left flex items-start gap-2.5 rounded-lg px-2 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   <span
                     className="w-4 h-4 rounded-[5px] border flex items-center justify-center text-[9px] shrink-0 mt-0.5"
                     style={{
-                      borderColor: t.is_completed ? "#2ED9A3" : "#3A4653",
+                      borderColor: t.is_completed ? "#2ED9A3" : "var(--border-strong)",
                       background: t.is_completed ? "rgba(46,217,163,0.16)" : "transparent",
                       color: "#2ED9A3",
                     }}
@@ -59,14 +59,14 @@ function PlanAccordion({ plan, onToggle }) {
                     {t.is_completed ? "✓" : ""}
                   </span>
                   <span
-                    className="text-[12.5px] font-medium leading-relaxed text-slate-100"
+                    className="text-[12.5px] font-medium leading-relaxed text-slate-900 dark:text-slate-100"
                     style={{ opacity: t.is_completed ? 0.55 : 1, textDecoration: t.is_completed ? "line-through" : "none" }}
                   >
                     {t.title}
                   </span>
                 </button>
               ))}
-              {tasks.length === 0 && <p className="text-[11px] text-[#55636F] px-2">Bu plan için görev bulunamadı.</p>}
+              {tasks.length === 0 && <p className="text-[11px] text-[var(--text-faint)] px-2">Bu plan için görev bulunamadı.</p>}
             </div>
           </div>
         </div>
@@ -112,29 +112,29 @@ export default function TodayPopover({ open, userId, onClose }) {
       <div
         className="pop-in fixed top-[62px] right-3 z-[70] w-[calc(100vw-24px)] max-w-[380px] rounded-2xl p-4 shadow-2xl font-sans"
         style={{
-          background: "rgba(15,20,27,0.96)",
+          background: "rgba(var(--glass-rgb), var(--alpha-modal))",
           backdropFilter: "blur(20px) saturate(160%)",
           WebkitBackdropFilter: "blur(20px) saturate(160%)",
-          border: "1px solid rgba(255,255,255,0.10)",
+          border: "1px solid var(--modal-border)",
           boxShadow: "0 24px 60px -18px rgba(0,0,0,0.75), inset 0 1px 22px -14px rgba(178,107,255,0.5)",
         }}
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[14px] font-semibold text-slate-100">⚡ Bugünün Görevleri</h3>
+          <h3 className="text-[14px] font-semibold text-slate-900 dark:text-slate-100">⚡ Bugünün Görevleri</h3>
           <button
             onClick={onClose}
             aria-label="Kapat"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-100 transition-colors"
-            style={{ background: "rgba(255,255,255,0.05)" }}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+            style={{ background: "rgba(var(--overlay-rgb),0.05)" }}
           >
             ✕
           </button>
         </div>
 
         {loading && !data ? (
-          <p className="text-[12.5px] text-slate-400 py-6 text-center font-medium">Yükleniyor...</p>
+          <p className="text-[12.5px] text-slate-500 dark:text-slate-400 py-6 text-center font-medium">Yükleniyor...</p>
         ) : plans.length === 0 ? (
-          <p className="text-[12.5px] text-slate-400 py-6 text-center font-medium">Henüz aktif planın yok.</p>
+          <p className="text-[12.5px] text-slate-500 dark:text-slate-400 py-6 text-center font-medium">Henüz aktif planın yok.</p>
         ) : (
           <div className="max-h-[70vh] overflow-y-auto no-scrollbar flex flex-col gap-2">
             {plans.map((p) => (

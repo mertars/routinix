@@ -44,11 +44,37 @@ export default function GlobalStyles() {
       }
 
       /* --- Glassmorphism kart --- */
+      /* Koyu temada ince, düşük-alfa "luminance" ayrımı; açık temada aynı teknik
+         neredeyse görünmez kaldığından belirgin gri bir kenarlığa (border-slate-200
+         eşleniği) geçilir — bkz. :root[data-theme="light"] --glass-border. */
       .glass {
-        background: rgba(18, 24, 31, 0.70);
+        background: rgba(var(--glass-rgb), var(--alpha-card));
         backdrop-filter: blur(16px) saturate(150%);
         -webkit-backdrop-filter: blur(16px) saturate(150%);
-        border: 1px solid rgba(255,255,255,0.06);
+        border: 1px solid var(--glass-border);
+        box-shadow: var(--glass-shadow);
+      }
+
+      /* --- Modal/Popover/Drawer katmanı: en yüksek okunabilirlik (bkz. --alpha-modal) --- */
+      .glass-modal {
+        background: rgba(var(--glass-rgb), var(--alpha-modal));
+        border: 1px solid var(--modal-border);
+      }
+
+      /* --- 4'lü odak kartları (Yazılım/Fitness/Seyahat/Öğrenme): koyu temada
+         .glass ile aynı, açık temada bembeyaz + belirgin gölge/kenarlık ile
+         mat zeminden öne çıkar. --- */
+      .category-card {
+        background: var(--category-card-bg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--category-card-border);
+        box-shadow: var(--category-card-shadow);
+      }
+
+      /* --- Header/Sidebar katmanı: en saydam, ambient (bkz. --alpha-chrome) --- */
+      .glass-chrome {
+        background: rgba(var(--glass-rgb), var(--alpha-chrome));
       }
 
       /* --- Dokunsal (tactile) mikro-çökme: tüm butonlar basılınca hafifçe içe çöker --- */
@@ -61,12 +87,13 @@ export default function GlobalStyles() {
         mask-image: linear-gradient(90deg, transparent 0, #000 26px, #000 calc(100% - 26px), transparent 100%);
       }
 
-      /* --- Kilitli gün: buzlu cam katmanı --- */
+      /* --- Kilitli gün: buzlu cam katmanı (koyu: yarı saydam koyu; açık:
+         bg-slate-200/60 + border-slate-300 eşleniği) --- */
       .frost-lock {
-        background: rgba(20, 24, 32, 0.55);
+        background: rgba(var(--lock-rgb), 0.6);
         backdrop-filter: blur(6px) saturate(120%);
         -webkit-backdrop-filter: blur(6px) saturate(120%);
-        border: 1px solid rgba(255,255,255,0.06);
+        border: 1px solid var(--lock-border);
       }
 
       /* --- Input odaklanınca yanlardan taşan neon ışıltı --- */
@@ -112,10 +139,10 @@ export default function GlobalStyles() {
         margin-left: -20px;
         margin-right: -20px;
         padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
-        background: rgba(10, 14, 19, 0.82);
+        background: rgba(var(--glass-rgb), var(--alpha-chrome));
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
-        border-top: 1px solid #1E2731;
+        border-top: 1px solid var(--border-header);
       }
 
       /* --- Popover (Bugünün Görevleri) açılış animasyonu --- */
@@ -141,9 +168,32 @@ export default function GlobalStyles() {
       }
       .chip-fill-pulse { animation: chipFill 0.6s ease-out; }
 
+      /* --- Yavaşça süzülen bulanık glow blob'lar (BackgroundScene) — mor ve
+         koyu turuncu dairesel parıltılar; hem koyu hem açık temada mevcut,
+         yalnızca opaklık (--blob-opacity) temaya göre ayarlanır. --- */
+      @keyframes blobFloatA {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(4%, 6%) scale(1.08); }
+        66% { transform: translate(-3%, 3%) scale(0.96); }
+      }
+      @keyframes blobFloatB {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        50% { transform: translate(-5%, -4%) scale(1.1); }
+      }
+      .bg-blob {
+        position: absolute;
+        border-radius: 9999px;
+        filter: blur(70px);
+        opacity: var(--blob-opacity);
+        will-change: transform;
+      }
+      .bg-blob--violet { animation: blobFloatA 26s ease-in-out infinite; }
+      .bg-blob--orange { animation: blobFloatB 32s ease-in-out infinite; }
+
       @media (prefers-reduced-motion: reduce) {
         .motion-safe\\:animate-spin { animation: none !important; }
         .drawer-panel, .focus-sheet, .day-reveal, .neon-strip, .pop-in, .chip-fill-pulse, .check-glow { animation: none !important; }
+        .bg-blob--violet, .bg-blob--orange { animation: none !important; }
         .accordion-body { transition: none !important; }
       }
 

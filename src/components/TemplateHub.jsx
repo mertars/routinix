@@ -9,7 +9,7 @@ function TemplateCard({ template, previewOpen, onTogglePreview, onUse }) {
   return (
     <div className="glass rounded-2xl overflow-hidden flex flex-col" style={{ borderColor: `${cat.accent}30` }}>
       {/* Kapak görseli + süre rozeti (Unsplash, kırılırsa gradyan zemin kalır) */}
-      <div className="relative h-32 md:h-36 shrink-0" style={{ background: `linear-gradient(135deg, ${cat.accent}33, #0b0c10)` }}>
+      <div className="relative h-32 md:h-36 shrink-0" style={{ background: `linear-gradient(135deg, ${cat.accent}33, var(--bg-app))` }}>
         <img
           src={template.image}
           alt=""
@@ -21,7 +21,7 @@ function TemplateCard({ template, previewOpen, onTogglePreview, onUse }) {
         <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, transparent 40%, rgba(11,12,16,0.85) 100%)" }} />
         <span
           className="absolute top-2 right-2 text-[10.5px] font-bold px-2 py-1 rounded-full"
-          style={{ background: "rgba(11,12,16,0.75)", color: "#ECF2F4", border: "1px solid rgba(255,255,255,0.15)" }}
+          style={{ background: "rgba(11,12,16,0.75)", color: "var(--text-primary)", border: "1px solid rgba(var(--overlay-rgb),0.15)" }}
         >
           {template.totalDays} Gün
         </span>
@@ -30,8 +30,8 @@ function TemplateCard({ template, previewOpen, onTogglePreview, onUse }) {
 
       {/* Orta kısım */}
       <div className="flex-1 p-3.5 flex flex-col gap-1.5">
-        <h3 className="text-[13.5px] font-semibold leading-snug text-slate-100 text-balance">{template.title}</h3>
-        <p className="text-[11.5px] text-slate-400 leading-relaxed line-clamp-2 flex-1">{template.description}</p>
+        <h3 className="text-[13.5px] font-semibold leading-snug text-slate-900 dark:text-slate-100 text-balance">{template.title}</h3>
+        <p className="text-[11.5px] text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 flex-1">{template.description}</p>
         <span
           className="inline-flex self-start items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full mt-0.5"
           style={{ background: "rgba(46,217,163,0.12)", color: "#7DE9C3" }}
@@ -43,14 +43,14 @@ function TemplateCard({ template, previewOpen, onTogglePreview, onUse }) {
       {/* Önizleme (inline accordion) */}
       <div className={`accordion-body ${previewOpen ? "open" : ""}`}>
         <div className="accordion-inner">
-          <div className="px-3.5 pb-3 pt-0 flex flex-col gap-2.5 border-t border-white/5 mt-0.5 pt-3">
+          <div className="px-3.5 pb-3 pt-0 flex flex-col gap-2.5 border-t border-slate-200 dark:border-white/5 mt-0.5 pt-3">
             <div>
               <p className="text-[9.5px] font-semibold uppercase tracking-[0.08em] mb-1.5" style={{ color: cat.accent }}>
                 🔁 Örnek Rutinler
               </p>
               <ul className="flex flex-col gap-1">
                 {template.previewRoutines.map((r, i) => (
-                  <li key={i} className="text-[11.5px] font-medium text-slate-200 leading-relaxed flex gap-1.5">
+                  <li key={i} className="text-[11.5px] font-medium text-slate-700 dark:text-slate-200 leading-relaxed flex gap-1.5">
                     <span className="text-slate-500">·</span>
                     <span>{r}</span>
                   </li>
@@ -63,7 +63,7 @@ function TemplateCard({ template, previewOpen, onTogglePreview, onUse }) {
               </p>
               <ul className="flex flex-col gap-1">
                 {template.previewDays.map((d, i) => (
-                  <li key={i} className="text-[11.5px] font-medium text-slate-200 leading-relaxed flex gap-1.5">
+                  <li key={i} className="text-[11.5px] font-medium text-slate-700 dark:text-slate-200 leading-relaxed flex gap-1.5">
                     <span className="shrink-0 text-slate-500" style={{ fontFamily: "ui-monospace, monospace" }}>
                       {i + 1}.
                     </span>
@@ -80,11 +80,11 @@ function TemplateCard({ template, previewOpen, onTogglePreview, onUse }) {
       </div>
 
       {/* Alt aksiyonlar */}
-      <div className="p-3.5 pt-2.5 flex gap-2 border-t border-white/5">
+      <div className="p-3.5 pt-2.5 flex gap-2 border-t border-slate-200 dark:border-white/5">
         <button
           onClick={onTogglePreview}
-          className="flex-1 rounded-lg py-2 text-[12px] font-semibold text-slate-300 hover:text-slate-100 transition-colors"
-          style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
+          className="flex-1 rounded-lg py-2 text-[12px] font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+          style={{ background: "rgba(var(--overlay-rgb),0.05)", border: "1px solid rgba(var(--overlay-rgb),0.08)" }}
         >
           {previewOpen ? "Gizle" : "Önizleme"}
         </button>
@@ -120,17 +120,17 @@ export default function TemplateHub({ open, onClose, onUseTemplate }) {
   return (
     <div
       className="fixed inset-0 z-[90] flex flex-col animate-[fadeIn_0.2s_ease]"
-      style={{ background: "rgba(2,3,5,0.90)", backdropFilter: "blur(28px) saturate(150%)", WebkitBackdropFilter: "blur(28px) saturate(150%)" }}
+      style={{ background: "rgba(var(--glass-rgb), var(--alpha-modal))", backdropFilter: "blur(28px) saturate(150%)", WebkitBackdropFilter: "blur(28px) saturate(150%)" }}
     >
       {/* Üst bar */}
-      <div className="shrink-0 px-4 md:px-8 pt-5 pb-3 border-b border-white/8">
+      <div className="shrink-0 px-4 md:px-8 pt-5 pb-3 border-b border-slate-200 dark:border-white/8">
         <div className="max-w-6xl mx-auto w-full flex items-center justify-between mb-4">
-          <h2 className="text-[18px] md:text-[22px] font-bold text-slate-100">✨ Şablon Keşfet</h2>
+          <h2 className="text-[18px] md:text-[22px] font-bold text-slate-900 dark:text-slate-100">✨ Şablon Keşfet</h2>
           <button
             onClick={onClose}
             aria-label="Kapat"
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-100 transition-colors"
-            style={{ background: "rgba(255,255,255,0.06)" }}
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+            style={{ background: "rgba(var(--overlay-rgb),0.06)" }}
           >
             ✕
           </button>
@@ -147,9 +147,9 @@ export default function TemplateHub({ open, onClose, onUseTemplate }) {
                 onClick={() => setTab(t.key)}
                 className="shrink-0 flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors"
                 style={{
-                  background: active ? `${accent}22` : "rgba(255,255,255,0.05)",
-                  color: active ? accent : "#8695A3",
-                  border: `1px solid ${active ? accent + "55" : "rgba(255,255,255,0.08)"}`,
+                  background: active ? `${accent}22` : "rgba(var(--overlay-rgb),0.05)",
+                  color: active ? accent : "var(--text-muted)",
+                  border: `1px solid ${active ? accent + "55" : "rgba(var(--overlay-rgb),0.08)"}`,
                 }}
               >
                 <span>{t.emoji}</span>

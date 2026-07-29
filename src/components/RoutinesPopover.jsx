@@ -103,29 +103,29 @@ export default function RoutinesPopover({ open, userId, onClose }) {
       <div
         className="pop-in fixed top-[62px] right-3 z-[70] w-[calc(100vw-24px)] max-w-[400px] rounded-2xl p-4 shadow-2xl font-sans"
         style={{
-          background: "rgba(15,20,27,0.96)",
+          background: "rgba(var(--glass-rgb), var(--alpha-modal))",
           backdropFilter: "blur(20px) saturate(160%)",
           WebkitBackdropFilter: "blur(20px) saturate(160%)",
-          border: "1px solid rgba(255,255,255,0.10)",
+          border: "1px solid var(--modal-border)",
           boxShadow: "0 24px 60px -18px rgba(0,0,0,0.75), inset 0 1px 22px -14px rgba(46,217,163,0.45)",
         }}
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[14px] font-semibold text-slate-100">🔁 Günlük Rutinler</h3>
+          <h3 className="text-[14px] font-semibold text-slate-900 dark:text-slate-100">🔁 Günlük Rutinler</h3>
           <button
             onClick={onClose}
             aria-label="Kapat"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-100 transition-colors"
-            style={{ background: "rgba(255,255,255,0.05)" }}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+            style={{ background: "rgba(var(--overlay-rgb),0.05)" }}
           >
             ✕
           </button>
         </div>
 
         {loading && !routines ? (
-          <p className="text-[12.5px] text-slate-400 py-6 text-center font-medium">Yükleniyor...</p>
+          <p className="text-[12.5px] text-slate-500 dark:text-slate-400 py-6 text-center font-medium">Yükleniyor...</p>
         ) : list.length === 0 ? (
-          <p className="text-[12.5px] text-slate-400 py-6 text-center font-medium">Aktif planlarında rutin bulunmuyor.</p>
+          <p className="text-[12.5px] text-slate-500 dark:text-slate-400 py-6 text-center font-medium">Aktif planlarında rutin bulunmuyor.</p>
         ) : (
           <div className="max-h-[70vh] overflow-y-auto no-scrollbar grid grid-cols-2 gap-2">
             {list.map((r, i) => {
@@ -142,7 +142,7 @@ export default function RoutinesPopover({ open, userId, onClose }) {
                     onClick={() => toggle(r.id)}
                     className={`shrink-0 mt-0.5 w-5 h-5 rounded-[6px] border flex items-center justify-center text-[10px] ${on ? "check-glow" : ""}`}
                     style={{
-                      borderColor: on ? "#2ED9A3" : "#3A4653",
+                      borderColor: on ? "#2ED9A3" : "var(--border-strong)",
                       background: on ? "rgba(46,217,163,0.18)" : "transparent",
                       color: "#2ED9A3",
                     }}
@@ -155,7 +155,7 @@ export default function RoutinesPopover({ open, userId, onClose }) {
                     <div className="flex items-start gap-1">
                       <span className="text-[13px] leading-none mt-0.5">{routineEmoji(r.content)}</span>
                       <span
-                        className="flex-1 text-[12.5px] font-medium leading-relaxed text-slate-100"
+                        className="flex-1 text-[12.5px] font-medium leading-relaxed text-slate-900 dark:text-slate-100"
                         style={{ textDecoration: on ? "line-through" : "none", opacity: on ? 0.6 : 1 }}
                       >
                         {microLabel(r.content)}
@@ -164,7 +164,7 @@ export default function RoutinesPopover({ open, userId, onClose }) {
                         onClick={() => setInfoId(showInfo ? null : r.id || i)}
                         title={r.content}
                         aria-label="Detay"
-                        className="shrink-0 text-slate-500 hover:text-slate-200 transition-colors text-[12px] leading-none mt-0.5"
+                        className="shrink-0 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors text-[12px] leading-none mt-0.5"
                       >
                         ℹ️
                       </button>
@@ -180,8 +180,8 @@ export default function RoutinesPopover({ open, userId, onClose }) {
                   {/* ℹ️ baloncuğu — tam metin */}
                   {showInfo && (
                     <div
-                      className="absolute z-10 left-2 right-2 top-full mt-1 rounded-lg p-2.5 text-[11.5px] font-medium leading-relaxed text-slate-100"
-                      style={{ background: "rgba(10,12,16,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 12px 30px -10px rgba(0,0,0,0.8)" }}
+                      className="absolute z-10 left-2 right-2 top-full mt-1 rounded-lg p-2.5 text-[11.5px] font-medium leading-relaxed text-slate-900 dark:text-slate-100"
+                      style={{ background: "rgba(var(--glass-rgb), var(--alpha-modal))", border: "1px solid rgba(var(--overlay-rgb),0.12)", boxShadow: "0 12px 30px -10px rgba(0,0,0,0.8)" }}
                       onClick={() => setInfoId(null)}
                     >
                       {r.content}

@@ -156,27 +156,14 @@ export async function setTaskCompleted(taskId, isCompleted) {
   }
 }
 
-// AI Koç'un hazır aksiyonları (Planı Hafiflet / Tempoyu Sıkılaştır / Bugün Çok
-// Yoruldum) için: her görev farklı alanlara güncellenebildiğinden (id başına
-// farklı duration_min/priority/day_number), Supabase'de tek sorguda toplu
-// update mümkün değil — satır başına paralel update atılır.
-//   updates: [{ id, ...değişecek alanlar }]
-export async function updateTasksBulk(updates) {
-  if (!updates?.length) return;
-  const results = await Promise.all(
-    updates.map(({ id, ...fields }) => supabase.from("tasks").update(fields).eq("id", id))
-  );
-  const failed = results.find((r) => r.error);
-  if (failed) {
-    logger.error("SUPABASE", "Görevler toplu güncellenemedi (AI Koç aksiyonu)", {
-      table: "tasks",
-      action: "bulk_update",
-      count: updates.length,
-      error: failed.error,
-    });
-    throw failed.error;
-  }
-}
+// GÜVENLİK NOTU: updateTasksBulk / insertTasks fonksiyonları buradan
+// KALDIRILDI — AI Koç'un "yüksek yetkili" görev mutasyonları (duration_min,
+// priority, day_number, yeni görev ekleme) artık YALNIZCA api/coach-action.js
+// (Vercel serverless function, service_role) üzerinden yapılıyor. Client
+// (anon key), Supabase RLS + kolon bazlı GRANT ile tasks tablosunda yalnızca
+// kendi is_completed alanını değiştirebilir ve satır silemez (bkz.
+// supabase/migration.sql "tasks" bölümü). Bu iki fonksiyonu buradan silmek,
+// birinin yanlışlıkla client'tan tekrar çağırmasını da mimari olarak engeller.
 
 // Bir planı siler. FK'lar ON DELETE CASCADE olduğu için ilgili routines/tasks
 // satırları da otomatik silinir.

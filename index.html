@@ -3,12 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <!-- iOS Safari alt/üst barının koyu kalması için: tarayıcı chrome rengi + koyu şema -->
+    <!-- iOS Safari alt/üst barının tema rengiyle eşleşmesi için (script aşağıda günceller) -->
     <meta name="theme-color" content="#0b0c10" />
-    <meta name="color-scheme" content="dark" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Routinix</title>
+    <!-- Anti-flash: React yüklenip boyamadan ÖNCE, senkron olarak doğru temayı
+         <html>'e uygula (localStorage → yoksa sistem tercihi). Bu olmadan
+         karanlık tema tercih eden bir kullanıcıda kısa bir beyaz "flash"
+         görülür. ThemeContext.jsx aynı mantığı devralıp React state'e bağlar. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("routinix_theme");
+          var theme = stored === "light" || stored === "dark" ? stored : null;
+          if (!theme) {
+            theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          var root = document.documentElement;
+          root.classList.add(theme);
+          root.setAttribute("data-theme", theme);
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", theme === "dark" ? "#0b0c10" : "#f8fafc");
+        } catch (e) {
+          document.documentElement.classList.add("dark");
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

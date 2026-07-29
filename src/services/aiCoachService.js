@@ -1,8 +1,9 @@
-// AI Koç'un hazır aksiyon çiplerinin SAF (Supabase'siz) veri dönüşümleri.
-// Her fonksiyon güncellenecek görevleri { id, fields } yama listesi olarak
-// döner; gerçek DB yazımı planService.updateTasksBulk ile ayrı yapılır —
-// böylece usePlanStudio önce optimistic UI güncellemesi uygulayıp sonra
-// arka planda kalıcılaştırabilir.
+// AI Koç'un hazır aksiyon çiplerinin SAF (Supabase'siz, DOM'suz) veri
+// dönüşümleri. Her fonksiyon güncellenecek görevleri { id, fields } yama
+// listesi olarak döner. Bu dosya hem burada (referans/test amaçlı) hem de
+// api/coach-action.js (Vercel serverless function) tarafından import edilir —
+// gerçek DB yazımı ve Gemini çağrısı artık YALNIZCA sunucu tarafında
+// (service_role ile) yapılır; client bu fonksiyonları doğrudan çağırmaz.
 
 function roundTo5(n) {
   return Math.max(5, Math.round(n / 5) * 5);

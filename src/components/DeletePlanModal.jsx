@@ -28,7 +28,7 @@ export default function DeletePlanModal({ open, plans, onDelete, onClose }) {
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-[360px] rounded-3xl overflow-hidden animate-[fadeIn_0.2s_ease]"
         style={{
-          background: "rgba(15,20,27,0.92)",
+          background: "rgba(var(--glass-rgb), var(--alpha-modal))",
           backdropFilter: "blur(24px) saturate(160%)",
           WebkitBackdropFilter: "blur(24px) saturate(160%)",
           border: "1px solid rgba(244,64,107,0.22)",
@@ -40,17 +40,17 @@ export default function DeletePlanModal({ open, plans, onDelete, onClose }) {
         {/* ADIM 2: onay */}
         {pending ? (
           <div className="p-6">
-            <h2 className="text-[16.5px] font-bold text-[#ECF2F4] mb-2 text-balance">
+            <h2 className="text-[16.5px] font-bold text-[var(--text-primary)] mb-2 text-balance">
               Bu planı silmek istediğinize emin misiniz?
             </h2>
-            <p className="text-[13px] text-[#8695A3] leading-relaxed mb-5">
-              <b style={{ color: "#ECF2F4" }}>"{pending.title || "Plan"}"</b> ve ona ait tüm rutin/görevler kalıcı olarak silinecek. Bu işlem geri alınamaz.
+            <p className="text-[13px] text-[var(--text-muted)] leading-relaxed mb-5">
+              <b style={{ color: "var(--text-primary)" }}>"{pending.title || "Plan"}"</b> ve ona ait tüm rutin/görevler kalıcı olarak silinecek. Bu işlem geri alınamaz.
             </p>
             <div className="flex gap-2.5">
               <button
                 onClick={() => setPending(null)}
                 className="flex-1 rounded-xl py-2.5 text-[13.5px] font-semibold border"
-                style={{ borderColor: "#232C36", color: "#C5D0D8" }}
+                style={{ borderColor: "var(--border-default)", color: "var(--text-secondary)" }}
               >
                 Geri
               </button>
@@ -67,19 +67,19 @@ export default function DeletePlanModal({ open, plans, onDelete, onClose }) {
           /* ADIM 1: plan seçimi */
           <div className="p-6">
             <div className="flex items-start justify-between mb-4">
-              <h2 className="text-[16.5px] font-bold text-[#ECF2F4] text-balance">Hangi planı silmek istiyorsunuz?</h2>
+              <h2 className="text-[16.5px] font-bold text-[var(--text-primary)] text-balance">Hangi planı silmek istiyorsunuz?</h2>
               <button
                 onClick={close}
                 aria-label="Kapat"
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#8695A3] hover:text-[#ECF2F4] transition-colors shrink-0"
-                style={{ background: "rgba(255,255,255,0.05)" }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+                style={{ background: "rgba(var(--overlay-rgb),0.05)" }}
               >
                 ✕
               </button>
             </div>
 
             {plans.length === 0 ? (
-              <p className="text-[13px] text-[#8695A3] leading-relaxed py-4 text-center">Silinecek kayıtlı planın yok.</p>
+              <p className="text-[13px] text-[var(--text-muted)] leading-relaxed py-4 text-center">Silinecek kayıtlı planın yok.</p>
             ) : (
               <div className="flex flex-col gap-2.5 max-h-[340px] overflow-y-auto no-scrollbar">
                 {plans.map((p) => {
@@ -88,13 +88,13 @@ export default function DeletePlanModal({ open, plans, onDelete, onClose }) {
                     <button
                       key={p.id}
                       onClick={() => setPending(p)}
-                      className="w-full text-left rounded-2xl border p-3.5 flex items-center gap-3 transition-colors hover:bg-[#161D25] card-glow"
-                      style={{ borderColor: "#232C36", background: "#12181F" }}
+                      className="w-full text-left rounded-2xl border p-3.5 flex items-center gap-3 transition-colors hover:bg-[var(--bg-elevated)] card-glow"
+                      style={{ borderColor: "var(--border-default)", background: "var(--bg-card)" }}
                     >
                       <span className="text-lg shrink-0">{cat.emoji}</span>
                       <div className="min-w-0 flex-1">
-                        <div className="text-[13.5px] font-semibold text-[#ECF2F4] truncate">{p.title || "Plan"}</div>
-                        <div className="text-[11.5px] text-[#8695A3] truncate">{cat.label}</div>
+                        <div className="text-[13.5px] font-semibold text-[var(--text-primary)] truncate">{p.title || "Plan"}</div>
+                        <div className="text-[11.5px] text-[var(--text-muted)] truncate">{cat.label}</div>
                       </div>
                       <span className="text-[14px] shrink-0" style={{ color: "#FF6E92" }}>🗑️</span>
                     </button>

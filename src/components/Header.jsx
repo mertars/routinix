@@ -1,3 +1,33 @@
+import { useTheme } from "../context/ThemeContext";
+
+// ☀️/🌙 Animasyonlu tema değiştirici — güneş/ay ikonu kayarak/dönerek geçiş yapar.
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === "dark";
+  return (
+    <button
+      onClick={toggleTheme}
+      aria-label="Tema Değiştir"
+      title={isDark ? "Aydınlık temaya geç" : "Karanlık temaya geç"}
+      className="relative w-9 h-9 rounded-lg flex items-center justify-center overflow-hidden shrink-0 transition-colors"
+      style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}
+    >
+      <span
+        className="absolute text-[15px] transition-all duration-300 ease-out"
+        style={{ transform: isDark ? "translateY(0) rotate(0deg)" : "translateY(-22px) rotate(90deg)", opacity: isDark ? 1 : 0 }}
+      >
+        🌙
+      </span>
+      <span
+        className="absolute text-[15px] transition-all duration-300 ease-out"
+        style={{ transform: isDark ? "translateY(22px) rotate(-90deg)" : "translateY(0) rotate(0deg)", opacity: isDark ? 0 : 1 }}
+      >
+        ☀️
+      </span>
+    </button>
+  );
+}
+
 export default function Header({
   modeAccent,
   modeAccentSoft,
@@ -16,7 +46,10 @@ export default function Header({
 }) {
   return (
     <div className="sticky top-0 z-20">
-      <header className="flex items-center justify-between gap-3 px-4 md:px-6 py-3.5 backdrop-blur-md bg-[#0b0c10]/85 border-b border-[#1E2731] max-w-7xl mx-auto w-full">
+      <header
+        className="flex items-center justify-between gap-3 px-4 md:px-6 py-3.5 backdrop-blur-md max-w-7xl mx-auto w-full"
+        style={{ background: "rgba(var(--glass-rgb), var(--alpha-chrome))", borderBottom: "1px solid var(--border-header)" }}
+      >
         <div className="flex items-center gap-2.5">
           {/* Geometrik çerçeveli "R" logosu */}
           <div
@@ -39,7 +72,7 @@ export default function Header({
               R
             </span>
           </div>
-          <span className="font-bold tracking-tight text-[16px] text-[#ECF2F4]">Routinix</span>
+          <span className="font-bold tracking-tight text-[16px] text-[var(--text-primary)]">Routinix</span>
         </div>
 
         <div className="flex items-center gap-1.5 md:gap-2">
@@ -52,7 +85,7 @@ export default function Header({
               className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
               style={{
                 background: hubActive ? "rgba(240,179,126,0.20)" : "rgba(240,179,126,0.10)",
-                color: "#F0B37E",
+                color: "var(--amber-accent)",
                 border: "1px solid rgba(240,179,126,0.40)",
                 boxShadow: hubActive ? "0 0 16px -4px rgba(240,179,126,0.7)" : "0 0 10px -5px rgba(240,179,126,0.6)",
               }}
@@ -110,8 +143,8 @@ export default function Header({
           {user ? (
             <button
               onClick={onSignOut}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 h-9 text-[12px] font-semibold text-[#C5D0D8] hover:text-[#ECF2F4] transition-colors"
-              style={{ background: "#161D25", border: "1px solid #232C36" }}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 h-9 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}
               title={user.email}
             >
               <span
@@ -131,10 +164,12 @@ export default function Header({
               Giriş Yap
             </button>
           )}
+          <ThemeToggle />
+
           <button
             onClick={onMenuToggle}
             aria-label="Menü"
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-[#8695A3] hover:text-[#ECF2F4] hover:bg-[#161D25] transition-colors"
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
           >
             <span className="text-xl leading-none">☰</span>
           </button>

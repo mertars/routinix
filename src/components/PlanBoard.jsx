@@ -16,7 +16,7 @@ function frequencyMeta(freq) {
 
 const PRIORITY_STYLE = {
   Yüksek: { color: "#FF6E92", bg: "rgba(244,64,107,0.14)" },
-  Orta: { color: "#F0B37E", bg: "rgba(240,179,126,0.14)" },
+  Orta: { color: "var(--amber-accent)", bg: "rgba(240,179,126,0.14)" },
   Düşük: { color: "#6FCF97", bg: "rgba(111,207,151,0.14)" },
 };
 
@@ -36,20 +36,20 @@ function DayCircle({ day, pct, active, accent, accentSoft, onClick }) {
         <div
           className="w-full h-full rounded-full flex items-center justify-center transition-colors"
           style={{
-            background: active ? accentSoft : "#12181F",
+            background: active ? accentSoft : "var(--bg-card)",
             border: active ? `1px solid ${accent}` : "1px solid transparent",
             boxShadow: active ? `0 0 14px -4px ${accent}` : "none",
           }}
         >
           <span
             className="text-[15px] font-bold"
-            style={{ color: active ? "#ECF2F4" : "#C5D0D8", fontFamily: MONO_FONT }}
+            style={{ color: active ? "var(--text-primary)" : "var(--text-secondary)", fontFamily: MONO_FONT }}
           >
             {day}
           </span>
         </div>
       </div>
-      <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: active ? accent : "#55636F" }}>
+      <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: active ? accent : "var(--text-faint)" }}>
         Gün
       </span>
     </button>
@@ -117,7 +117,7 @@ export default function PlanBoard({
       {/* Başlık + genel ilerleme */}
       <div className="glass rounded-2xl p-5" style={{ borderColor: `${accent}33` }}>
         <div className="flex items-center justify-between mb-3">
-          <button onClick={onBack} className="text-[12px] font-medium text-[#8695A3] hover:text-[#ECF2F4] transition-colors">
+          <button onClick={onBack} className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
             ‹ Ana Sayfa
           </button>
           <button
@@ -130,19 +130,19 @@ export default function PlanBoard({
         </div>
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">{cat.emoji}</span>
-          <h1 className="text-[18px] font-bold leading-snug text-balance text-[#ECF2F4]">{plan.title || "Planım"}</h1>
+          <h1 className="text-[18px] font-bold leading-snug text-balance text-[var(--text-primary)]">{plan.title || "Planım"}</h1>
         </div>
-        {plan.summary && <p className="text-[12.5px] text-[#8695A3] leading-relaxed">{plan.summary}</p>}
+        {plan.summary && <p className="text-[12.5px] text-[var(--text-muted)] leading-relaxed">{plan.summary}</p>}
 
         <div className="flex items-center justify-between mt-4 mb-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-[0.07em]" style={{ color: accent, fontFamily: MONO_FONT }}>
             {completedTasks}/{totalTasks} görev
           </span>
-          <span className="text-[11px] text-[#55636F]" style={{ fontFamily: MONO_FONT }}>
+          <span className="text-[11px] text-[var(--text-faint)]" style={{ fontFamily: MONO_FONT }}>
             %{overallPct} tamamlandı
           </span>
         </div>
-        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#1A222B" }}>
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--disabled-bg)" }}>
           <div
             className="h-full rounded-full transition-all duration-500 ease-out"
             style={{ width: `${overallPct}%`, background: "linear-gradient(90deg, #B26BFF, #F4406B)" }}
@@ -160,7 +160,7 @@ export default function PlanBoard({
                 <div
                   key={r.id || i}
                   className="rounded-xl border p-3 flex items-start gap-3"
-                  style={{ borderColor: `${accent}22`, background: "#0F151B" }}
+                  style={{ borderColor: `${accent}22`, background: "var(--bg-input)" }}
                 >
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[14px] shrink-0" style={{ background: soft }}>
                     {fm.icon}
@@ -172,7 +172,7 @@ export default function PlanBoard({
                     >
                       {fm.label}
                     </span>
-                    <p className="text-[12.5px] text-[#C5D0D8] leading-relaxed">{r.content}</p>
+                    <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">{r.content}</p>
                   </div>
                 </div>
               );
@@ -184,7 +184,7 @@ export default function PlanBoard({
       {/* Takvim rozet şeridi */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#55636F]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-faint)]">
             Performans Çerçevesi · {targetDays} gün
           </p>
           {nextWeekError && (
@@ -209,7 +209,7 @@ export default function PlanBoard({
                     {loadingNextWeek && cell.dayNumber === firstLockedDay ? "⏳" : "🔒"}
                   </span>
                 </div>
-                <span className="text-[9px] font-semibold" style={{ color: "#55636F", fontFamily: MONO_FONT }}>
+                <span className="text-[9px] font-semibold" style={{ color: "var(--text-faint)", fontFamily: MONO_FONT }}>
                   {cell.dayNumber}
                 </span>
               </button>
@@ -226,7 +226,7 @@ export default function PlanBoard({
             )
           )}
         </div>
-        <p className="mt-2.5 text-[11px] text-[#55636F] leading-relaxed">
+        <p className="mt-2.5 text-[11px] text-[var(--text-faint)] leading-relaxed">
           🔒 Kilitli güne dokunarak bir sonraki haftanın stratejisini aç.
         </p>
       </div>
@@ -243,12 +243,12 @@ export default function PlanBoard({
               >
                 {effectiveActiveDay}. GÜN
               </span>
-              <span className="text-[11px] text-[#55636F]" style={{ fontFamily: MONO_FONT }}>
+              <span className="text-[11px] text-[var(--text-faint)]" style={{ fontFamily: MONO_FONT }}>
                 {activeDayObj.weekNumber}. hafta
               </span>
             </div>
           </div>
-          <h2 className="text-[15px] font-bold tracking-tight text-[#ECF2F4] -mt-1.5">Günün Stratejik Adımları</h2>
+          <h2 className="text-[15px] font-bold tracking-tight text-[var(--text-primary)] -mt-1.5">Günün Stratejik Adımları</h2>
 
           {activeDayObj.tasks.length > 0 && activeDayObj.tasks.every((t) => t.is_completed) && (
             <div
@@ -267,14 +267,14 @@ export default function PlanBoard({
               <div
                 key={t.id}
                 className="rounded-2xl border p-3.5 card-glow"
-                style={{ borderColor: t.is_completed ? "#1E2731" : `${accent}44`, background: "#12181F" }}
+                style={{ borderColor: t.is_completed ? "var(--border-header)" : `${accent}44`, background: "var(--bg-card)" }}
               >
                 <div className="flex items-start gap-3">
                   <button
                     onClick={() => onToggleTask(t.id, !t.is_completed)}
                     className="w-6 h-6 rounded-full border flex items-center justify-center text-[11px] shrink-0 mt-0.5"
                     style={{
-                      borderColor: t.is_completed ? "#2ED9A3" : "#3A4653",
+                      borderColor: t.is_completed ? "#2ED9A3" : "var(--border-strong)",
                       background: t.is_completed ? "rgba(46,217,163,0.16)" : "transparent",
                       color: "#2ED9A3",
                     }}
@@ -285,17 +285,17 @@ export default function PlanBoard({
                   <div className="flex-1 min-w-0">
                     <p
                       className="text-[14px] font-semibold leading-snug text-balance"
-                      style={{ color: t.is_completed ? "#55636F" : "#ECF2F4", textDecoration: t.is_completed ? "line-through" : "none" }}
+                      style={{ color: t.is_completed ? "var(--text-faint)" : "var(--text-primary)", textDecoration: t.is_completed ? "line-through" : "none" }}
                     >
                       {t.title}
                     </p>
-                    {t.detail && <p className="text-[12px] text-[#8695A3] leading-relaxed mt-1">{t.detail}</p>}
+                    {t.detail && <p className="text-[12px] text-[var(--text-muted)] leading-relaxed mt-1">{t.detail}</p>}
 
                     {/* Şık rozetler: süre / öncelik / bütçe */}
                     {(t.duration_min || pr || t.estimated_cost) && (
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
                         {t.duration_min ? (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#1A222B", color: "#9BB0C0" }}>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--disabled-bg)", color: "#9BB0C0" }}>
                             ⏱ {t.duration_min} dk
                           </span>
                         ) : null}
@@ -305,7 +305,7 @@ export default function PlanBoard({
                           </span>
                         )}
                         {t.estimated_cost && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#1A222B", color: "#F0B37E" }}>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--disabled-bg)", color: "var(--amber-accent)" }}>
                             💰 {t.estimated_cost}
                           </span>
                         )}

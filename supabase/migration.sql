@@ -102,6 +102,13 @@ create policy "routines_delete_own" on public.routines
   for delete using (auth.uid() = user_id);
 
 -- tasks -----------------------------------------------------------------
+-- GÜVENLİK SERTLEŞTİRME: tasks satırları artık istemciden (anon key + kullanıcı
+-- JWT'si) TOPLU SİLİNEMEZ ve yalnızca "is_completed" kolonu doğrudan
+-- güncellenebilir (checkbox tiklemesi). duration_min/priority/day_number/title
+-- gibi "yüksek yetkili" alanlar SADECE api/coach-action.js üzerinden,
+-- service_role ile değiştirilebilir. Bir plan tamamen silinince (plans_delete_own)
+-- ona bağlı tasks satırları zaten ON DELETE CASCADE ile otomatik silinir —
+-- bu yüzden tasks için ayrı bir "delete" policy'sine hiç ihtiyaç yok.
 alter table public.tasks enable row level security;
 
 create policy "tasks_select_own" on public.tasks
@@ -110,8 +117,12 @@ create policy "tasks_insert_own" on public.tasks
   for insert with check (auth.uid() = user_id);
 create policy "tasks_update_own" on public.tasks
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "tasks_delete_own" on public.tasks
-  for delete using (auth.uid() = user_id);
+-- Bilerek YOK: "tasks_delete_own". Doğrudan client-side toplu silme kapalı.
+
+-- Kolon bazlı yetki daraltma: RLS satır erişimine izin verse bile,
+-- authenticated rolü UPDATE ile yalnızca is_completed kolonuna dokunabilir.
+revoke update on public.tasks from authenticated;
+grant update (is_completed) on public.tasks to authenticated;
 
 -- =====================================================================
 -- Bitti. plans / routines / tasks tabloları RLS açık şekilde hazır.
@@ -125,6 +136,12 @@ create policy "tasks_delete_own" on public.tasks
 --   alter table public.plans add column if not exists total_days int;
 --   alter table public.tasks add column if not exists duration_min int;
 --   alter table public.tasks add column if not exists priority text;
+--
+--   -- Güvenlik sertleştirme (tabloları yeniden oluşturmadan, var olan
+--   -- kuruluma tek başına uygulanabilir):
+--   drop policy if exists "tasks_delete_own" on public.tasks;
+--   revoke update on public.tasks from authenticated;
+--   grant update (is_completed) on public.tasks to authenticated;
 -- ---------------------------------------------------------------------
 
 -- =====================================================================
@@ -161,3 +178,89 @@ create policy "logs_insert_own_or_anon" on public.logs
 -- ekranı gerekirse hazır; admin/servis rolü ayrıca genişletilebilir).
 create policy "logs_select_own" on public.logs
   for select using (auth.uid() = user_id);
+
+-- GÜVENLİK: src/services/logService.js'teki debounce/rate-limit YALNIZCA
+-- istemci tarafı bir nezaket katmanı — biri anon key ile doğrudan Supabase
+-- REST API'sine istek atarak bunu bypass edebilir. Bu yüzden gerçek sınır
+-- burada, veritabanı seviyesinde: bir kullanıcı son 1 dakikada 30'dan fazla
+-- log satırı ekleyemez (log injection/spam koruması). user_id NULL olan
+-- (misafir) loglar için kararlı bir kimlik olmadığından bu tetikleyici
+-- yalnızca oturumlu kullanıcıları kapsar.
+create or replace function public.enforce_logs_rate_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  recent_count int;
+begin
+  if new.user_id is not null then
+    select count(*) into recent_count
+    from public.logs
+    where user_id = new.user_id
+      and created_at > now() - interval '1 minute';
+
+    if recent_count >= 30 then
+      raise exception 'log rate limit exceeded for user %', new.user_id;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists logs_rate_limit_trigger on public.logs;
+create trigger logs_rate_limit_trigger
+  before insert on public.logs
+  for each row execute function public.enforce_logs_rate_limit();
+
+-- =====================================================================
+-- 6) user_quotas — AI Koç'un günlük hak sayacı (SUNUCU TARAFI — GÜVENLİ)
+--    localStorage tabanlı sayaç tamamen kaldırıldı (kullanıcı DevTools'tan
+--    localStorage.clear() ile hakkını sıfırlayabiliyordu). Artık sayaç
+--    burada tutulur ve YALNIZCA api/coach-action.js (service_role) yazabilir;
+--    istemci (anon key) yalnızca kendi satırını OKUYABİLİR, hiçbir insert/
+--    update/delete policy'si tanımlı değil — service_role RLS'i zaten
+--    bypass eder, bu yüzden istemcinin buraya yazma yolu yoktur.
+-- =====================================================================
+create table if not exists public.user_quotas (
+  user_id         uuid not null references auth.users (id) on delete cascade,
+  date            date not null default current_date,
+  remaining_usage int not null default 3,
+  updated_at      timestamptz not null default now(),
+  primary key (user_id, date)
+);
+
+alter table public.user_quotas enable row level security;
+
+create policy "user_quotas_select_own" on public.user_quotas
+  for select using (auth.uid() = user_id);
+-- Bilerek YOK: insert/update/delete policy'si. Yalnızca service_role yazabilir.
+
+-- Atomik düşüm: eşzamanlı iki istek aynı anda gelirse (yarış durumu) bile
+-- hakkın 0'ın altına inmemesini ve iki kez düşmemesini garanti eder — tek bir
+-- INSERT ... ON CONFLICT ... DO UPDATE ifadesi Postgres'te satır kilidiyle
+-- atomik çalışır. security definer sayesinde RLS'i güvenle bypass eder;
+-- yalnızca service_role çalıştırabilir (aşağıdaki revoke/grant).
+create or replace function public.decrement_user_quota(p_user_id uuid, p_date date, p_default_limit int default 3)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_remaining int;
+begin
+  insert into public.user_quotas (user_id, date, remaining_usage)
+  values (p_user_id, p_date, greatest(p_default_limit - 1, 0))
+  on conflict (user_id, date)
+  do update set remaining_usage = greatest(public.user_quotas.remaining_usage - 1, 0),
+                updated_at = now()
+  returning remaining_usage into v_remaining;
+
+  return v_remaining;
+end;
+$$;
+
+revoke all on function public.decrement_user_quota(uuid, date, int) from public;
+grant execute on function public.decrement_user_quota(uuid, date, int) to service_role;
