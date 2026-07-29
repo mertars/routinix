@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { categoryOf } from "../constants";
 import { fetchDashboardData, setTaskCompleted } from "../services/planService";
 import logger from "../utils/logger";
+import { runWhenIdle } from "../utils/idle";
 
 // Bir planın "bugün"ü: ilk tamamlanmamış görev içeren gün; yoksa ilk gün.
 function todayOf(tasks) {
@@ -103,7 +104,9 @@ export default function TodayPopover({ open, userId, onClose }) {
         p.id !== planId ? p : { ...p, tasks: p.tasks.map((t) => (t.id === taskId ? { ...t, is_completed: next } : t)) }
       )
     );
-    setTaskCompleted(taskId, next).catch((err) => logger.error("TASK", "Görev güncellenemedi", { taskId, error: err?.message }));
+    runWhenIdle(() => {
+      setTaskCompleted(taskId, next).catch((err) => logger.error("TASK", "Görev güncellenemedi", { taskId, error: err?.message }));
+    });
   };
 
   return (

@@ -22,6 +22,7 @@ import {
 import { callCoachAction } from "./services/coachActionService";
 import { setHapticsEnabled } from "./lib/haptics";
 import logger from "./utils/logger";
+import { runWhenIdle } from "./utils/idle";
 
 // DB'den gelen düz tasks satırlarını haftalara/günlere gruplar.
 // [{ weekNumber, days: [{ dayNumber, tasks: [row...] }] }] (hafta & gün sıralı)
@@ -278,7 +279,12 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
         return prev;
       });
     });
-    setTaskCompletedSvc(taskId, nextVal).catch((err) => logger.error("TASK", "Görev durumu güncellenemedi", { taskId, error: err?.message }));
+    // DB yazması görsel olarak hiçbir şeye bağlı değil — parmak henüz ekrandan
+    // kalkmamış/scroll sürüyor olabilir; bu yüzden tarayıcının boşta kaldığı ana
+    // ertelenir (bkz. utils/idle.js, Safari için setTimeout düşüşlü).
+    runWhenIdle(() => {
+      setTaskCompletedSvc(taskId, nextVal).catch((err) => logger.error("TASK", "Görev durumu güncellenemedi", { taskId, error: err?.message }));
+    });
   }, []);
 
   // ---- Kayıtlı bir planı yeniden aç ----

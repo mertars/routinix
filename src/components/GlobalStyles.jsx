@@ -94,6 +94,19 @@ export default function GlobalStyles() {
         background: rgba(var(--glass-rgb), var(--alpha-chrome));
       }
 
+      /* --- Mobil dokunma gecikmesini sıfırla: tarayıcının "çift dokununca
+         yakınlaştır" için beklediği ~300ms algılama gecikmesi devre dışı
+         kalır (manipulation = kaydırma/pinch-zoom serbest, yalnızca çift-tap
+         zoom kapalı). -webkit-tap-highlight-color de tarayıcının varsayılan
+         gri/mavi dokunma flaşını kaldırır — bu efekt zaten bizim kendi
+         :active tasarımımızla (aşağıdaki mikro-çökme + card-glow) çakışıp
+         görsel gürültü yaratıyordu; kaldırılması TASARIMI DEĞİL, tarayıcının
+         bizim tasarımımızın üzerine bindirdiği varsayılan katmanı kaldırır. */
+      button, .card-glow, input, textarea, select {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+
       /* --- Dokunsal (tactile) mikro-çökme: tüm butonlar basılınca hafifçe içe çöker --- */
       button { transition: transform 0.09s ease; }
       button:not(:disabled):active { transform: scale(0.97); }
@@ -211,6 +224,18 @@ export default function GlobalStyles() {
          değişimi) sayfanın geri kalanından (takvim şeridi, başlık) izole eder —
          yalnızca reflow kapsamını daraltır, hiçbir görsel etkisi yoktur. --- */
       .task-grid { contain: layout style; }
+
+      /* --- Ekran dışı görev kartları/satırları: content-visibility:auto,
+         viewport'a girmemiş elemanların layout+paint maliyetini tamamen
+         atlar (DOM'dan silmez, yalnızca "henüz çizme" der). contain-intrinsic-size
+         "auto <yükseklik>" formu KRİTİK: "auto" tarayıcıya, eleman bir kez
+         gerçekten çizildikten sonra GERÇEK yüksekliğini hatırlamasını söyler;
+         yalnızca hiç görülmemiş ilk durumda <yükseklik> tahmini kullanılır.
+         Bu sayede scroll sırasında yanlış tahminden kaynaklanan bir sıçrama/
+         zıplama OLMAZ — görsel %100 aynı kalır, yalnızca ekran dışındaki
+         işlemci maliyeti sıfırlanır. */
+      .task-card { content-visibility: auto; contain-intrinsic-size: auto 160px; }
+      .task-row { content-visibility: auto; contain-intrinsic-size: auto 44px; }
 
       /* --- Mobilde ağır backdrop-blur/saturate maliyetini azalt: aynı katman
          hiyerarşisi (chrome < card < modal) korunur, yalnızca piksel maliyeti

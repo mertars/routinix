@@ -158,7 +158,7 @@ export default function TaskPickerModal({ open, onClose, plans, selectedTaskId, 
                         <button
                           key={t.id}
                           onClick={() => handleSelect(t.id)}
-                          className="text-left text-[12.5px] font-medium rounded-lg px-3 py-2 truncate transition-colors card-glow flex items-center gap-2"
+                          className="task-row text-left text-[12.5px] font-medium rounded-lg px-3 py-2 truncate transition-colors card-glow flex items-center gap-2"
                           style={{
                             background: active ? "rgba(178,107,255,0.14)" : "rgba(var(--overlay-rgb),0.04)",
                             color: active ? "var(--pomo-work-accent)" : "var(--text-primary)",
