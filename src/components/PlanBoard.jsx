@@ -18,8 +18,9 @@ function frequencyMeta(freq) {
 // Dairesel ilerleme halkalı gün rozeti (conic-gradient mor→kırmızı dolum).
 // React.memo + `onSelect` (setActiveDay, referansı sabit) + `day` (primitif)
 // sayesinde, aktif olmayan bir gün rozetinin tıklanması diğer gün rozetlerini
-// yeniden render ETMEZ.
-const DayCircle = memo(function DayCircle({ day, pct, active, accent, accentSoft, onSelect }) {
+// yeniden render ETMEZ. Karşılaştırıcı bilinçli olarak nokta atışı: yalnızca bu
+// bileşenin görselini etkileyen 5 prop kontrol edilir.
+function DayCircleImpl({ day, pct, active, accent, accentSoft, onSelect }) {
   return (
     <button onClick={() => onSelect(day)} className="shrink-0 flex flex-col items-center gap-1.5 card-glow" aria-label={`${day}. gün`}>
       <div
@@ -47,7 +48,17 @@ const DayCircle = memo(function DayCircle({ day, pct, active, accent, accentSoft
       </span>
     </button>
   );
-});
+}
+const DayCircle = memo(
+  DayCircleImpl,
+  (prev, next) =>
+    prev.day === next.day &&
+    prev.pct === next.pct &&
+    prev.active === next.active &&
+    prev.accent === next.accent &&
+    prev.accentSoft === next.accentSoft &&
+    prev.onSelect === next.onSelect
+);
 
 // Aktif plan ekranı: sabit başlık + genel ilerleme, rutinler (accordion), takvim
 // rozet şeridi (dolum halkalı + kilitli günler) ve seçili günün görev kartları.
@@ -255,7 +266,7 @@ export default function PlanBoard({
           {/* Masaüstünde 2/3/4'lü grid — mobilde tek sütun. Her kart memoized
               TaskCard — dokunulmayan görevler, bir tık sırasında hiç render
               edilmez (bkz. TaskCard.jsx + usePlanStudio.toggleTask). */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="task-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {activeDayObj.tasks.map((t) => (
               <TaskCard key={t.id} task={t} accent={accent} soft={soft} isVacation={isVacation} onToggle={onToggleTask} />
             ))}

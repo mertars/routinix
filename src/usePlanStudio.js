@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, startTransition } from "react";
 import {
   categoryOf,
   STAGE_INTRO,
@@ -253,22 +253,30 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   // memoized TaskCard/DayCircle bileşenleri, değişmeyen kartlar için re-render'ı
   // (props referansı sabit kaldığından) atlayabilir — mobilde tik atma/kart
   // seçme anındaki FPS düşüşünün kök nedeni buradaki gereksiz tüm-ağaç kopyasıydı.
+  // setWeeks çağrısı startTransition içine sarılı: bu, React'e "bu render'ı
+  // gerekirse kesintiye uğrat/ertele, tıklamanın kendi tepkisini (buton :active
+  // basılma animasyonu tarayıcı tarafından zaten anında ve JS'den bağımsız
+  // veriliyor) bloklama" sinyali verir. Zaten O(1)'e yakın hafif bir güncelleme
+  // olduğundan normal koşulda gecikme hissettirmez; zayıf donanımda arka arkaya
+  // hızlı tıklamalarda ana thread'i tıkamaması için ek bir güvenlik payı sağlar.
   const toggleTask = useCallback((taskId, nextVal) => {
-    setWeeks((prev) => {
-      for (const w of prev) {
-        const dayIdx = w.days.findIndex((d) => d.tasks.some((t) => t.id === taskId));
-        if (dayIdx === -1) continue;
-        const day = w.days[dayIdx];
-        const taskIdx = day.tasks.findIndex((t) => t.id === taskId);
-        const nextTasks = day.tasks.slice();
-        nextTasks[taskIdx] = { ...nextTasks[taskIdx], is_completed: nextVal };
-        const nextDay = { ...day, tasks: nextTasks };
-        const nextDays = w.days.slice();
-        nextDays[dayIdx] = nextDay;
-        const nextWeek = { ...w, days: nextDays };
-        return prev.map((ww) => (ww === w ? nextWeek : ww));
-      }
-      return prev;
+    startTransition(() => {
+      setWeeks((prev) => {
+        for (const w of prev) {
+          const dayIdx = w.days.findIndex((d) => d.tasks.some((t) => t.id === taskId));
+          if (dayIdx === -1) continue;
+          const day = w.days[dayIdx];
+          const taskIdx = day.tasks.findIndex((t) => t.id === taskId);
+          const nextTasks = day.tasks.slice();
+          nextTasks[taskIdx] = { ...nextTasks[taskIdx], is_completed: nextVal };
+          const nextDay = { ...day, tasks: nextTasks };
+          const nextDays = w.days.slice();
+          nextDays[dayIdx] = nextDay;
+          const nextWeek = { ...w, days: nextDays };
+          return prev.map((ww) => (ww === w ? nextWeek : ww));
+        }
+        return prev;
+      });
     });
     setTaskCompletedSvc(taskId, nextVal).catch((err) => logger.error("TASK", "Görev durumu güncellenemedi", { taskId, error: err?.message }));
   }, []);

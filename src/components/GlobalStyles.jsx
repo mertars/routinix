@@ -194,12 +194,23 @@ export default function GlobalStyles() {
       .card-glow {
         transition: box-shadow 0.2s ease, transform 0.12s ease;
         transform: translateZ(0);
-        will-change: transform;
+        will-change: transform, opacity;
+        /* "layout style" (paint HARİÇ): tıklama/hover'da bu kartın iç
+           yeniden-ölçümü sayfanın geri kalanına sıçramaz, tarayıcı re-layout'u
+           bu sınırın dışına taşmaz. Kasıtlı olarak "paint"/"strict" KULLANILMADI
+           çünkü :active durumundaki box-shadow (glow) kutu sınırının dışına
+           taşıyor — paint containment bunu kırpar ve görseli değiştirirdi. */
+        contain: layout style;
       }
       .card-glow:active {
         transform: translateZ(0) scale(0.985);
         box-shadow: 0 0 0 1px rgba(178,107,255,0.4), 0 8px 26px -8px rgba(244,64,107,0.45);
       }
+
+      /* --- Günün görev grid'i: kendi iç layout'unu (kartlar sarma/yükseklik
+         değişimi) sayfanın geri kalanından (takvim şeridi, başlık) izole eder —
+         yalnızca reflow kapsamını daraltır, hiçbir görsel etkisi yoktur. --- */
+      .task-grid { contain: layout style; }
 
       /* --- Mobilde ağır backdrop-blur/saturate maliyetini azalt: aynı katman
          hiyerarşisi (chrome < card < modal) korunur, yalnızca piksel maliyeti

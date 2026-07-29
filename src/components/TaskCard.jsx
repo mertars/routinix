@@ -82,4 +82,15 @@ function TaskCard({ task, accent, soft, isVacation, onToggle }) {
   );
 }
 
-export default memo(TaskCard);
+// Nokta atışı karşılaştırıcı: `task` objesi usePlanStudio.toggleTask'ta yalnızca
+// dokunulan görev için yeniden oluşturulduğundan (diğerleri aynı referansı
+// korur), bu tam olarak "bu görev değişti mi?" sorusuna denk gelir.
+export default memo(
+  TaskCard,
+  (prev, next) =>
+    prev.task === next.task &&
+    prev.accent === next.accent &&
+    prev.soft === next.soft &&
+    prev.isVacation === next.isVacation &&
+    prev.onToggle === next.onToggle
+);
