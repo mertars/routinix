@@ -156,6 +156,28 @@ export async function setTaskCompleted(taskId, isCompleted) {
   }
 }
 
+// AI Koç'un hazır aksiyonları (Planı Hafiflet / Tempoyu Sıkılaştır / Bugün Çok
+// Yoruldum) için: her görev farklı alanlara güncellenebildiğinden (id başına
+// farklı duration_min/priority/day_number), Supabase'de tek sorguda toplu
+// update mümkün değil — satır başına paralel update atılır.
+//   updates: [{ id, ...değişecek alanlar }]
+export async function updateTasksBulk(updates) {
+  if (!updates?.length) return;
+  const results = await Promise.all(
+    updates.map(({ id, ...fields }) => supabase.from("tasks").update(fields).eq("id", id))
+  );
+  const failed = results.find((r) => r.error);
+  if (failed) {
+    logger.error("SUPABASE", "Görevler toplu güncellenemedi (AI Koç aksiyonu)", {
+      table: "tasks",
+      action: "bulk_update",
+      count: updates.length,
+      error: failed.error,
+    });
+    throw failed.error;
+  }
+}
+
 // Bir planı siler. FK'lar ON DELETE CASCADE olduğu için ilgili routines/tasks
 // satırları da otomatik silinir.
 export async function deletePlan(planId) {

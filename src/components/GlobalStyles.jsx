@@ -77,6 +77,15 @@ export default function GlobalStyles() {
                     0 0 0 1px rgba(178,107,255,0.25);
       }
 
+      /* --- AI Koç "yazıyor..." noktaları --- */
+      @keyframes typingBounce {
+        0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+        30% { transform: translateY(-3px); opacity: 1; }
+      }
+      .typing-dot { animation: typingBounce 1.1s ease-in-out infinite; }
+      .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+      .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
       /* --- Karta tıklayınca (aktif) hafif neon glow --- */
       .card-glow { transition: box-shadow 0.2s ease, transform 0.12s ease; }
       .card-glow:active {

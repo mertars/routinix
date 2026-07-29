@@ -15,6 +15,7 @@ import PrintModal from "./components/PrintModal";
 import PrintablePlan from "./components/PrintablePlan";
 import TemplateHub from "./components/TemplateHub";
 import MyPlansHub from "./components/MyPlansHub";
+import AiCoachWidget from "./components/AiCoachWidget";
 import CategoryIntro from "./components/CategoryIntro";
 import OnboardingWizard from "./components/OnboardingWizard";
 import PlanBoard from "./components/PlanBoard";
@@ -247,6 +248,9 @@ export default function App() {
         onOpenPlan={ps.openSavedPlan}
         onClose={() => setPlansOpen(false)}
       />
+
+      {/* AI Koç — yalnızca aktif bir plan açıkken (aksiyonları o planın görevlerini günceller) */}
+      {ps.dbPlan && <AiCoachWidget plan={ps.dbPlan} userId={auth.user?.id} onApplyAction={ps.applyCoachAction} />}
 
       {/* PDF / Yazdır — aralık seçimi + yazdır */}
       <PrintModal

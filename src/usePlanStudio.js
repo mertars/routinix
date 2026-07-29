@@ -18,7 +18,9 @@ import {
   fetchUserPlans,
   fetchPlanDetail,
   deletePlan as deletePlanSvc,
+  updateTasksBulk,
 } from "./services/planService";
+import { lightenTasks, intensifyTasks, postponeDayTasks, findTodayDay, analyzeProgress } from "./services/aiCoachService";
 import { setHapticsEnabled } from "./lib/haptics";
 import logger from "./utils/logger";
 
@@ -294,6 +296,62 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     }
   };
 
+  // ---- AI Koç: hazır aksiyon çipleri (Planı Hafiflet / Tempoyu Sıkılaştır /
+  // Bugün Çok Yoruldum / Gidişatımı Analiz Et) ----
+  // Önce local `weeks` state'i optimistic olarak günceller (task'ları yeniden
+  // gruplayarak — day_number değişen görevler doğru gün kovasına taşınsın diye),
+  // sonra Supabase'e kalıcılaştırır. Döner: { ok, message } — sohbet baloncuğuna basılır.
+  const applyCoachAction = async (actionKey) => {
+    if (!dbPlan) return { ok: false, message: "Önce bir plan açman gerekiyor." };
+
+    if (actionKey === "analyze") {
+      return { ok: true, message: analyzeProgress(weeks) };
+    }
+
+    let patches = [];
+    let message = "";
+
+    if (actionKey === "lighten") {
+      patches = lightenTasks(allTasks);
+      message = "Anlaşıldı! Bugünkü görev yükünü %30 hafifletip süreleri güncelledim 🌿";
+    } else if (actionKey === "intensify") {
+      patches = intensifyTasks(allTasks);
+      message = "Tempoyu sıkılaştırdım — görev süreleri kısaldı, öncelikler yükseldi. Hadi bakalım 🔥";
+    } else if (actionKey === "postponeToday") {
+      const todayDay = findTodayDay(weeks);
+      if (!todayDay || !todayDay.tasks.some((t) => !t.is_completed)) {
+        return { ok: true, message: "Bugün için bekleyen görevin yok, harika gidiyorsun! ✅" };
+      }
+      patches = postponeDayTasks(todayDay);
+      message = "Bugünün kalan görevlerini yarına kaydırdım — kendine iyi bak, yarın devam ederiz ☕";
+    } else {
+      return { ok: false, message: "Bu aksiyonu tanımıyorum." };
+    }
+
+    if (patches.length === 0) {
+      return { ok: true, message: "Şu an güncellenecek aktif bir görev bulamadım — plan zaten tamamlanmış görünüyor 🎉" };
+    }
+
+    // Optimistic UI: task'ları düz listeye indirip yamaları uygula, sonra
+    // week_number/day_number'a göre yeniden grupla (postpone gün taşırsa doğru
+    // kovaya düşsün diye groupTasksToWeeks'ten geçirmek şart).
+    const patchMap = new Map(patches.map((p) => [p.id, p.fields]));
+    setWeeks((prev) => {
+      const flat = prev.flatMap((w) => w.days.flatMap((d) => d.tasks));
+      const patched = flat.map((t) => (patchMap.has(t.id) ? { ...t, ...patchMap.get(t.id) } : t));
+      return groupTasksToWeeks(patched);
+    });
+
+    try {
+      await updateTasksBulk(patches.map((p) => ({ id: p.id, ...p.fields })));
+    } catch (err) {
+      logger.error("AI_COACH", "Plan güncellemesi kaydedilemedi", { planId: dbPlan.id, actionKey, error: err?.message });
+      return { ok: false, message: "Değişiklikleri uyguladım ama kaydederken bir sorun oluştu — bağlantını kontrol edip tekrar dener misin?" };
+    }
+
+    return { ok: true, message };
+  };
+
   // Aktif planın ilerlemesi (tüm haftalar).
   const allTasks = weeks.flatMap((w) => w.days.flatMap((d) => d.tasks));
   const totalTasks = allTasks.length;
@@ -315,6 +373,6 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     // setter/aksiyon
     setGoal, setExtraNote, setMenuOpen, setRemindersOn, setHapticsOn,
     handleCategoryChange, startOnboarding, setAnswer, goNextQuestion, goPrevQuestion, finalizeAndGenerate,
-    loadNextWeek, toggleTask, openSavedPlan, deletePlan, startNewPlan, resetToIntro, startFromTemplate,
+    loadNextWeek, toggleTask, openSavedPlan, deletePlan, startNewPlan, resetToIntro, startFromTemplate, applyCoachAction,
   };
 }
