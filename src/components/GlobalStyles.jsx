@@ -52,6 +52,22 @@ export default function GlobalStyles() {
       .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
       .no-scrollbar::-webkit-scrollbar { display: none; }
 
+      /* --- İnce, transparan-beyaz scrollbar (Pomodoro Studio görev paneli).
+         Projede bir Tailwind scrollbar eklentisi (tailwind-scrollbar vb.) KURULU
+         DEĞİL — "scrollbar-thin scrollbar-thumb-white/10" gibi sınıflar bu
+         projede hiçbir şey yapmaz. Onun yerine gerçek çalışan bir CSS
+         karşılığı: --- */
+      .thin-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.14) transparent; }
+      .thin-scrollbar::-webkit-scrollbar { width: 6px; }
+      .thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .thin-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 9999px; }
+      .thin-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+      /* Not: "Bugünün Görevleri" (TodayPopover) ve Pomodoro Studio'nun sol
+         Görev/Plan paneli (TaskListPanel) artık .custom-neon-scroll'u
+         kullanıyor — bkz. src/index.css (fonksiyonel overflow/touch
+         özellikleriyle birlikte TEK bir yerde, yüksek öncelikli tanım). */
+
       /* --- Mor/kırmızı neon aura şeridi (header altı, vurgu çizgileri) --- */
       .neon-strip {
         height: 2px;
@@ -213,7 +229,12 @@ export default function GlobalStyles() {
       /* --- Günün görev grid'i: kendi iç layout'unu (kartlar sarma/yükseklik
          değişimi) sayfanın geri kalanından (takvim şeridi, başlık) izole eder —
          yalnızca reflow kapsamını daraltır, hiçbir görsel etkisi yoktur. --- */
-      .task-grid { contain: layout style; }
+      /* NOT: contain:layout BİLEREK YOK — bu konteynerin içinde (TaskCard'ın
+         Fragment kardeşi olarak) position:fixed bir FocusSidePanel render
+         edildiğinde, contain:layout onu viewport yerine BU konteynerin
+         sınırlayıcı kutusuna hapsediyordu (sağ-alt köşede küçük, konumu
+         bozuk bir "popup" gibi görünmesinin kök nedeni buydu). */
+      .task-grid { contain: style; }
 
       /* --- Ekran dışı görev kartları/satırları: content-visibility:auto,
          viewport'a girmemiş elemanların layout+paint maliyetini tamamen

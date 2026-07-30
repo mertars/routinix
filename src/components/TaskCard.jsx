@@ -27,7 +27,7 @@ function estimatePomodoros(durationMin) {
 // değildir. Etiket/açıklama/bütçe gibi detaylar varsayılan olarak GİZLİ; satıra
 // dokununca (checkbox/Başlat HARİÇ) mobilde alttan açılan Bottom Sheet,
 // masaüstünde sağdan süzülen Drawer ile açılır (bkz. FocusSidePanel.jsx).
-// Sert çerçeve yerine hafif ton farkı + tek incelik `--glass-border` hairline.
+// Sert çerçeve YOK — yalnızca arka plan ton farkıyla (bg-white/5 eşleniği) ayrışır.
 function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onStartPomodoro }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const pr = task.priority ? PRIORITY_STYLE[task.priority] : null;
@@ -40,7 +40,7 @@ function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onSt
     <>
       <div
         className="task-card rounded-2xl card-glow flex items-center gap-3.5 pl-0 pr-3 py-3.5 overflow-hidden"
-        style={{ background: task.is_completed ? "rgba(var(--overlay-rgb),0.03)" : "rgba(var(--overlay-rgb),0.05)", border: "1px solid var(--glass-border)" }}
+        style={{ background: task.is_completed ? "rgba(var(--overlay-rgb),0.03)" : "rgba(var(--overlay-rgb),0.05)" }}
       >
         <div className="self-stretch w-[3px] shrink-0 rounded-r-full" style={{ background: task.is_completed ? "var(--border-strong)" : stripColor }} />
 
@@ -83,7 +83,7 @@ function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onSt
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onStartPomodoro(task.id);
+              onStartPomodoro(task);
             }}
             aria-label="Bu görev için Pomodoro başlat"
             title="Pomodoro'da başlat"

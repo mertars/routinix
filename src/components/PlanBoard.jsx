@@ -141,7 +141,7 @@ export default function PlanBoard({
   return (
     <div className="flex flex-col gap-6 animate-[fadeIn_0.4s_ease]">
       {/* Başlık + genel ilerleme */}
-      <div className="glass rounded-2xl p-5" style={{ borderColor: `${accent}33` }}>
+      <div className="glass rounded-2xl p-4 md:p-5" style={{ borderColor: `${accent}33` }}>
         <div className="flex items-center justify-between mb-3">
           <button onClick={onBack} className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
             ‹ Ana Sayfa
@@ -155,19 +155,24 @@ export default function PlanBoard({
           </button>
         </div>
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-lg">{cat.emoji}</span>
-          <h1 className="text-[18px] font-bold leading-snug text-balance text-[var(--text-primary)]">{plan.title || "Planım"}</h1>
+          <span className="text-base md:text-lg">{cat.emoji}</span>
+          <h1 className="text-[15.5px] md:text-[18px] font-bold leading-snug text-balance text-[var(--text-primary)]">{plan.title || "Planım"}</h1>
         </div>
         {/* Akıllı Başlık: bu planın NEDEN/NASIL böyle kurgulandığını tek
             bakışta anlatan mikro-açıklama — plana özel özet + kategorinin
-            metodolojisi (tagline). Sol aksan şerit + yumuşak zemin + ikon. */}
-        <div className="flex items-start gap-3 rounded-xl px-3.5 py-3 mt-1" style={{ background: "rgba(var(--overlay-rgb),0.05)", borderLeft: `3px solid ${accent}` }}>
-          <span className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[13px] mt-0.5" style={{ background: soft }}>
+            metodolojisi (tagline). Sol aksan şerit + yumuşak zemin + ikon.
+            Mobilde daha küçük font + daha sıkı dolgu + satırlar arasında
+            biraz daha fazla boşluk — sıkışıklık gidermek için. */}
+        <div
+          className="flex items-start gap-2.5 md:gap-3 rounded-xl px-3 py-2.5 md:px-3.5 md:py-3 mt-1"
+          style={{ background: "rgba(var(--overlay-rgb),0.05)", borderLeft: `3px solid ${accent}` }}
+        >
+          <span className="shrink-0 w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center text-[12px] md:text-[13px] mt-0.5" style={{ background: soft }}>
             {cat.emoji}
           </span>
-          <div className="min-w-0 flex flex-col gap-1.5">
-            {plan.summary && <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">{plan.summary}</p>}
-            <p className="text-[11px] font-medium leading-relaxed" style={{ color: accent }}>
+          <div className="min-w-0 flex flex-col gap-2">
+            {plan.summary && <p className="text-[11.5px] md:text-[12.5px] text-[var(--text-secondary)] leading-relaxed">{plan.summary}</p>}
+            <p className="text-[10px] md:text-[11px] font-medium leading-relaxed" style={{ color: accent }}>
               🧭 Yaklaşım: {cat.tagline}
             </p>
           </div>

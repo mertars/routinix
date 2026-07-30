@@ -36,7 +36,7 @@ export default function DrawerMenu({
   onDeletePlan,
   onSignOut,
   onOpenHub,
-  onOpenToday,
+  onOpenTasks,
   onOpenRoutines,
   onOpenPlans,
   onOpenPomodoro,
@@ -47,7 +47,7 @@ export default function DrawerMenu({
   // yatay sıralı olduğu için burada yalnızca md altında gösterilir).
   const quickAccess = [
     { key: "hub", emoji: "✨", label: "Şablon Keşfet", color: "#F0B37E", onClick: onOpenHub, always: true },
-    { key: "today", emoji: "⚡", label: "Bugünün Görevleri", color: "#C99CFF", onClick: onOpenToday, always: false },
+    { key: "tasks", emoji: "📋", label: "Görevler ve Planlar", color: "#00F2FE", onClick: onOpenTasks, always: false },
     { key: "routines", emoji: "🔁", label: "Rutinler", color: "#7DE9C3", onClick: onOpenRoutines, always: false },
     { key: "plans", emoji: "📂", label: "Planlarım", color: "#8FA0FF", onClick: onOpenPlans, always: false },
     { key: "pomodoro", icon: <Timer className="w-4 h-4" strokeWidth={2.25} />, label: "Pomodoro & Focus", color: "#FB7185", onClick: onOpenPomodoro, always: true },

@@ -33,8 +33,8 @@ export default function Header({
   modeAccent,
   modeAccentSoft,
   user,
-  todayActive,
-  onTodayClick,
+  tasksActive,
+  onTasksClick,
   routinesActive,
   onRoutinesClick,
   hubActive,
@@ -108,21 +108,21 @@ export default function Header({
               Şablon Keşfet
             </button>
 
-            {/* Bugünün Görevleri + Rutinler + Planlarım (oturum açıkken) */}
+            {/* Görevler ve Planlar + Rutinler + Planlarım (oturum açıkken) */}
             {user && (
               <>
                 <button
-                  onClick={onTodayClick}
+                  onClick={onTasksClick}
                   className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
                   style={{
-                    background: todayActive ? "rgba(178,107,255,0.20)" : "rgba(178,107,255,0.10)",
-                    color: "#C99CFF",
-                    border: "1px solid rgba(178,107,255,0.40)",
-                    boxShadow: todayActive ? "0 0 16px -4px rgba(178,107,255,0.7)" : "0 0 10px -5px rgba(178,107,255,0.6)",
+                    background: tasksActive ? "rgba(0,242,254,0.20)" : "rgba(0,242,254,0.10)",
+                    color: "#00F2FE",
+                    border: "1px solid rgba(0,242,254,0.40)",
+                    boxShadow: tasksActive ? "0 0 16px -4px rgba(0,242,254,0.7)" : "0 0 10px -5px rgba(0,242,254,0.6)",
                   }}
                 >
-                  <span className="text-[13px] leading-none">⚡</span>
-                  Bugünün Görevleri
+                  <span className="text-[13px] leading-none">📋</span>
+                  Görevler ve Planlar
                 </button>
                 <button
                   onClick={onRoutinesClick}

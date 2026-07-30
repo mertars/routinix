@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Timer } from "lucide-react";
 import { STAGE_INTRO, STAGE_WIZARD, STAGE_LOADING, STAGE_ERROR, STAGE_PLAN } from "./constants";
 import usePlanStudio from "./usePlanStudio";
 import useAuth from "./useAuth";
@@ -10,7 +9,7 @@ import AuthModal from "./components/AuthModal";
 import ConfirmModal from "./components/ConfirmModal";
 import DrawerMenu from "./components/DrawerMenu";
 import DeletePlanModal from "./components/DeletePlanModal";
-import TodayPopover from "./components/TodayPopover";
+import TaskDrawer from "./components/TaskDrawer";
 import RoutinesPopover from "./components/RoutinesPopover";
 import PrintModal from "./components/PrintModal";
 import PrintablePlan from "./components/PrintablePlan";
@@ -29,12 +28,12 @@ export default function App() {
   const [authOpen, setAuthOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [todayOpen, setTodayOpen] = useState(false);
+  const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
   const [routinesOpen, setRoutinesOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
   const [plansOpen, setPlansOpen] = useState(false);
   const [pomodoroOpen, setPomodoroOpen] = useState(false);
-  const [pomodoroInitialTaskId, setPomodoroInitialTaskId] = useState("");
+  const [pomodoroInitialTask, setPomodoroInitialTask] = useState(null);
   const [printOpen, setPrintOpen] = useState(false);
   const [printRange, setPrintRange] = useState(Infinity);
   const ps = usePlanStudio({ user: auth.user, onRequireAuth: () => setAuthOpen(true) });
@@ -44,17 +43,17 @@ export default function App() {
   // anda yalnızca biri açık olur; tetiklendiklerinde hamburger menüsü de kapanır
   // (mobilde Hızlı Erişim'den açılan paneller için gerekli, masaüstünde zararsız).
   const closeAllPanels = () => {
-    setTodayOpen(false);
+    setTaskDrawerOpen(false);
     setRoutinesOpen(false);
     setHubOpen(false);
     setPlansOpen(false);
     setPomodoroOpen(false);
   };
-  const toggleToday = () => {
-    const next = !todayOpen;
+  const toggleTaskDrawer = () => {
+    const next = !taskDrawerOpen;
     closeAllPanels();
     ps.setMenuOpen(false);
-    setTodayOpen(next);
+    setTaskDrawerOpen(next);
   };
   const toggleRoutines = () => {
     const next = !routinesOpen;
@@ -81,9 +80,11 @@ export default function App() {
     setPomodoroOpen(next);
   };
   // Görev kartındaki "Başlat" — Pomodoro Studio'yu bu görev seçiliyken açar
-  // (bkz. PomodoroStudio.jsx `initialTaskId` prop'u).
-  const startPomodoroForTask = (taskId) => {
-    setPomodoroInitialTaskId(taskId);
+  // (bkz. PomodoroStudio.jsx `initialTask` prop'u). Tam görev objesi TaskCard'dan
+  // geldiği için PomodoroStudio kendi başına ayrı bir plan/görev fetch'i
+  // yapmak zorunda kalmıyor — tek doğruluk kaynağı çağıran yerdeki veridir.
+  const startPomodoroForTask = (task) => {
+    setPomodoroInitialTask(task);
     closeAllPanels();
     ps.setMenuOpen(false);
     setPomodoroOpen(true);
@@ -127,8 +128,8 @@ export default function App() {
           modeAccent={mode.accent}
           modeAccentSoft={mode.accentSoft}
           user={auth.user}
-          todayActive={todayOpen}
-          onTodayClick={toggleToday}
+          tasksActive={taskDrawerOpen}
+          onTasksClick={toggleTaskDrawer}
           routinesActive={routinesOpen}
           onRoutinesClick={toggleRoutines}
           hubActive={hubOpen}
@@ -164,7 +165,7 @@ export default function App() {
             setDeleteOpen(true);
           }}
           onOpenHub={toggleHub}
-          onOpenToday={toggleToday}
+          onOpenTasks={toggleTaskDrawer}
           onOpenRoutines={toggleRoutines}
           onOpenPlans={togglePlans}
           onOpenPomodoro={togglePomodoro}
@@ -234,8 +235,9 @@ export default function App() {
         </main>
       </div>
 
-      {/* Bugünün Görevleri + Rutinler popover'ları (aynı anda yalnızca biri açık) */}
-      <TodayPopover open={todayOpen} userId={auth.user?.id} onClose={() => setTodayOpen(false)} />
+      {/* Görevler ve Planlar (soldan kayan neon çekmece) + Rutinler popover'ı
+          (aynı anda yalnızca biri açık) */}
+      <TaskDrawer open={taskDrawerOpen} userId={auth.user?.id} onClose={() => setTaskDrawerOpen(false)} />
       <RoutinesPopover open={routinesOpen} userId={auth.user?.id} onClose={() => setRoutinesOpen(false)} />
 
       <AuthModal
@@ -282,7 +284,7 @@ export default function App() {
       />
 
       {/* Pomodoro & Focus Studio — herkese açık (Şablon Keşfet gibi) */}
-      <PomodoroStudio open={pomodoroOpen} userId={auth.user?.id} initialTaskId={pomodoroInitialTaskId} onClose={() => setPomodoroOpen(false)} />
+      <PomodoroStudio open={pomodoroOpen} userId={auth.user?.id} initialTask={pomodoroInitialTask} onClose={() => setPomodoroOpen(false)} />
 
       {/* AI Koç — yalnızca PlanBoard ekranındayken (yalnızca `dbPlan` kontrolü
           yetersizdi: "‹ Ana Sayfa" ile intro'ya dönünce dbPlan temizlenmediği
@@ -298,24 +300,9 @@ export default function App() {
         />
       )}
 
-      {/* Pomodoro'nun mobil "alt menü" erişim noktası — AiCoachWidget ile aynı
-          çakışma riskini taşımaması için yalnızca PlanBoard'dayken (sticky CTA'sız
-          ekran) ve sol altta (sağ alt AiCoachWidget'a ait) gösterilir. */}
-      {stage === STAGE_PLAN && (
-        <button
-          onClick={togglePomodoro}
-          aria-label="Pomodoro & Focus Studio"
-          className="md:hidden fixed z-40 flex items-center justify-center w-14 h-14 rounded-full transition-transform hover:scale-105 active:scale-95"
-          style={{
-            left: "1.5rem",
-            bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))",
-            background: "linear-gradient(135deg, #FB7185, #F43F5E)",
-            boxShadow: "0 10px 34px -10px rgba(251,113,133,0.75)",
-          }}
-        >
-          <Timer className="w-6 h-6 text-white" strokeWidth={2.25} />
-        </button>
-      )}
+      {/* Mobilde yüzen bir Pomodoro butonu YOK — ekranın üzerinde gezinip
+          sıkışıklık yaratıyordu. Pomodoro, DrawerMenu'nün "Hızlı Erişim"
+          gridinden (mobil) ve Header'dan (masaüstü) zaten erişilebilir. */}
 
       {/* PDF / Yazdır — aralık seçimi + yazdır */}
       <PrintModal

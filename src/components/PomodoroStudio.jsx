@@ -1,31 +1,39 @@
 import { useState, useEffect, useRef } from "react";
-import { Timer as TimerIcon, Music2, Play, Pause, ListChecks, SlidersHorizontal } from "lucide-react";
-import { fetchDashboardData } from "../services/planService";
+import { Timer as TimerIcon, Music2, ListMusic, Play, Pause, X, ClipboardList } from "lucide-react";
 import { tapFeedback } from "../lib/haptics";
 import logger from "../utils/logger";
-import TaskListPanel from "./TaskListPanel";
+import TaskDrawer from "./TaskDrawer";
 
 const DEFAULT_WORK_MIN = 25;
 const DEFAULT_BREAK_MIN = 5;
 const WORK_STEP = 5;
 const BREAK_STEP = 1;
 
-const SPOTIFY_EMBED_URL = "https://open.spotify.com/embed/playlist/37i9dQZF1DWWQRw9knGDs0?utm_source=generator&theme=0";
-// Lofi Girl — "lofi hip hop radio - beats to relax/study to" (7/24 canlı yayın,
-// gömülü oynatım için tasarlanmış, herkese açık video id). Değiştirmek istersen
-// bu tek sabiti güncellemen yeterli.
-const YOUTUBE_VIDEO_ID = "jfKfPfyJRdk";
+// İki kısa, herkese açık, gömülü oynatım için tasarlanmış Lofi Girl canlı
+// yayını — gerçek bir "Önceki/Sonraki" deneyimi için (tek video yerine küçük
+// bir liste). Parça adı hazır olduğunda YouTube'un kendi verisinden
+// (player.getVideoData().title) çekilir; bu etiketler yalnızca ilk an/düşüş içindir.
+const PLAYLIST = [
+  { id: "5qap5aO4i9A", label: "lofi hip hop radio 📚 beats to relax/study to" },
+  { id: "jfKfPfyJRdk", label: "synthwave radio 🌌 beats to chill/game to" },
+];
 
-// Sayaç rakamları için — index.html'de Google Fonts'tan yükleniyor, yoksa
-// sistem monospace'ine güvenli şekilde düşer.
+// Spotify Embed iframe (resmi "Lo-Fi Beats" editöryel çalma listesi) — Spotify
+// Web Playback SDK (Premium hesap + OAuth gerektirir) olmadan DIŞARIDAN kontrol
+// (play/pause/skip) mümkün değil; bu yüzden Spotify kendi görünür oynatıcısıyla
+// yalnızca popover AÇIKKEN çalışır (bkz. SpotifyPopover).
+const SPOTIFY_PLAYLIST_ID = "37i9dQZF1DWWQRw9knGDs0";
+const SPOTIFY_EMBED_URL = `https://open.spotify.com/embed/playlist/${SPOTIFY_PLAYLIST_ID}?utm_source=generator&theme=0`;
+
 const TIMER_FONT = '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
 
-const TABS = [
-  { key: "counter", label: "Sayaç", icon: TimerIcon },
-  { key: "tasks", label: "Görevler", icon: ListChecks },
-  { key: "music", label: "Müzik", icon: Music2 },
-  { key: "settings", label: "Ayarlar", icon: SlidersHorizontal },
-];
+// Tema-duyarlı vurgu renkleri — index.css'teki --pomo-work-accent/
+// --pomo-break-accent üzerinden okunur: koyu temada neon cyan/zümrüt, açık
+// temada okunur mor/turkuaz. `--pomo-accent`, mod'a bağlı olmayan genel
+// "marka" çipleri (Odak Modu, Görevler ve Planlar butonu) için ayrı bir
+// tondur (koyu: aynı neon cyan; açık: cyan-600 — beyaz zeminde okunur).
+const ACCENT = { work: "var(--pomo-work-accent)", break: "var(--pomo-break-accent)" };
+const BRAND_ACCENT = "var(--pomo-accent)";
 
 function formatTime(totalSeconds) {
   const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
@@ -33,205 +41,154 @@ function formatTime(totalSeconds) {
   return `${m}:${s}`;
 }
 
-// Dev neon sayaç: buzlu cam arkalık + ilerleme halkası + JetBrains Mono
-// rakamlar + Aktif Görev satırı. Mobil sekme içeriği VE masaüstü sol sütunda
-// ortak kullanılır — `showSteppers`/`onOpenTasks` farkıyla iki bağlamı yönetir.
-function CounterPane({
-  mode,
-  switchMode,
-  running,
-  secondsLeft,
-  pct,
-  ringCircumference,
-  ringOffset,
-  modeAccent,
-  lightsOut,
-  selectedTask,
-  onOpenTasks,
-  toggleRunning,
-  resetTimer,
-  showSteppers,
-  workMin,
-  breakMin,
-  adjustDuration,
-}) {
+// Neon halkalı, buzlu-cam arkalıklı, JetBrains Mono rakamlı dev sayaç. Odak
+// Modu'nda (`boost`) glow/kontrast belirgin şekilde artar.
+function TimerRing({ secondsLeft, mode, accent, pct, ringCircumference, ringOffset, boost }) {
   return (
-    <div className="flex flex-col items-center gap-7 w-full">
-      {/* Mod sekmeleri (İş/Mola) — Odak Modu'nda gizlenir */}
-      <div className={`flex gap-2 transition-opacity duration-500 ${lightsOut ? "opacity-0 pointer-events-none h-0 overflow-hidden" : "opacity-100"}`}>
-        {[
-          { key: "work", label: "🧠 Odaklanma" },
-          { key: "break", label: "☕ Mola" },
-        ].map((m) => (
-          <button
-            key={m.key}
-            onClick={() => switchMode(m.key)}
-            disabled={running}
-            className="rounded-full px-4 py-1.5 text-[12.5px] font-semibold transition-all disabled:opacity-50"
-            style={{
-              background: mode === m.key ? "rgba(178,107,255,0.16)" : "rgba(var(--overlay-rgb),0.045)",
-              color: mode === m.key ? "var(--pomo-work-accent)" : "var(--text-muted)",
-            }}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="relative w-[240px] h-[240px] md:w-[280px] md:h-[280px] flex items-center justify-center shrink-0">
-        <div
-          className="absolute rounded-full transition-all duration-700"
-          style={{
-            inset: 22,
-            background: lightsOut ? "rgba(255,255,255,0.03)" : "rgba(var(--overlay-rgb),0.05)",
-            backdropFilter: "blur(18px) saturate(140%)",
-            WebkitBackdropFilter: "blur(18px) saturate(140%)",
-            boxShadow: `inset 0 0 40px -10px ${modeAccent}`,
-          }}
-        />
-        <svg viewBox="0 0 200 200" className="absolute inset-0 w-full h-full -rotate-90">
-          <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(var(--overlay-rgb),0.08)" strokeWidth="8" />
-          <circle
-            cx="100"
-            cy="100"
-            r="88"
-            fill="none"
-            stroke={modeAccent}
-            strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={ringCircumference}
-            strokeDashoffset={ringOffset}
-            style={{ transition: "stroke-dashoffset 1s linear", filter: `drop-shadow(0 0 10px ${modeAccent})` }}
-          />
-        </svg>
-        <div className="relative flex flex-col items-center gap-1">
-          <span
-            className="text-[52px] md:text-[64px] font-bold tabular-nums leading-none transition-all duration-500"
-            style={{
-              fontFamily: TIMER_FONT,
-              color: lightsOut ? "#FFFFFF" : "var(--text-primary)",
-              textShadow: lightsOut ? `0 0 12px #fff, 0 0 30px ${modeAccent}, 0 0 60px ${modeAccent}` : `0 0 26px ${modeAccent}`,
-            }}
-          >
-            {formatTime(secondsLeft)}
-          </span>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: modeAccent }}>
-            {mode === "work" ? "Odaklanma" : "Mola"}
-          </span>
-        </div>
-      </div>
-
-      {/* Aktif Görev satırı — Odak Modu'nda da görünür kalır */}
+    <div className="relative w-[250px] h-[250px] md:w-[300px] md:h-[300px] flex items-center justify-center shrink-0">
       <div
-        className="flex items-center gap-2.5 max-w-[92vw] rounded-full px-4 py-2 transition-all duration-500"
-        style={{
-          background: "rgba(var(--overlay-rgb),0.06)",
-          boxShadow: selectedTask ? `0 0 0 1px ${modeAccent}55${lightsOut ? `, 0 0 24px -2px ${modeAccent}` : ""}` : "none",
-        }}
-      >
-        <span className="truncate text-[12.5px] md:text-[13.5px] font-semibold" style={{ color: selectedTask ? modeAccent : "var(--text-faint)" }}>
-          {selectedTask ? `📌 ${selectedTask.title}` : "Bir görev seçilmedi"}
+        className="absolute rounded-full bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 backdrop-blur-xl transition-all duration-700"
+        style={{ inset: 20, boxShadow: `inset 0 0 46px -12px ${accent}` }}
+      />
+      <svg viewBox="0 0 200 200" className="absolute inset-0 w-full h-full -rotate-90">
+        <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(var(--overlay-rgb),0.06)" strokeWidth="7" />
+        <circle
+          cx="100"
+          cy="100"
+          r="88"
+          fill="none"
+          stroke={accent}
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeDasharray={ringCircumference}
+          strokeDashoffset={ringOffset}
+          style={{ transition: "stroke-dashoffset 1s linear", filter: `drop-shadow(0 0 ${boost ? 14 : 9}px ${accent})` }}
+        />
+      </svg>
+      <div className="relative flex flex-col items-center gap-1.5">
+        <span
+          className="text-[56px] md:text-[68px] font-bold tabular-nums leading-none tracking-wider transition-all duration-500"
+          style={{
+            fontFamily: TIMER_FONT,
+            color: "var(--text-primary)",
+            textShadow: `0 0 ${boost ? 34 : 20}px ${boost ? accent : `color-mix(in srgb, ${accent} 60%, transparent)`}`,
+          }}
+        >
+          {formatTime(secondsLeft)}
         </span>
-        {onOpenTasks && (
-          <button
-            onClick={onOpenTasks}
-            className="shrink-0 text-[11.5px] font-semibold rounded-full px-2.5 py-1 transition-colors"
-            style={{ background: "rgba(var(--overlay-rgb),0.08)", color: "var(--text-muted)" }}
-          >
-            {selectedTask ? "Değiştir ▾" : "Görev Seç ▾"}
-          </button>
-        )}
-      </div>
-
-      {showSteppers && (
-        <DurationSteppers workMin={workMin} breakMin={breakMin} running={running} adjustDuration={adjustDuration} compact />
-      )}
-
-      {/* Başlat/Duraklat + Sıfırla — Odak Modu'nda da görünür kalır */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={resetTimer}
-          aria-label="Sıfırla"
-          className="w-11 h-11 rounded-full flex items-center justify-center text-[16px] transition-all"
-          style={{ background: "rgba(var(--overlay-rgb),0.08)", color: "var(--text-muted)" }}
-        >
-          ↺
-        </button>
-        <button
-          onClick={toggleRunning}
-          className="rounded-full px-8 py-3 text-[14px] font-bold transition-all"
-          style={{ background: modeAccent, color: "#04040a", boxShadow: `0 8px 30px -8px ${modeAccent}` }}
-        >
-          {running ? "⏸ Duraklat" : "▶ Başlat"}
-        </button>
-        <div className="w-11" aria-hidden="true" />
+        <span className="text-[11px] font-bold uppercase tracking-[0.18em] whitespace-nowrap" style={{ color: accent }}>
+          {mode === "work" ? "Odaklanma" : "Mola"}
+        </span>
       </div>
     </div>
   );
 }
 
-// Süre ayarı satırları — "Ayarlar" sekmesinin (mobil) ve masaüstü sayaç
-// sütununun ortak içeriği. `compact`: masaüstünde ring'in hemen altında
-// küçük tek satır; aksi halde (mobil Ayarlar sekmesi) iki ayrı geniş satır.
-function DurationSteppers({ workMin, breakMin, running, adjustDuration, compact }) {
-  const rows = [
-    { field: "work", label: "🧠 Odaklanma Süresi", value: workMin, step: WORK_STEP },
-    { field: "break", label: "☕ Mola Süresi", value: breakMin, step: BREAK_STEP },
-  ];
-
-  if (compact) {
-    return (
-      <div className="flex items-center gap-5">
-        {rows.map((r) => (
-          <div key={r.field} className="flex items-center gap-2.5">
-            <span className="text-[10.5px] font-semibold text-[var(--text-faint)]">{r.label.slice(0, 2)}</span>
-            <button
-              onClick={() => adjustDuration(r.field, -r.step)}
-              disabled={running}
-              className="w-7 h-7 rounded-full flex items-center justify-center text-[14px] font-bold disabled:opacity-30 transition-colors"
-              style={{ background: "rgba(var(--overlay-rgb),0.08)", color: "var(--text-primary)" }}
-            >
-              −
-            </button>
-            <span className="text-[12px] font-semibold text-[var(--text-muted)] w-12 text-center" style={{ fontFamily: TIMER_FONT }}>
-              {r.value} dk
-            </span>
-            <button
-              onClick={() => adjustDuration(r.field, r.step)}
-              disabled={running}
-              className="w-7 h-7 rounded-full flex items-center justify-center text-[14px] font-bold disabled:opacity-30 transition-colors"
-              style={{ background: "rgba(var(--overlay-rgb),0.08)", color: "var(--text-primary)" }}
-            >
-              +
-            </button>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
+// Başlat/Duraklat (devasa, neon dolgu) + Sıfırla — Odak Modu'nda da HER ZAMAN
+// görünür kalan TEK kontrol grubu.
+function ControlButtons({ running, toggleRunning, resetTimer, accent }) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex items-center gap-4">
+      <button
+        onClick={resetTimer}
+        aria-label="Sıfırla"
+        className="w-12 h-12 rounded-full flex items-center justify-center text-[17px] text-gray-500 hover:text-gray-900 dark:text-white/50 dark:hover:text-white/90 bg-black/[0.04] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 transition-all active:scale-95"
+      >
+        ↺
+      </button>
+      <button
+        onClick={toggleRunning}
+        className="rounded-full px-11 py-4 text-[15px] font-bold whitespace-nowrap text-[#040608] transition-all active:scale-95"
+        style={{ background: accent, boxShadow: `0 0 40px -6px ${accent}, 0 10px 34px -10px ${accent}` }}
+      >
+        {running ? "⏸ Duraklat" : "▶ Başlat"}
+      </button>
+      <div className="w-12" aria-hidden="true" />
+    </div>
+  );
+}
+
+// Odaklanma/Mola segmented control — neon geçişli.
+function ModeTabs({ mode, switchMode, running }) {
+  return (
+    <div className="flex gap-1.5 p-1 rounded-full bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
+      {[
+        { key: "work", label: "Odaklanma" },
+        { key: "break", label: "Mola" },
+      ].map((m) => {
+        const active = mode === m.key;
+        return (
+          <button
+            key={m.key}
+            onClick={() => switchMode(m.key)}
+            disabled={running}
+            className={`rounded-full px-5 py-1.5 text-[12.5px] font-bold whitespace-nowrap transition-all disabled:opacity-40 ${
+              active ? "" : "text-gray-400 dark:text-white/40"
+            }`}
+            style={{
+              background: active ? `color-mix(in srgb, ${ACCENT[m.key]} 12%, transparent)` : "transparent",
+              color: active ? ACCENT[m.key] : undefined,
+              boxShadow: active ? `0 0 16px -4px ${ACCENT[m.key]}` : "none",
+            }}
+          >
+            {m.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Halkanın altındaki "Seçili Görev" rozeti — glassmorphism, tek satır truncate.
+// Dokununca (paylaşılan) TaskDrawer'ı açar.
+function SelectedTaskBadge({ selectedTask, accent, onOpen }) {
+  return (
+    <button
+      onClick={onOpen}
+      className="flex items-center gap-2.5 max-w-[92vw] rounded-full px-4 py-2 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 backdrop-blur-xl transition-all duration-300"
+    >
+      <span
+        className="truncate text-[12.5px] font-semibold whitespace-nowrap"
+        style={{ color: selectedTask ? accent : "var(--text-faint)" }}
+      >
+        {selectedTask ? `📌 Seçili Görev: ${selectedTask.title}` : "Bir görev seçilmedi"}
+      </span>
+      <span className="shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-black/[0.05] dark:bg-white/[0.06] text-gray-500 dark:text-white/50 whitespace-nowrap">
+        {selectedTask ? "Değiştir" : "Seç"}
+      </span>
+    </button>
+  );
+}
+
+// Süre ayarı satırları — Odaklanma/Mola için ayrı ayrı, dikeyde hizalı iki
+// satır. Her satırda -/değer/+ ergonomik pill butonlar.
+function DurationSteppers({ workMin, breakMin, running, adjustDuration }) {
+  const rows = [
+    { field: "work", label: "Odaklanma", value: workMin, step: WORK_STEP, accent: ACCENT.work },
+    { field: "break", label: "Mola", value: breakMin, step: BREAK_STEP, accent: ACCENT.break },
+  ];
+  return (
+    <div className="flex flex-col gap-2 w-full max-w-[300px]">
       {rows.map((r) => (
-        <div key={r.field} className="flex items-center justify-between rounded-2xl px-4 py-3.5" style={{ background: "rgba(var(--overlay-rgb),0.045)" }}>
-          <span className="text-[13.5px] font-semibold text-[var(--text-primary)]">{r.label}</span>
-          <div className="flex items-center gap-3">
+        <div key={r.field} className="flex items-center justify-between rounded-2xl px-3.5 py-2.5 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
+          <span className="text-[12px] font-bold whitespace-nowrap" style={{ color: r.accent }}>
+            {r.label}
+          </span>
+          <div className="flex items-center gap-2.5">
             <button
               onClick={() => adjustDuration(r.field, -r.step)}
               disabled={running}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-[16px] font-bold disabled:opacity-30 transition-colors"
-              style={{ background: "rgba(var(--overlay-rgb),0.08)", color: "var(--text-primary)" }}
+              className="w-7 h-7 rounded-full flex items-center justify-center text-[14px] font-bold text-gray-600 dark:text-white/70 bg-black/[0.04] dark:bg-white/[0.05] disabled:opacity-25 transition-all active:scale-90"
             >
               −
             </button>
-            <span className="text-[13px] font-semibold text-[var(--text-muted)] w-14 text-center" style={{ fontFamily: TIMER_FONT }}>
+            <span className="text-[12.5px] font-bold text-gray-900 dark:text-white w-11 text-center whitespace-nowrap" style={{ fontFamily: TIMER_FONT }}>
               {r.value} dk
             </span>
             <button
               onClick={() => adjustDuration(r.field, r.step)}
               disabled={running}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-[16px] font-bold disabled:opacity-30 transition-colors"
-              style={{ background: "rgba(var(--overlay-rgb),0.08)", color: "var(--text-primary)" }}
+              className="w-7 h-7 rounded-full flex items-center justify-center text-[14px] font-bold text-gray-600 dark:text-white/70 bg-black/[0.04] dark:bg-white/[0.05] disabled:opacity-25 transition-all active:scale-90"
             >
               +
             </button>
@@ -242,100 +199,194 @@ function DurationSteppers({ workMin, breakMin, running, adjustDuration, compact 
   );
 }
 
-// Müzik içeriği — Spotify Embed (kendi play/pause/ilerleme çubuğuyla) +
-// gerçek YouTube IFrame Player API oynatıcısı (harici sekmeye YÖNLENDİRME
-// YOK). Mobilde "Müzik" sekmesinin, masaüstünde sol sütunun içeriği.
-function MusicContent({ ytContainerRef, toggleYoutube, ytReady, ytPlaying }) {
+// "Hero Focus Zone" — mod sekmeleri + halka + görev rozeti + süre ayarı +
+// kontrol butonları. Mobil ve masaüstünde AYNI, tek ortak odak ekranı —
+// görev/plan seçimi artık gömülü bir panel değil, paylaşılan TaskDrawer
+// (bkz. PomodoroStudio ana bileşeni). Odak Modu'nda mod sekmeleri/rozet/süre
+// ayarı `grid-template-rows` tekniğiyle YUMUŞAKÇA yüksekliği sıfıra iner +
+// solar (yalnızca opaklık değil, gerçekten yer de kaplamaz) — halka + kontrol
+// butonları HER ZAMAN kalır.
+function HeroZone({
+  mode,
+  switchMode,
+  running,
+  secondsLeft,
+  pct,
+  ringCircumference,
+  ringOffset,
+  accent,
+  selectedTask,
+  onOpenTaskDrawer,
+  toggleRunning,
+  resetTimer,
+  workMin,
+  breakMin,
+  adjustDuration,
+  isFocusMode,
+}) {
   return (
-    <div className="flex flex-col gap-5 w-full">
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] mb-2" style={{ color: "#1DB954" }}>
-          🎧 Spotify — Lo-Fi / Deep Focus
-        </p>
-        <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(var(--overlay-rgb),0.035)" }}>
-          <iframe
-            title="Spotify Lo-Fi / Deep Focus"
-            src={SPOTIFY_EMBED_URL}
-            width="100%"
-            height="352"
-            frameBorder="0"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy"
-          />
+    <div className="flex flex-col items-center w-full">
+      <div className="w-full grid transition-[grid-template-rows] duration-500 ease-out" style={{ gridTemplateRows: isFocusMode ? "0fr" : "1fr" }}>
+        <div className="overflow-hidden min-h-0">
+          <div className={`flex flex-col items-center pb-7 transition-opacity duration-300 ${isFocusMode ? "opacity-0" : "opacity-100"}`}>
+            <ModeTabs mode={mode} switchMode={switchMode} running={running} />
+          </div>
         </div>
       </div>
 
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] mb-2" style={{ color: "#FF3B5C" }}>
-          ▶ YouTube Music — Lofi Radio
-        </p>
-        <div className="rounded-2xl overflow-hidden mb-2" style={{ background: "rgba(var(--overlay-rgb),0.035)" }}>
-          <div ref={ytContainerRef} className="w-full aspect-video" />
+      <TimerRing secondsLeft={secondsLeft} mode={mode} accent={accent} pct={pct} ringCircumference={ringCircumference} ringOffset={ringOffset} boost={isFocusMode} />
+
+      <div className="w-full grid transition-[grid-template-rows] duration-500 ease-out" style={{ gridTemplateRows: isFocusMode ? "0fr" : "1fr" }}>
+        <div className="overflow-hidden min-h-0">
+          <div className={`flex flex-col items-center gap-5 pt-7 pb-7 transition-opacity duration-300 ${isFocusMode ? "opacity-0" : "opacity-100"}`}>
+            <SelectedTaskBadge selectedTask={selectedTask} accent={accent} onOpen={onOpenTaskDrawer} />
+            <DurationSteppers workMin={workMin} breakMin={breakMin} running={running} adjustDuration={adjustDuration} />
+          </div>
         </div>
-        <button
-          onClick={toggleYoutube}
-          disabled={!ytReady}
-          className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-[12.5px] font-semibold transition-all disabled:opacity-40"
-          style={{ background: "rgba(255,59,92,0.12)", color: "#FF3B5C" }}
-        >
-          {ytPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-          {ytPlaying ? "Duraklat" : "Oynat"}
-        </button>
       </div>
+
+      <ControlButtons running={running} toggleRunning={toggleRunning} resetTimer={resetTimer} accent={accent} />
     </div>
   );
 }
 
-// 🕐 Pomodoro & Focus Studio — Aşamalı Açıklık (Progressive Disclosure)
-// mimarisi: mobilde yüzen alt sekme çubuğu (Sayaç/Görevler/Müzik/Ayarlar) ile
-// tek seferde YALNIZCA bir sekmenin içeriği görünür; sayaç çalışırken (veya
-// Işıklar Söndü açıldığında) Odak Modu'na geçilip sekme çubuğu dahil tüm
-// ikincil kontroller gizlenir. Masaüstünde (≥768px) sekme YOK — sabit 2 sütun:
-// sol = Sayaç + Müzik, sağ = Görevler (bkz. TaskListPanel.jsx) sürekli görünür.
-export default function PomodoroStudio({ open, userId, initialTaskId, onClose }) {
+// Üst bardaki müzik popover'larının ortak iskeleti: tam ekran görünmez bir
+// backdrop (dışarı tıklayınca kapanır) + sağ üstte, diğer panellerle ASLA
+// çakışmayan yüksek z-index'li ([97]/[96]) küçük, kompakt bir kutu.
+function MusicPopoverShell({ onClose, title, tint, children }) {
+  return (
+    <>
+      <div className="fixed inset-0 z-[96]" onClick={onClose} />
+      <div
+        className="absolute top-full right-0 mt-2 z-[97] w-[300px] rounded-2xl p-4 border border-black/10 dark:border-white/10 backdrop-blur-xl"
+        style={{ background: "var(--pomo-bg)", boxShadow: `0 24px 60px -18px rgba(0,0,0,0.35), 0 0 0 1px ${tint}22` }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-[12.5px] font-bold whitespace-nowrap" style={{ color: tint }}>
+            {title}
+          </h4>
+          <button
+            onClick={onClose}
+            aria-label="Kapat"
+            className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-900 dark:text-white/40 dark:hover:text-white transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </>
+  );
+}
+
+// Spotify popover — resmi Embed iframe'i (kendi play/pause/ilerleme
+// çubuğuyla) yalnızca bu popover AÇIKKEN mount edilir/çalar; kapatınca durur.
+// Web Playback SDK (Premium hesap + OAuth) olmadan dışarıdan kontrol edilemez —
+// bu yüzden sahte/çalışmayan bir Oynat/Durdur butonu GÖSTERİLMİYOR, kontrol
+// doğrudan Spotify'ın kendi embed arayüzünde yapılıyor.
+function SpotifyPopover({ onClose }) {
+  return (
+    <MusicPopoverShell onClose={onClose} title="🎧 Spotify — Lo-Fi Beats" tint="#1DB954">
+      <div className="rounded-xl overflow-hidden">
+        <iframe
+          title="Spotify Lo-Fi Beats"
+          src={SPOTIFY_EMBED_URL}
+          width="100%"
+          height="152"
+          frameBorder="0"
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          loading="lazy"
+        />
+      </div>
+      <p className="mt-2.5 text-[10.5px] leading-relaxed text-gray-500 dark:text-white/35">
+        Spotify'ın kendi oynatıcısı — kontrolü doğrudan burada yap. Bu pencereyi kapatman müziği durdurur.
+      </p>
+    </MusicPopoverShell>
+  );
+}
+
+// YouTube Music popover — bir parça seçilince arkadaki gizli YouTube IFrame
+// Player'ı besler ve panel kendiliğinden kapanır. Oynat/Duraklat kontrolü de
+// burada yaşıyor (ayrı bir kontrol yüzeyi olmadan işlevsellik kaybolmasın diye).
+function YoutubePopover({ onClose, trackIndex, trackLabel, ytReady, ytPlaying, onTogglePlay, onSelectTrack }) {
+  return (
+    <MusicPopoverShell onClose={onClose} title="▶ YouTube Music" tint="#FF3B5C">
+      <div className="flex items-center gap-2.5 mb-3 rounded-xl px-3 py-2.5 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
+        <span className="flex-1 min-w-0 truncate text-[11.5px] font-semibold text-gray-600 dark:text-white/70 whitespace-nowrap">{trackLabel}</span>
+        <button
+          onClick={onTogglePlay}
+          disabled={!ytReady}
+          aria-label={ytPlaying ? "Duraklat" : "Oynat"}
+          className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 disabled:opacity-30"
+          style={{ background: "#FF3B5C22", color: "#FF3B5C" }}
+        >
+          {ytPlaying ? <Pause className="w-3.5 h-3.5" fill="currentColor" /> : <Play className="w-3.5 h-3.5" fill="currentColor" />}
+        </button>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {PLAYLIST.map((t, i) => {
+          const active = i === trackIndex;
+          return (
+            <button
+              key={t.id}
+              onClick={() => {
+                onSelectTrack(i);
+                onClose();
+              }}
+              className={`text-left rounded-lg px-3 py-2.5 text-[12px] font-medium leading-relaxed transition-colors ${
+                active ? "bg-[#FF3B5C]/[0.14] text-[#FF3B5C]" : "bg-black/[0.03] dark:bg-white/[0.03] text-gray-600 dark:text-white/70 hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
+              }`}
+            >
+              {active ? "▶ " : ""}
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+    </MusicPopoverShell>
+  );
+}
+
+// 🕐 Pomodoro & Focus Studio — sabit "neon-dark" bir odak odası (uygulamanın
+// light/dark tema tercihinden BİLEREK bağımsız). Görev/Plan seçimi artık
+// gömülü bir panel DEĞİL — Ana Sayfa'yla PAYLAŞILAN, ekrandan/layout'tan
+// tamamen bağımsız bir Slide-Over çekmece (bkz. TaskDrawer.jsx). Mobil ve
+// masaüstü aynı tek "Hero Focus Zone" ekranını kullanır. Odak Modu
+// (isFocusMode): üst bar ekstraları GERÇEKTEN (opaklık + pointer-events)
+// kaybolur, yalnızca halka + Başlat/Durdur/Sıfırla ve tek bir "Işıkları Aç"
+// düğmesi kalır. Alt bir medya çubuğu YOK — müzik yalnızca üst bardaki
+// Spotify/YouTube popover'larından kontrol edilir.
+export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
   const [mode, setMode] = useState("work"); // "work" | "break"
   const [workMin, setWorkMin] = useState(DEFAULT_WORK_MIN);
   const [breakMin, setBreakMin] = useState(DEFAULT_BREAK_MIN);
   const [secondsLeft, setSecondsLeft] = useState(DEFAULT_WORK_MIN * 60);
   const [running, setRunning] = useState(false);
-  const [plans, setPlans] = useState([]);
-  const [selectedTaskId, setSelectedTaskId] = useState("");
-  const [lightsOut, setLightsOut] = useState(false);
-  const [activeTab, setActiveTab] = useState("counter"); // yalnızca mobil sekme mimarisi için
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
+  const [musicPopover, setMusicPopover] = useState(null); // null | "spotify" | "youtube"
   const [ytReady, setYtReady] = useState(false);
   const [ytPlaying, setYtPlaying] = useState(false);
+  const [trackIndex, setTrackIndex] = useState(0);
+  const [ytTitle, setYtTitle] = useState("");
 
   const ytPlayerRef = useRef(null);
   const ytContainerRef = useRef(null);
 
   const totalForMode = (mode === "work" ? workMin : breakMin) * 60;
-  const chromeHidden = lightsOut || running; // Odak Modu: sekme çubuğu + ikincil kontroller gizlenir
 
-  // Görev kartındaki "Başlat" ile açılmışsa (initialTaskId), o görevi otomatik
-  // olarak Aktif Görev yapar — kullanıcı Görevler sekmesine gitmeden odaklanmaya başlar.
+  // Görev kartındaki "Başlat" ile açılmışsa (initialTask — tam görev objesi,
+  // ayrı bir fetch gerekmez), o görevi otomatik olarak Aktif Görev yapar.
   useEffect(() => {
-    if (open && initialTaskId) setSelectedTaskId(initialTaskId);
-  }, [open, initialTaskId]);
+    if (open && initialTask) setSelectedTask(initialTask);
+  }, [open, initialTask]);
 
-  // Drawer açıldığında kullanıcının planlarını çek (görev seçici için).
-  useEffect(() => {
-    if (!open || !userId) return;
-    let cancelled = false;
-    fetchDashboardData(userId)
-      .then((data) => !cancelled && setPlans(data))
-      .catch((err) => logger.error("POMODORO", "Planlar getirilemedi", { error: err?.message }));
-    return () => {
-      cancelled = true;
-    };
-  }, [open, userId]);
-
-  // Mod ya da süre değişince (çalışmıyorken) sayaç sıfırlansın.
   useEffect(() => {
     if (!running) setSecondsLeft(totalForMode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, workMin, breakMin]);
 
-  // Geri sayım — her saniye tetiklenen, temiz (stale-closure'suz) setTimeout zinciri.
   useEffect(() => {
     if (!open || !running) return;
     if (secondsLeft <= 0) {
@@ -350,24 +401,26 @@ export default function PomodoroStudio({ open, userId, initialTaskId, onClose })
     return () => clearTimeout(id);
   }, [open, running, secondsLeft, mode, workMin, breakMin]);
 
-  // --- YouTube IFrame Player API: gerçek gömülü oynatıcı. Studio açılır
-  // açılmaz kurulur (artık ayrı bir "panel açıldı" tetikleyicisi yok — Müzik
-  // hem sekme hem de masaüstü sütunu olarak DOM'da mevcut olabiliyor). ---
+  // --- YouTube IFrame Player API: arkada, görünmez şekilde çalan gerçek
+  // oynatıcı (harici sekmeye YÖNLENDİRME YOK). ---
   useEffect(() => {
     if (!open || ytPlayerRef.current) return;
-
     const createPlayer = () => {
       if (ytPlayerRef.current || !ytContainerRef.current || !window.YT?.Player) return;
       ytPlayerRef.current = new window.YT.Player(ytContainerRef.current, {
-        videoId: YOUTUBE_VIDEO_ID,
-        playerVars: { autoplay: 0, controls: 1, modestbranding: 1, rel: 0 },
+        videoId: PLAYLIST[0].id,
+        playerVars: { autoplay: 0, controls: 0, modestbranding: 1, rel: 0 },
         events: {
           onReady: () => setYtReady(true),
-          onStateChange: (e) => setYtPlaying(e.data === window.YT.PlayerState.PLAYING),
+          onStateChange: (e) => {
+            setYtPlaying(e.data === window.YT.PlayerState.PLAYING);
+            const title = ytPlayerRef.current?.getVideoData?.()?.title;
+            if (title) setYtTitle(title);
+          },
+          onError: (e) => logger.warn("POMODORO_YT", "YouTube oynatıcı hatası", { code: e?.data }),
         },
       });
     };
-
     if (window.YT?.Player) {
       createPlayer();
       return;
@@ -385,26 +438,23 @@ export default function PomodoroStudio({ open, userId, initialTaskId, onClose })
     };
   }, [open]);
 
-  // Studio tamamen kapanınca YouTube oynatıcıyı da temizle.
   useEffect(() => {
     if (open) return;
     ytPlayerRef.current?.destroy?.();
     ytPlayerRef.current = null;
     setYtReady(false);
     setYtPlaying(false);
+    setYtTitle("");
+    setTrackIndex(0);
   }, [open]);
 
   if (!open) return null;
 
-  // Seçili görev (varsa) — Aktif Görev satırında gösterilmek üzere tüm
-  // planlar/görevler (tamamlanmış dahil, Görevler sekmesi ikisini de listeler) içinde aranır.
-  const selectedTaskPlan = plans.find((p) => (p.tasks || []).some((t) => t.id === selectedTaskId));
-  const selectedTask = selectedTaskPlan?.tasks.find((t) => t.id === selectedTaskId);
-
   const pct = totalForMode > 0 ? Math.max(0, Math.min(100, Math.round((1 - secondsLeft / totalForMode) * 100))) : 0;
   const ringCircumference = 2 * Math.PI * 88;
   const ringOffset = ringCircumference * (1 - pct / 100);
-  const modeAccent = mode === "work" ? "var(--pomo-work-accent)" : "var(--pomo-break-accent)";
+  const accent = ACCENT[mode];
+  const trackLabel = ytTitle || PLAYLIST[trackIndex].label;
 
   const adjustDuration = (field, delta) => {
     if (running) return;
@@ -412,15 +462,7 @@ export default function PomodoroStudio({ open, userId, initialTaskId, onClose })
     else setBreakMin((m) => Math.min(30, Math.max(1, m + delta)));
   };
 
-  // Odaklanma başlatılınca otomatik olarak Sayaç sekmesine dönülür ve (Odak
-  // Modu üzerinden) sekme çubuğu/ikincil kontroller gizlenir — "gereksiz tüm
-  // kontroller" isteğinin karşılığı budur.
-  const toggleRunning = () =>
-    setRunning((r) => {
-      const next = !r;
-      if (next) setActiveTab("counter");
-      return next;
-    });
+  const toggleRunning = () => setRunning((r) => !r);
 
   const resetTimer = () => {
     setRunning(false);
@@ -438,12 +480,14 @@ export default function PomodoroStudio({ open, userId, initialTaskId, onClose })
     else ytPlayerRef.current.playVideo();
   };
 
-  const selectTaskMobile = (taskId) => {
-    setSelectedTaskId(taskId);
-    setActiveTab("counter");
+  const goToTrack = (nextIndex) => {
+    const clamped = ((nextIndex % PLAYLIST.length) + PLAYLIST.length) % PLAYLIST.length;
+    setTrackIndex(clamped);
+    setYtTitle("");
+    ytPlayerRef.current?.loadVideoById?.(PLAYLIST[clamped].id);
   };
 
-  const counterProps = {
+  const heroProps = {
     mode,
     switchMode,
     running,
@@ -451,117 +495,125 @@ export default function PomodoroStudio({ open, userId, initialTaskId, onClose })
     pct,
     ringCircumference,
     ringOffset,
-    modeAccent,
-    lightsOut,
+    accent,
     selectedTask,
     toggleRunning,
     resetTimer,
     workMin,
     breakMin,
     adjustDuration,
+    isFocusMode,
+    onOpenTaskDrawer: () => setTaskDrawerOpen(true),
   };
 
-  const musicProps = { ytContainerRef, toggleYoutube, ytReady, ytPlaying };
-
   return (
-    <div
-      className="fixed inset-0 z-[90] flex flex-col transition-colors duration-700"
-      style={{
-        background: lightsOut ? "rgba(2,2,4,0.985)" : "rgba(var(--glass-rgb), var(--alpha-modal))",
-        backdropFilter: "blur(28px) saturate(150%)",
-        WebkitBackdropFilter: "blur(28px) saturate(150%)",
-      }}
-    >
-      {/* Üst bar — Odak Modu'nda sadeleşir (yalnızca kapatma + odak butonu kalır) */}
+    <div className="fixed inset-0 z-[90] flex flex-col transition-colors duration-700" style={{ background: isFocusMode ? "var(--pomo-bg-focus)" : "var(--pomo-bg)" }}>
+      {/* YouTube oynatıcı — görünmez (1x1), arkada gerçekten çalar. */}
+      <div ref={ytContainerRef} style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none", overflow: "hidden" }} />
+
+      {/* Üst bar */}
       <div className="shrink-0 px-4 md:px-8 pt-5 pb-3 flex items-center justify-between gap-2">
-        <div className={`flex items-center gap-2.5 transition-opacity duration-500 ${lightsOut ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
-          <TimerIcon className="w-5 h-5" style={{ color: "var(--pomo-work-accent)" }} strokeWidth={2.25} />
-          <h2 className="text-[18px] font-bold text-[var(--text-primary)]">Pomodoro &amp; Focus Studio</h2>
+        <div className={`flex items-center gap-2.5 transition-opacity duration-300 ${isFocusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+          <TimerIcon className="w-5 h-5 shrink-0" style={{ color: accent }} strokeWidth={2.25} />
+          <h2 className="text-[17px] font-bold text-gray-900 dark:text-white whitespace-nowrap">Focus Studio</h2>
         </div>
         <div className="flex items-center gap-2">
+          {/* Görevler ve Planlar + Spotify / YouTube Music — z-index izole popover'lar
+              açar; Odak Modu'nda gizlenir */}
+          <div className={`hidden md:flex items-center gap-2 transition-opacity duration-300 ${isFocusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+            <button
+              onClick={() => setTaskDrawerOpen(true)}
+              className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[12px] font-bold whitespace-nowrap transition-all"
+              style={{ background: `color-mix(in srgb, ${BRAND_ACCENT} 10%, transparent)`, color: BRAND_ACCENT }}
+            >
+              <ClipboardList className="w-3.5 h-3.5" strokeWidth={2.25} />
+              Görevler ve Planlar
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setMusicPopover((v) => (v === "spotify" ? null : "spotify"))}
+                className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[12px] font-bold whitespace-nowrap transition-all"
+                style={{ background: musicPopover === "spotify" ? "#1DB9541f" : "rgba(var(--overlay-rgb),0.04)", color: "#1DB954" }}
+              >
+                <Music2 className="w-3.5 h-3.5" strokeWidth={2.25} />
+                Spotify
+              </button>
+              {musicPopover === "spotify" && <SpotifyPopover onClose={() => setMusicPopover(null)} />}
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => setMusicPopover((v) => (v === "youtube" ? null : "youtube"))}
+                className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[12px] font-bold whitespace-nowrap transition-all"
+                style={{ background: musicPopover === "youtube" ? "#FF3B5C1f" : "rgba(var(--overlay-rgb),0.04)", color: "#FF3B5C" }}
+              >
+                <ListMusic className="w-3.5 h-3.5" strokeWidth={2.25} />
+                YouTube Music
+              </button>
+              {musicPopover === "youtube" && (
+                <YoutubePopover
+                  onClose={() => setMusicPopover(null)}
+                  trackIndex={trackIndex}
+                  trackLabel={trackLabel}
+                  ytReady={ytReady}
+                  ytPlaying={ytPlaying}
+                  onTogglePlay={toggleYoutube}
+                  onSelectTrack={goToTrack}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Mobilde de Görevler ve Planlar erişimi — üst barda kompakt ikon buton */}
           <button
-            onClick={() => setLightsOut((v) => !v)}
-            aria-label="Odak Modu / Işıkları Söndür"
-            title="Odak Modu"
-            className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
-            style={{
-              background: lightsOut ? "rgba(178,107,255,0.22)" : "rgba(var(--overlay-rgb),0.06)",
-              color: lightsOut ? "#C99CFF" : "var(--text-muted)",
-            }}
+            onClick={() => setTaskDrawerOpen(true)}
+            aria-label="Görevler ve Planlar"
+            className={`md:hidden w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
+              isFocusMode ? "opacity-0 pointer-events-none scale-95" : "opacity-100 scale-100"
+            }`}
+            style={{ background: `color-mix(in srgb, ${BRAND_ACCENT} 10%, transparent)`, color: BRAND_ACCENT }}
           >
-            💡 {lightsOut ? "Işıkları Aç" : "Odak Modu"}
+            <ClipboardList className="w-4 h-4" strokeWidth={2.25} />
+          </button>
+
+          <button
+            onClick={() => setIsFocusMode((v) => !v)}
+            aria-label="Odak Modu / Işıkları Söndür"
+            className={`flex items-center gap-1.5 rounded-full px-4 h-9 text-[12px] font-bold whitespace-nowrap transition-all ${
+              isFocusMode ? "text-gray-500 dark:text-white/55" : ""
+            }`}
+            style={
+              isFocusMode
+                ? { background: "transparent" }
+                : { background: `color-mix(in srgb, ${BRAND_ACCENT} 10%, transparent)`, color: BRAND_ACCENT, boxShadow: `0 0 16px -6px ${BRAND_ACCENT}` }
+            }
+          >
+            💡 {isFocusMode ? "Işıkları Aç" : "Odak Modu"}
           </button>
           <button
             onClick={onClose}
             aria-label="Kapat"
-            className={`w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all ${lightsOut ? "opacity-40 hover:opacity-100" : ""}`}
-            style={{ background: "rgba(var(--overlay-rgb),0.06)" }}
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 dark:text-white/45 dark:hover:text-white bg-black/[0.04] dark:bg-white/[0.04] transition-all duration-300 ${
+              isFocusMode ? "opacity-0 pointer-events-none scale-95" : "opacity-100 scale-100"
+            }`}
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* MOBİL: Aşamalı Açıklık — tek seferde yalnızca AKTİF sekmenin içeriği */}
-      <div className="md:hidden flex-1 min-h-0 overflow-y-auto flex flex-col items-center px-6 py-4 gap-6">
-        {activeTab === "counter" && <CounterPane {...counterProps} onOpenTasks={() => setActiveTab("tasks")} showSteppers={false} />}
-        {activeTab === "tasks" && (
-          <div className="w-full h-full min-h-0 flex-1">
-            <TaskListPanel plans={plans} selectedTaskId={selectedTaskId} onSelectTask={selectTaskMobile} />
-          </div>
-        )}
-        {activeTab === "music" && <MusicContent {...musicProps} />}
-        {activeTab === "settings" && (
-          <div className="w-full flex flex-col gap-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-faint)]">Süre Ayarları</p>
-            <DurationSteppers workMin={workMin} breakMin={breakMin} running={running} adjustDuration={adjustDuration} />
-          </div>
-        )}
+      {/* Tek, ortak odak ekranı — mobil ve masaüstünde AYNI. Görev/plan seçimi
+          artık gömülü bir panel değil, paylaşılan TaskDrawer (aşağıda). */}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center px-6 py-4">
+        <HeroZone {...heroProps} />
       </div>
 
-      {/* MASAÜSTÜ (≥768px): sekme yok — sabit 2 sütun, hepsi aynı anda görünür */}
-      <div className="hidden md:grid md:grid-cols-[minmax(0,1fr)_380px] md:gap-10 flex-1 min-h-0 px-8 pb-8">
-        <div className="min-h-0 overflow-y-auto no-scrollbar flex flex-col items-center gap-10 py-4">
-          <CounterPane {...counterProps} onOpenTasks={null} showSteppers />
-          <MusicContent {...musicProps} />
-        </div>
-        <div className="min-h-0 flex flex-col py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-faint)] mb-3 shrink-0">Görevler</p>
-          <TaskListPanel plans={plans} selectedTaskId={selectedTaskId} onSelectTask={setSelectedTaskId} />
-        </div>
-      </div>
-
-      {/* Mobil yüzen alt sekme çubuğu — Odak Modu'nda kayıp soluklaşarak kaybolur */}
-      <div
-        className={`md:hidden shrink-0 px-4 transition-all duration-500 ${chromeHidden ? "opacity-0 translate-y-3 pointer-events-none" : "opacity-100 translate-y-0"}`}
-        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
-      >
-        <div
-          className="pomo-tabbar flex items-center justify-around rounded-2xl px-2 py-2"
-          style={{
-            background: "rgba(var(--glass-rgb), var(--alpha-modal))",
-            backdropFilter: "blur(20px) saturate(160%)",
-            WebkitBackdropFilter: "blur(20px) saturate(160%)",
-            boxShadow: "0 12px 34px -14px rgba(0,0,0,0.55)",
-          }}
-        >
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            const active = activeTab === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setActiveTab(t.key)}
-                className="flex-1 flex flex-col items-center gap-1 rounded-xl py-2 transition-colors"
-                style={{ background: active ? "rgba(178,107,255,0.16)" : "transparent", color: active ? "var(--pomo-work-accent)" : "var(--text-muted)" }}
-              >
-                <Icon className="w-[18px] h-[18px]" strokeWidth={2.25} />
-                <span className="text-[9.5px] font-semibold">{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <TaskDrawer
+        open={taskDrawerOpen}
+        userId={userId}
+        onClose={() => setTaskDrawerOpen(false)}
+        selectedTaskId={selectedTask?.id}
+        onSelectTask={setSelectedTask}
+      />
     </div>
   );
 }

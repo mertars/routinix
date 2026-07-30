@@ -77,10 +77,17 @@
   --category-card-shadow: var(--glass-shadow);
 
   /* Pomodoro & Focus Studio — koyu temada Cyberpunk/OLED: neon cyan (odaklanma)
-     + mor (mola) ışıltı. Açık temada aynı roller yumuşak mor/turkuaz tonlarına
-     düşer (bkz. :root[data-theme="light"]). */
-  --pomo-work-accent: #22d3ee;
-  --pomo-break-accent: #b26bff;
+     + neon zümrüt (mola) ışıltı; genel "marka" vurgusu (Odak Modu/Görevler
+     butonları gibi mod'a bağlı olmayan çip'ler) de aynı neon cyan. Açık temada
+     aynı roller okunur, daha az doygun mor/turkuaz/camgöbeği tonlarına düşer
+     (bkz. :root[data-theme="light"]). Zemin de temaya göre değişir: koyu
+     temada gerçek "odak odası" (neredeyse siyah), açık temada uygulamanın
+     kendi --bg-app'i (Odak Modu'nda hafifçe daha mat bir tona iner).  */
+  --pomo-work-accent: #00f2fe;
+  --pomo-break-accent: #34f5c5;
+  --pomo-accent: #00f2fe;
+  --pomo-bg: #0b0f17;
+  --pomo-bg-focus: #050709;
 }
 
 :root[data-theme="light"] {
@@ -144,6 +151,9 @@
      beyaz zeminde okunur doygunlukta). */
   --pomo-work-accent: #7c3aed; /* violet-600 */
   --pomo-break-accent: #0d9488; /* teal-600 */
+  --pomo-accent: #0891b2; /* cyan-600 — beyaz zeminde okunur camgöbeği */
+  --pomo-bg: var(--bg-app);
+  --pomo-bg-focus: #e2e8f0; /* slate-200 — Odak Modu'nda hafif matlaşma, siyaha DEĞİL */
 }
 
 /* OLED-dostu koyu zemin — html/body/#root'a set edilir ki iOS Safari'nin
@@ -158,4 +168,32 @@ body {
   margin: 0;
   min-height: 100dvh;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Özel Neon Scrollbar — "Bugünün Görevleri" (TodayPopover) ve Pomodoro
+   Studio'nun sol Görev/Plan paneli (TaskListPanel) için. Fonksiyonel
+   overflow/touch özellikleri BURADA, sınıfın kendi içinde tanımlı (ayrı
+   Tailwind utility sınıflarına bağımlı değil) — tek, yüksek öncelikli bir
+   kaynak. */
+.custom-neon-scroll {
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.custom-neon-scroll::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+  display: block !important;
+}
+
+.custom-neon-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 8px !important;
+}
+
+.custom-neon-scroll::-webkit-scrollbar-thumb {
+  background: #00f2fe !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 8px rgba(0, 242, 254, 0.6) !important;
 }
