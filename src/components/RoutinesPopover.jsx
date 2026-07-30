@@ -2,17 +2,21 @@ import { useState, useEffect } from "react";
 import { categoryOf } from "../constants";
 import { fetchDashboardData } from "../services/planService";
 import logger from "../utils/logger";
-import { routineEmoji, routineMicroLabel as microLabel } from "../utils/routineText";
+import { routineEmoji, routineMicroLabel } from "../utils/routineText";
 import { isRoutineChecked as readCheckin, setRoutineChecked as writeCheckin } from "../utils/routineCheckin";
+import RoutineDetailModal from "./RoutineDetailModal";
 
-// "🔁 Rutinler" popover'ı: tüm planların günlük rutinlerini kompakt tikleme
-// çipleri (2'li grid) olarak gösterir. Günlük check-in localStorage'da tutulur
-// (rutin tablosunda tarih-bazlı kolon olmadığı için sayfa yenilense de korunur).
+// "🔁 Rutinler" popover'ı: tüm planların günlük rutinlerini tek sütunlu,
+// okunaklı kartlar olarak gösterir (başlık 2 satıra kadar kesilmeden sarar,
+// tam metin önizlemesi de 2 satıra kadar görünür — hiçbir yerde manuel
+// karakter kesme YOK). Karta tıklayınca tam metni/sıklığı/planı gösteren
+// RoutineDetailModal açılır. Günlük check-in localStorage'da tutulur (rutin
+// tablosunda tarih-bazlı kolon olmadığı için sayfa yenilense de korunur).
 export default function RoutinesPopover({ open, userId, onClose }) {
   const [routines, setRoutines] = useState(null);
   const [loading, setLoading] = useState(false);
   const [checked, setChecked] = useState({}); // { [routineId]: true }
-  const [infoId, setInfoId] = useState(null); // açık ℹ️ baloncuğu
+  const [detailRoutine, setDetailRoutine] = useState(null);
 
   useEffect(() => {
     if (!open || !userId) return;
@@ -39,7 +43,8 @@ export default function RoutinesPopover({ open, userId, onClose }) {
 
   if (!open) return null;
 
-  const toggle = (id) => {
+  const toggle = (e, id) => {
+    e.stopPropagation();
     setChecked((prev) => {
       const next = { ...prev, [id]: !prev[id] };
       writeCheckin(id, next[id]);
@@ -47,13 +52,19 @@ export default function RoutinesPopover({ open, userId, onClose }) {
     });
   };
 
+  // Detay modalından tiklenirse listedeki checkbox'ın da anında yansıması için.
+  const syncFromModal = (id, next) => {
+    setChecked((prev) => ({ ...prev, [id]: next }));
+  };
+
   const list = routines || [];
+  const detailCat = detailRoutine ? categoryOf(detailRoutine.mode) : null;
 
   return (
     <>
       <div className="fixed inset-0 z-[65]" onClick={onClose} />
       <div
-        className="pop-in fixed top-[62px] right-3 z-[70] w-[calc(100vw-24px)] max-w-[400px] rounded-2xl p-4 shadow-2xl font-sans"
+        className="pop-in fixed top-[62px] right-3 z-[70] w-[calc(100vw-24px)] max-w-[420px] rounded-2xl p-4 shadow-2xl font-sans"
         style={{
           background: "rgba(var(--glass-rgb), var(--alpha-modal))",
           backdropFilter: "blur(20px) saturate(160%)",
@@ -79,72 +90,61 @@ export default function RoutinesPopover({ open, userId, onClose }) {
         ) : list.length === 0 ? (
           <p className="text-[12.5px] text-slate-500 dark:text-slate-400 py-6 text-center font-medium">Aktif planlarında rutin bulunmuyor.</p>
         ) : (
-          <div className="max-h-[70vh] overflow-y-auto no-scrollbar grid grid-cols-2 gap-2">
+          <div className="max-h-[70vh] overflow-y-auto no-scrollbar flex flex-col gap-2.5">
             {list.map((r, i) => {
               const on = !!checked[r.id];
               const cat = categoryOf(r.mode);
-              const showInfo = infoId === (r.id || i);
               return (
                 <div
                   key={r.id || i}
-                  className="relative glass rounded-xl p-2.5 flex items-start gap-2"
+                  onClick={() => setDetailRoutine(r)}
+                  role="button"
+                  tabIndex={0}
+                  className="glass rounded-2xl p-4 flex flex-col gap-1.5 transition-colors cursor-pointer"
                   style={{ borderColor: on ? "rgba(46,217,163,0.45)" : `${cat.accent}22` }}
                 >
-                  <button
-                    onClick={() => toggle(r.id)}
-                    className={`shrink-0 mt-0.5 w-5 h-5 rounded-[6px] border flex items-center justify-center text-[10px] ${on ? "check-glow" : ""}`}
-                    style={{
-                      borderColor: on ? "#2ED9A3" : "var(--border-strong)",
-                      background: on ? "rgba(46,217,163,0.18)" : "transparent",
-                      color: "#2ED9A3",
-                    }}
-                    aria-label="Bugün için işaretle"
-                  >
-                    {on ? "✓" : ""}
-                  </button>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-1">
-                      <span className="text-[13px] leading-none mt-0.5">{routineEmoji(r.content)}</span>
-                      <span
-                        className="flex-1 text-[12.5px] font-medium leading-relaxed text-slate-900 dark:text-slate-100"
-                        style={{ textDecoration: on ? "line-through" : "none", opacity: on ? 0.6 : 1 }}
-                      >
-                        {microLabel(r.content)}
-                      </span>
-                      <button
-                        onClick={() => setInfoId(showInfo ? null : r.id || i)}
-                        title={r.content}
-                        aria-label="Detay"
-                        className="shrink-0 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors text-[12px] leading-none mt-0.5"
-                      >
-                        ℹ️
-                      </button>
-                    </div>
-                    <span
-                      className="inline-block mt-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
-                      style={{ background: cat.accentSoft, color: cat.accent }}
+                  <div className="flex items-start gap-2.5">
+                    <button
+                      onClick={(e) => toggle(e, r.id)}
+                      className={`shrink-0 mt-0.5 w-6 h-6 rounded-full border flex items-center justify-center text-[11px] ${on ? "check-glow" : ""}`}
+                      style={{
+                        borderColor: on ? "#2ED9A3" : "var(--border-strong)",
+                        background: on ? "rgba(46,217,163,0.18)" : "transparent",
+                        color: "#2ED9A3",
+                      }}
+                      aria-label="Bugün için işaretle"
                     >
-                      {r.planTitle.length > 12 ? r.planTitle.slice(0, 11) + "…" : r.planTitle}
-                    </span>
+                      {on ? "✓" : routineEmoji(r.content)}
+                    </button>
+                    <p
+                      className="flex-1 min-w-0 text-[14px] font-semibold leading-relaxed break-words line-clamp-2 text-gray-900 dark:text-gray-100"
+                      style={{ textDecoration: on ? "line-through" : "none", opacity: on ? 0.6 : 1 }}
+                    >
+                      {routineMicroLabel(r.content)}
+                    </p>
                   </div>
-
-                  {/* ℹ️ baloncuğu — tam metin */}
-                  {showInfo && (
-                    <div
-                      className="absolute z-10 left-2 right-2 top-full mt-1 rounded-lg p-2.5 text-[11.5px] font-medium leading-relaxed text-slate-900 dark:text-slate-100"
-                      style={{ background: "rgba(var(--glass-rgb), var(--alpha-modal))", border: "1px solid rgba(var(--overlay-rgb),0.12)", boxShadow: "0 12px 30px -10px rgba(0,0,0,0.8)" }}
-                      onClick={() => setInfoId(null)}
-                    >
-                      {r.content}
-                    </div>
-                  )}
+                  <p className="pl-[34px] text-[12.5px] leading-relaxed break-words line-clamp-2 text-gray-600 dark:text-gray-300">{r.content}</p>
+                  <span
+                    className="ml-[34px] inline-block w-fit text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
+                    style={{ background: cat.accentSoft, color: cat.accent }}
+                  >
+                    {r.planTitle}
+                  </span>
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
+      <RoutineDetailModal
+        open={!!detailRoutine}
+        onClose={() => setDetailRoutine(null)}
+        routine={detailRoutine}
+        cat={detailCat}
+        planTitle={detailRoutine?.planTitle}
+        onToggled={syncFromModal}
+      />
     </>
   );
 }

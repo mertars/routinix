@@ -28,3 +28,17 @@ export function routineMicroLabel(text) {
   if (s.length > 34) s = s.slice(0, 33).trim() + "…";
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+// Rutin sıklık anahtarını minik ikon + Türkçe etikete çevirir — RoutineCard/
+// RoutineDetailModal ortak kullanır (eskiden PlanBoard.jsx'te yerel bir
+// FREQUENCY_META olarak tekrarlanıyordu, artık tek doğruluk kaynağı burada).
+const FREQUENCY_META = {
+  daily: { icon: "🔆", label: "Günlük" },
+  weekly: { icon: "🔁", label: "Haftalık" },
+  biweekly: { icon: "🔁", label: "2 Haftada Bir" },
+  monthly: { icon: "🗓️", label: "Aylık" },
+};
+export function routineFrequencyLabel(freq) {
+  const key = String(freq || "weekly").toLowerCase();
+  return FREQUENCY_META[key] || { icon: "🔁", label: freq || "Düzenli" };
+}

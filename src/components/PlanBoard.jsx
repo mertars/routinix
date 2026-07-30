@@ -2,16 +2,20 @@ import { useState, memo } from "react";
 import { MONO_FONT, categoryOf } from "../constants";
 import Accordion from "./Accordion";
 import TaskCard from "./TaskCard";
+import RoutineDetailModal from "./RoutineDetailModal";
 import { routineEmoji, routineMicroLabel } from "../utils/routineText";
 import { isRoutineChecked, setRoutineChecked } from "../utils/routineCheckin";
 
-// Kompakt, tiklenebilir rutin hap rozeti — günlük check-in durumu
-// (RoutinesPopover.jsx ile PAYLAŞILAN localStorage anahtarı üzerinden, bkz.
-// utils/routineCheckin.js) her iki yüzeyde de tutarlı kalır. Tamamlanan rutin
-// soluklaşır + üzeri çizilir.
-function RoutinePill({ routine, accent, soft }) {
+// Okunabilir rutin kartı — başlık (kısa etiket) + tam metnin önizlemesi
+// (2 satıra kadar, kesilmez, satır atlar). Karta tıklayınca tam metni/sıklığı
+// gösteren RoutineDetailModal açılır; checkbox kendi başına tıklanınca
+// (event bubbling durdurulur) günlük check-in'i değiştirir — bu durum
+// RoutinesPopover.jsx ile PAYLAŞILAN localStorage anahtarı üzerinden
+// (bkz. utils/routineCheckin.js) her iki yüzeyde de tutarlı kalır.
+function RoutineCard({ routine, accent, soft, onOpenDetail }) {
   const [on, setOn] = useState(() => isRoutineChecked(routine.id));
-  const toggle = () => {
+  const toggle = (e) => {
+    e.stopPropagation();
     setOn((prev) => {
       const next = !prev;
       setRoutineChecked(routine.id, next);
@@ -19,24 +23,31 @@ function RoutinePill({ routine, accent, soft }) {
     });
   };
   return (
-    <button
-      onClick={toggle}
-      className="flex items-center gap-1.5 rounded-full pl-1.5 pr-3 py-1.5 transition-all card-glow"
-      style={{ background: on ? "rgba(46,217,163,0.12)" : soft, opacity: on ? 0.6 : 1 }}
+    <div
+      onClick={() => onOpenDetail(routine)}
+      role="button"
+      tabIndex={0}
+      className="w-full rounded-2xl p-4 flex flex-col gap-1.5 transition-all card-glow cursor-pointer"
+      style={{ background: on ? "rgba(46,217,163,0.08)" : soft, opacity: on ? 0.75 : 1 }}
     >
-      <span
-        className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] shrink-0"
-        style={{ background: on ? "rgba(46,217,163,0.2)" : "rgba(var(--overlay-rgb),0.08)", color: on ? "#2ED9A3" : accent }}
-      >
-        {on ? "✓" : routineEmoji(routine.content)}
-      </span>
-      <span
-        className="text-[11.5px] font-semibold"
-        style={{ color: on ? "var(--text-faint)" : accent, textDecoration: on ? "line-through" : "none" }}
-      >
-        {routineMicroLabel(routine.content)}
-      </span>
-    </button>
+      <div className="flex items-start gap-2.5">
+        <button
+          onClick={toggle}
+          className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[12px] mt-0.5"
+          style={{ background: on ? "rgba(46,217,163,0.2)" : "rgba(var(--overlay-rgb),0.08)", color: on ? "#2ED9A3" : accent }}
+          aria-label="Bugün için işaretle"
+        >
+          {on ? "✓" : routineEmoji(routine.content)}
+        </button>
+        <p
+          className="flex-1 min-w-0 text-[14px] font-semibold leading-relaxed break-words line-clamp-2"
+          style={{ color: on ? "var(--text-faint)" : "var(--text-primary)", textDecoration: on ? "line-through" : "none" }}
+        >
+          {routineMicroLabel(routine.content)}
+        </p>
+      </div>
+      <p className="pl-[34px] text-[12.5px] leading-relaxed break-words line-clamp-2 text-gray-600 dark:text-gray-300">{routine.content}</p>
+    </div>
   );
 }
 
@@ -96,6 +107,7 @@ export default function PlanBoard({
   onBack,
 }) {
   const [activeDay, setActiveDay] = useState(null);
+  const [detailRoutine, setDetailRoutine] = useState(null);
   if (!plan) return null;
 
   const cat = categoryOf(plan.mode);
@@ -200,12 +212,12 @@ export default function PlanBoard({
         </div>
       </div>
 
-      {/* Genel rutinler — kompakt, tiklenebilir hap rozetleri (accordion içinde) */}
+      {/* Genel rutinler — okunaklı, tam genişlikte kartlar (accordion içinde) */}
       {routines.length > 0 && (
         <Accordion title="Genel Rutinler" icon="🔁" accent={accent} defaultOpen>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2.5">
             {routines.map((r, i) => (
-              <RoutinePill key={r.id || i} routine={r} accent={accent} soft={soft} />
+              <RoutineCard key={r.id || i} routine={r} accent={accent} soft={soft} onOpenDetail={setDetailRoutine} />
             ))}
           </div>
         </Accordion>
@@ -308,6 +320,14 @@ export default function PlanBoard({
           </div>
         </div>
       )}
+
+      <RoutineDetailModal
+        open={!!detailRoutine}
+        onClose={() => setDetailRoutine(null)}
+        routine={detailRoutine}
+        cat={cat}
+        planTitle={plan.title || "Plan"}
+      />
     </div>
   );
 }

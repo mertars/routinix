@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { Timer as TimerIcon, Music2, ListMusic, Play, Pause, X, ClipboardList } from "lucide-react";
 import { tapFeedback } from "../lib/haptics";
 import logger from "../utils/logger";
@@ -42,8 +42,10 @@ function formatTime(totalSeconds) {
 }
 
 // Neon halkalı, buzlu-cam arkalıklı, JetBrains Mono rakamlı dev sayaç. Odak
-// Modu'nda (`boost`) glow/kontrast belirgin şekilde artar.
-function TimerRing({ secondsLeft, mode, accent, pct, ringCircumference, ringOffset, boost }) {
+// Modu'nda (`boost`) glow/kontrast belirgin şekilde artar. Saf/görsel bileşen
+// — memo ile sarmalanır ki CountdownDisplay'in HER SANİYE re-render'ı yalnızca
+// gerçekten değişen prop'lar (secondsLeft/pct/ringOffset) için tekrar çizsin.
+const TimerRing = memo(function TimerRing({ secondsLeft, mode, accent, pct, ringCircumference, ringOffset, boost }) {
   return (
     <div className="relative w-[250px] h-[250px] md:w-[300px] md:h-[300px] flex items-center justify-center shrink-0">
       <div
@@ -82,7 +84,7 @@ function TimerRing({ secondsLeft, mode, accent, pct, ringCircumference, ringOffs
       </div>
     </div>
   );
-}
+});
 
 // Başlat/Duraklat (devasa, neon dolgu) + Sıfırla — Odak Modu'nda da HER ZAMAN
 // görünür kalan TEK kontrol grubu.
@@ -199,6 +201,40 @@ function DurationSteppers({ workMin, breakMin, running, adjustDuration }) {
   );
 }
 
+// ⏱️ İzole sayaç bileşeni — saniyede bir değişen `secondsLeft` state'ini ve
+// ilgili setTimeout zincirini TEK BAŞINA taşır. Böylece "tick" her saniye
+// SADECE bu küçük yaprak bileşeni re-render eder; PomodoroStudio'nun geri
+// kalanı (üst bar, müzik popover'ları, TaskDrawer) saniyede bir yeniden
+// çizilmez. `resetNonce` ebeveynin "Sıfırla" tıklamasını bu bileşene
+// iletmenin tek yolu (secondsLeft artık burada yaşadığı için ebeveyn onu
+// doğrudan set edemez). Mod tamamlanınca `onModeComplete` ile ebeveyne haber
+// verilir (mod/running değişimi orada, nadiren tetiklenen state'te kalır).
+const CountdownDisplay = memo(function CountdownDisplay({ mode, workMin, breakMin, running, accent, boost, resetNonce, onModeComplete }) {
+  const totalForMode = (mode === "work" ? workMin : breakMin) * 60;
+  const [secondsLeft, setSecondsLeft] = useState(totalForMode);
+
+  useEffect(() => {
+    if (!running) setSecondsLeft(totalForMode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, workMin, breakMin, resetNonce]);
+
+  useEffect(() => {
+    if (!running) return;
+    if (secondsLeft <= 0) {
+      onModeComplete();
+      return;
+    }
+    const id = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [running, secondsLeft, mode, workMin, breakMin, onModeComplete]);
+
+  const pct = totalForMode > 0 ? Math.max(0, Math.min(100, Math.round((1 - secondsLeft / totalForMode) * 100))) : 0;
+  const ringCircumference = 2 * Math.PI * 88;
+  const ringOffset = ringCircumference * (1 - pct / 100);
+
+  return <TimerRing secondsLeft={secondsLeft} mode={mode} accent={accent} pct={pct} ringCircumference={ringCircumference} ringOffset={ringOffset} boost={boost} />;
+});
+
 // "Hero Focus Zone" — mod sekmeleri + halka + görev rozeti + süre ayarı +
 // kontrol butonları. Mobil ve masaüstünde AYNI, tek ortak odak ekranı —
 // görev/plan seçimi artık gömülü bir panel değil, paylaşılan TaskDrawer
@@ -210,10 +246,8 @@ function HeroZone({
   mode,
   switchMode,
   running,
-  secondsLeft,
-  pct,
-  ringCircumference,
-  ringOffset,
+  resetNonce,
+  onModeComplete,
   accent,
   selectedTask,
   onOpenTaskDrawer,
@@ -234,7 +268,16 @@ function HeroZone({
         </div>
       </div>
 
-      <TimerRing secondsLeft={secondsLeft} mode={mode} accent={accent} pct={pct} ringCircumference={ringCircumference} ringOffset={ringOffset} boost={isFocusMode} />
+      <CountdownDisplay
+        mode={mode}
+        workMin={workMin}
+        breakMin={breakMin}
+        running={running}
+        accent={accent}
+        boost={isFocusMode}
+        resetNonce={resetNonce}
+        onModeComplete={onModeComplete}
+      />
 
       <div className="w-full grid transition-[grid-template-rows] duration-500 ease-out" style={{ gridTemplateRows: isFocusMode ? "0fr" : "1fr" }}>
         <div className="overflow-hidden min-h-0">
@@ -360,8 +403,8 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
   const [mode, setMode] = useState("work"); // "work" | "break"
   const [workMin, setWorkMin] = useState(DEFAULT_WORK_MIN);
   const [breakMin, setBreakMin] = useState(DEFAULT_BREAK_MIN);
-  const [secondsLeft, setSecondsLeft] = useState(DEFAULT_WORK_MIN * 60);
   const [running, setRunning] = useState(false);
+  const [resetNonce, setResetNonce] = useState(0);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
@@ -374,32 +417,11 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
   const ytPlayerRef = useRef(null);
   const ytContainerRef = useRef(null);
 
-  const totalForMode = (mode === "work" ? workMin : breakMin) * 60;
-
   // Görev kartındaki "Başlat" ile açılmışsa (initialTask — tam görev objesi,
   // ayrı bir fetch gerekmez), o görevi otomatik olarak Aktif Görev yapar.
   useEffect(() => {
     if (open && initialTask) setSelectedTask(initialTask);
   }, [open, initialTask]);
-
-  useEffect(() => {
-    if (!running) setSecondsLeft(totalForMode);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, workMin, breakMin]);
-
-  useEffect(() => {
-    if (!open || !running) return;
-    if (secondsLeft <= 0) {
-      tapFeedback([40, 60, 40]);
-      const nextMode = mode === "work" ? "break" : "work";
-      setMode(nextMode);
-      setSecondsLeft((nextMode === "work" ? workMin : breakMin) * 60);
-      setRunning(false);
-      return;
-    }
-    const id = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => clearTimeout(id);
-  }, [open, running, secondsLeft, mode, workMin, breakMin]);
 
   // --- YouTube IFrame Player API: arkada, görünmez şekilde çalan gerçek
   // oynatıcı (harici sekmeye YÖNLENDİRME YOK). ---
@@ -450,9 +472,6 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
 
   if (!open) return null;
 
-  const pct = totalForMode > 0 ? Math.max(0, Math.min(100, Math.round((1 - secondsLeft / totalForMode) * 100))) : 0;
-  const ringCircumference = 2 * Math.PI * 88;
-  const ringOffset = ringCircumference * (1 - pct / 100);
   const accent = ACCENT[mode];
   const trackLabel = ytTitle || PLAYLIST[trackIndex].label;
 
@@ -464,15 +483,28 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
 
   const toggleRunning = () => setRunning((r) => !r);
 
+  // secondsLeft artık CountdownDisplay'in kendi state'i olduğu için ebeveyn
+  // onu doğrudan set edemez — resetNonce'u artırmak "sıfırla" sinyalini
+  // aşağıdaki isolated bileşene iletir (bkz. CountdownDisplay'in reset efekti).
   const resetTimer = () => {
     setRunning(false);
-    setSecondsLeft(totalForMode);
+    setResetNonce((n) => n + 1);
   };
 
   const switchMode = (nextMode) => {
     if (running || nextMode === mode) return;
     setMode(nextMode);
   };
+
+  // Süre bittiğinde CountdownDisplay tarafından çağrılır — mod/running
+  // değişimi burada, PomodoroStudio'nun (nadiren re-render olan) state'inde
+  // kalır; yeni mod'un süresi CountdownDisplay'in kendi mode-izleme efektiyle
+  // otomatik ayarlanır.
+  const handleModeComplete = useCallback(() => {
+    tapFeedback([40, 60, 40]);
+    setMode((m) => (m === "work" ? "break" : "work"));
+    setRunning(false);
+  }, []);
 
   const toggleYoutube = () => {
     if (!ytPlayerRef.current) return;
@@ -491,10 +523,8 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
     mode,
     switchMode,
     running,
-    secondsLeft,
-    pct,
-    ringCircumference,
-    ringOffset,
+    resetNonce,
+    onModeComplete: handleModeComplete,
     accent,
     selectedTask,
     toggleRunning,
