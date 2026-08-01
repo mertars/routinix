@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState, useEffect } from "react";
 
 // Kategoriye göre ambiyans ışığı rengi — plan/görev türüne özgü, kendi başına
 // bir renk sistemi (uygulamanın diğer yerlerindeki kategori "accent" rozet
@@ -32,8 +32,34 @@ const DEFAULT_GLOW = GLOW_BY_CATEGORY.software;
 // hesaplanmasını engeller; yalnızca kategori GERÇEKTEN değişince re-render olur.
 function BackgroundScene({ category }) {
   const glow = GLOW_BY_CATEGORY[category] || DEFAULT_GLOW;
+
+  // Sürekli koşan CSS animasyonlarını (ridge-sweep + bg-blob, GlobalStyles.jsx)
+  // iki durumda DURDUR: (1) mobil genişlikte (<768px — küçük/orta segment
+  // cihazlarda GPU/pil bütçesi daha kısıtlı, tamamen dekoratif bir arka plan
+  // için harcanacak pay değil), (2) sekme arka plana alındığında
+  // (`visibilitychange`) — kullanıcı görmediği bir animasyonun compositor'ı
+  // meşgul etmeye devam etmesinin hiçbir faydası yok. `matchMedia` (yalnızca
+  // breakpoint GEÇİŞİNDE tetiklenir) kullanılır — ham `resize` dinleyicisi
+  // gibi her pikselde ateşlenen bir olay DEĞİL.
+  const [animPaused, setAnimPaused] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 767px)").matches || document.hidden;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setAnimPaused(mq.matches || document.hidden);
+    update();
+    mq.addEventListener("change", update);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      mq.removeEventListener("change", update);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
+    <div className={`fixed inset-0 z-0 pointer-events-none overflow-hidden ${animPaused ? "bg-anim-paused" : ""}`} aria-hidden="true">
       {/* --- Süzülen glow blob'lar — her iki temada, kategoriye duyarlı renk --- */}
       <div
         className="bg-blob bg-blob--violet"
@@ -178,6 +204,11 @@ function BackgroundScene({ category }) {
         @media (prefers-reduced-motion: reduce) {
           .ridge-sweep { animation: none !important; opacity: 0.28; stroke-dasharray: none; }
         }
+        /* Mobilde veya sekme arka plandayken (bkz. yukarıdaki useEffect) —
+           animasyonu tamamen KALDIRMAK yerine duraklatmak (play-state:paused)
+           tercih edildi: sekme öne geldiğinde kaldığı kareden akıcıca devam
+           eder, "none" ile sıfırlansaydı her seferinde başa sarardı. */
+        .bg-anim-paused .ridge-sweep { animation-play-state: paused !important; }
       `}</style>
     </div>
   );

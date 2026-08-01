@@ -86,6 +86,13 @@ export default function GlobalStyles() {
         -webkit-backdrop-filter: blur(16px) saturate(150%);
         border: 1px solid var(--glass-border);
         box-shadow: var(--glass-shadow);
+        /* GPU katmanına erken taşı (transform-gpu eşleniği): RhythmStudio/
+           PlanBoard'daki dashboard grid'i artık ekranda AYNI ANDA çok sayıda
+           .glass kart gösteriyor — tarayıcıya erkenden "bunu kendi
+           compositor katmanına al" sinyali vererek scroll sırasında her
+           kartın backdrop-filter'ını yeniden hesaplama/repaint maliyetini azaltır. */
+        transform: translateZ(0);
+        will-change: transform;
       }
 
       /* --- Modal/Popover/Drawer katmanı: en yüksek okunabilirlik (bkz. --alpha-modal) --- */
@@ -196,6 +203,33 @@ export default function GlobalStyles() {
         }
       }
 
+      /* --- TaskDrawer.jsx: FocusSidePanel ile AYNI duyarlı desen — mobilde
+         alttan yukarı kayan yuvarlatık üst köşeli "Bottom Sheet", md'den
+         itibaren soldan kayan tam-yükseklik "Drawer/Sidebar"a dönüşür.
+         Yalnızca konum/şekil/animasyon burada yönetilir; genişlik (md:max-w-md)
+         ve z-index TaskDrawer.jsx'te Tailwind sınıfı olarak kalır. --- */
+      .task-sheet {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-radius: 1.5rem 1.5rem 0 0;
+        max-height: 85vh;
+        transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+        animation: slideUpSheet 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+      }
+      @media (min-width: 768px) {
+        .task-sheet {
+          right: auto;
+          top: 0;
+          bottom: 0;
+          height: 100%;
+          max-height: none;
+          border-radius: 0;
+          animation: slideInDrawerLeft 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+      }
+
       /* --- Pomodoro Studio: yüzen alt sekme çubuğu (mobil, md'den itibaren
          gizli — masaüstünde sabit 2 sütun düzeni kullanılıyor, sekmeye gerek
          yok). Odak Modu'na girildiğinde (sayaç çalışırken ya da Işıklar
@@ -236,6 +270,17 @@ export default function GlobalStyles() {
          bozuk bir "popup" gibi görünmesinin kök nedeni buydu). */
       .task-grid { contain: style; }
 
+      /* --- Mobil güvenli-alan alt boşluğu: RhythmStudio/TaskDrawer gibi
+         tam-ekran/bottom-sheet panellerin kaydırılabilir içerik alanlarına
+         eklenir — içerik iOS/Android'in ev göstergesi (home indicator) /
+         hareket çubuğu (gesture bar) alanının ALTINDA kalmasın diye normal
+         boşluğa (6rem) gerçek env(safe-area-inset-bottom) eklenir. Masaüstünde
+         (≥lg) bu kaygı yok (tarayıcı çerçevesi var), o yüzden normal 2rem'e döner. --- */
+      .pb-mobile-safe { padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px)); }
+      @media (min-width: 1024px) {
+        .pb-mobile-safe { padding-bottom: 2rem; }
+      }
+
       /* --- Ekran dışı görev kartları/satırları: content-visibility:auto,
          viewport'a girmemiş elemanların layout+paint maliyetini tamamen
          atlar (DOM'dan silmez, yalnızca "henüz çizme" der). contain-intrinsic-size
@@ -269,8 +314,18 @@ export default function GlobalStyles() {
          maliyeti düşer. */
       @media (max-width: 767px), (hover: none) and (pointer: coarse) {
         .blur-cap-mobile {
-          backdrop-filter: blur(10px) saturate(130%) !important;
-          -webkit-backdrop-filter: blur(10px) saturate(130%) !important;
+          /* backdrop-blur-sm eşleniği (4px) + saturate TAMAMEN kaldırıldı —
+             saturate() blur ile birlikte kullanıldığında iOS Safari'de tek
+             başına en pahalı kombinasyonlardan biri. Kaybedilen görsel
+             yoğunluk, panelin kendi arka plan rengini (rgba(...,
+             --alpha-modal)) burada YALNIZCA mobilde daha da opaklaştırarak
+             (bkz. --alpha-modal override'ı) telafi edilir — sabit
+             bg-slate-900/90 gibi tema-kör bir renk YERİNE, panelin zaten
+             kullandığı --glass-rgb/--alpha-modal token'ı üzerinden, hem
+             açık hem koyu temada doğru sonucu üretir. */
+          --alpha-modal: 0.97;
+          backdrop-filter: blur(4px) !important;
+          -webkit-backdrop-filter: blur(4px) !important;
         }
       }
 
@@ -368,10 +423,13 @@ export default function GlobalStyles() {
         transition: --glow-orange 0.8s ease;
         animation: blobFloatB 32s ease-in-out infinite;
       }
+      /* Mobilde veya sekme arka plandayken duraklatılır — bkz.
+         BackgroundScene.jsx'teki matchMedia/visibilitychange kontrolü. */
+      .bg-anim-paused .bg-blob--violet, .bg-anim-paused .bg-blob--orange { animation-play-state: paused !important; }
 
       @media (prefers-reduced-motion: reduce) {
         .motion-safe\\:animate-spin { animation: none !important; }
-        .drawer-panel, .drawer-panel-left, .focus-sheet, .focus-panel, .pomo-tabbar, .day-reveal, .neon-strip, .pop-in, .chip-fill-pulse, .check-glow { animation: none !important; }
+        .drawer-panel, .drawer-panel-left, .focus-sheet, .focus-panel, .task-sheet, .pomo-tabbar, .day-reveal, .neon-strip, .pop-in, .chip-fill-pulse, .check-glow { animation: none !important; }
         .bg-blob--violet, .bg-blob--orange { animation: none !important; }
         .accordion-body { transition: none !important; }
       }

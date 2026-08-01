@@ -186,11 +186,14 @@ export default function TaskDrawer({ open, userId, onClose, selectedTaskId, onSe
       {/* Arka plan karartması — açık temada daha hafif, koyu temada belirgin */}
       <div className="fixed inset-0 bg-black/30 dark:bg-black/70 backdrop-blur-sm z-[98]" onClick={onClose} />
 
-      {/* Soldan kayan çekmece kutusu — Pomodoro Studio'nun müzik popover'larından
-          (z-96/97) DA yüksek: ikisi aynı anda açık olabildiği için TaskDrawer'ın
-          her zaman en üstte kalması gerekir. */}
+      {/* Mobilde alttan yukarı kayan Bottom Sheet, md'den itibaren soldan kayan
+          tam-yükseklik Drawer'a dönüşür (bkz. GlobalStyles.jsx .task-sheet —
+          FocusSidePanel'in .focus-panel'iyle AYNI duyarlı desen). Pomodoro
+          Studio'nun müzik popover'larından (z-96/97) DA yüksek: ikisi aynı
+          anda açık olabildiği için TaskDrawer'ın her zaman en üstte kalması
+          gerekir. */}
       <div
-        className="drawer-panel-left fixed inset-y-0 left-0 z-[99] w-full max-w-md border-r border-black/10 dark:border-white/10 shadow-2xl flex flex-col h-full"
+        className="task-sheet md:max-w-md w-full border-t md:border-t-0 md:border-r border-black/10 dark:border-white/10 shadow-2xl transform-gpu flex flex-col z-[99]"
         style={{ background: "var(--pomo-bg)" }}
       >
         {/* 1. Başlık — sabit yükseklik */}
@@ -278,7 +281,7 @@ export default function TaskDrawer({ open, userId, onClose, selectedTaskId, onSe
             inline style ile (Tailwind sınıfına/flex zincirine bağımlı değil). */}
         <div
           style={{ overflowY: "auto", overscrollBehaviorY: "contain", WebkitOverflowScrolling: "touch" }}
-          className="flex-1 p-4 custom-neon-scroll space-y-3"
+          className="flex-1 p-4 pb-mobile-safe custom-neon-scroll space-y-3"
         >
           {totalMatches === 0 ? (
             <p className="text-[13px] text-gray-400 dark:text-white/35 text-center py-8">

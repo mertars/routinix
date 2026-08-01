@@ -70,7 +70,19 @@ export default async function handler(req, res) {
 
   try {
     if (action === "generate") {
-      const plans = await fetchPlansWithTasks(admin, user.id);
+      // Bugünün odaklanma (Pomodoro) süresi — focus_sessions'tan, gün UTC
+      // sınırlarıyla. Plan/task sorgusundan BAĞIMSIZ (ikisi de yalnızca
+      // user.id/dateStr'ye ihtiyaç duyar) — sıralı await yerine Promise.all
+      // ile PARALEL çekilir, sunucu gecikmesini tek bir round-trip'e indirir.
+      const dayStart = `${dateStr}T00:00:00.000Z`;
+      const dayEnd = `${dateStr}T23:59:59.999Z`;
+      const [plans, sessionsRes] = await Promise.all([
+        fetchPlansWithTasks(admin, user.id),
+        admin.from("focus_sessions").select("duration_min").eq("user_id", user.id).gte("started_at", dayStart).lte("started_at", dayEnd),
+      ]);
+      if (sessionsRes.error) throw sessionsRes.error;
+      const focusMinutesToday = (sessionsRes.data || []).reduce((n, s) => n + (s.duration_min || 0), 0);
+
       const todayEntries = collectTodayAcrossPlans(plans);
 
       let completedTasks = 0;
@@ -79,18 +91,6 @@ export default async function handler(req, res) {
         totalTasks += day.tasks.length;
         completedTasks += day.tasks.filter((t) => t.is_completed).length;
       }
-
-      // Bugünün odaklanma (Pomodoro) süresi — focus_sessions'tan, gün UTC sınırlarıyla.
-      const dayStart = `${dateStr}T00:00:00.000Z`;
-      const dayEnd = `${dateStr}T23:59:59.999Z`;
-      const { data: sessions, error: sessErr } = await admin
-        .from("focus_sessions")
-        .select("duration_min")
-        .eq("user_id", user.id)
-        .gte("started_at", dayStart)
-        .lte("started_at", dayEnd);
-      if (sessErr) throw sessErr;
-      const focusMinutesToday = (sessions || []).reduce((n, s) => n + (s.duration_min || 0), 0);
 
       const stats = {
         completedTasks,
