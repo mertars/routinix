@@ -27,7 +27,7 @@ export default function PrintModal({ open, accent, maxDays, onExport, onClose })
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-[360px] rounded-3xl overflow-hidden animate-[fadeIn_0.2s_ease]"
+        className="blur-cap-mobile relative w-full max-w-[360px] rounded-3xl overflow-hidden animate-[fadeIn_0.2s_ease]"
         style={{
           background: "rgba(var(--glass-rgb), var(--alpha-modal))",
           backdropFilter: "blur(20px) saturate(160%)",

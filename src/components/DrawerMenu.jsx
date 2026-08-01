@@ -1,4 +1,5 @@
-import { Timer } from "lucide-react";
+import { memo } from "react";
+import { Timer, BarChart3 } from "lucide-react";
 import { MONO_FONT } from "../constants";
 
 // Sadece bu menüde kullanılan küçük toggle atomu.
@@ -20,8 +21,11 @@ function ToggleSwitch({ checked, onChange, accent }) {
   );
 }
 
-// Sağdan açılan cam efektli, mor/kırmızı neon aksanlı kontrol paneli.
-export default function DrawerMenu({
+// Sağdan açılan cam efektli, mor/kırmızı neon aksanlı kontrol paneli. `open`
+// çoğunlukla false; memo + App.jsx'in stabilize edilmiş callback'leri
+// sayesinde kapalıyken alakasız App re-render'larında (ör. yazı yazarken)
+// bu bileşenin fonksiyon gövdesi hiç çalışmaz.
+function DrawerMenu({
   open,
   onClose,
   accent,
@@ -39,6 +43,7 @@ export default function DrawerMenu({
   onOpenTasks,
   onOpenRoutines,
   onOpenPlans,
+  onOpenRhythm,
   onOpenPomodoro,
 }) {
   if (!open) return null;
@@ -50,6 +55,7 @@ export default function DrawerMenu({
     { key: "tasks", emoji: "📋", label: "Görevler ve Planlar", color: "#00F2FE", onClick: onOpenTasks, always: false },
     { key: "routines", emoji: "🔁", label: "Rutinler", color: "#7DE9C3", onClick: onOpenRoutines, always: false },
     { key: "plans", emoji: "📂", label: "Planlarım", color: "#8FA0FF", onClick: onOpenPlans, always: false },
+    { key: "rhythm", icon: <BarChart3 className="w-4 h-4" strokeWidth={2.25} />, label: "Ritim & Gün Sonu", color: "#A78BFA", onClick: onOpenRhythm, always: false },
     { key: "pomodoro", icon: <Timer className="w-4 h-4" strokeWidth={2.25} />, label: "Pomodoro & Focus", color: "#FB7185", onClick: onOpenPomodoro, always: true },
   ].filter((b) => b.always || user);
 
@@ -57,7 +63,7 @@ export default function DrawerMenu({
     <>
       <div className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm animate-[fadeIn_0.2s_ease]" onClick={onClose} />
       <div
-        className="fixed top-0 right-0 z-50 h-full w-[86%] max-w-[340px] flex flex-col drawer-panel no-scrollbar"
+        className="blur-cap-mobile fixed top-0 right-0 z-50 h-full w-[86%] max-w-[340px] flex flex-col drawer-panel no-scrollbar"
         style={{
           // Okunabilirlik önceliği: yoğun "buzlu cam" yerine büyük ölçüde OPAK bir
           // zemin + hafif blur. --alpha-chrome (Header'ın şeffaf ambient katmanı)
@@ -190,3 +196,4 @@ export default function DrawerMenu({
     </>
   );
 }
+export default memo(DrawerMenu);

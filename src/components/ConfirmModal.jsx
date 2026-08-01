@@ -20,7 +20,7 @@ export default function ConfirmModal({
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-[340px] rounded-3xl p-6 animate-[fadeIn_0.2s_ease]"
+        className="blur-cap-mobile relative w-full max-w-[340px] rounded-3xl p-6 animate-[fadeIn_0.2s_ease]"
         style={{
           background: "rgba(var(--glass-rgb), var(--alpha-modal))",
           backdropFilter: "blur(24px) saturate(160%)",

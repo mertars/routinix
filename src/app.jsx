@@ -1,27 +1,51 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { STAGE_INTRO, STAGE_WIZARD, STAGE_LOADING, STAGE_ERROR, STAGE_PLAN } from "./constants";
 import usePlanStudio from "./usePlanStudio";
 import useAuth from "./useAuth";
 import { tapFeedback } from "./lib/haptics";
 import { setLogUser } from "./utils/logger";
 import Header from "./components/Header";
-import AuthModal from "./components/AuthModal";
 import ConfirmModal from "./components/ConfirmModal";
 import DrawerMenu from "./components/DrawerMenu";
 import DeletePlanModal from "./components/DeletePlanModal";
-import TaskDrawer from "./components/TaskDrawer";
-import RoutinesPopover from "./components/RoutinesPopover";
-import PrintModal from "./components/PrintModal";
-import PrintablePlan from "./components/PrintablePlan";
-import TemplateHub from "./components/TemplateHub";
-import MyPlansHub from "./components/MyPlansHub";
-import AiCoachWidget from "./components/AiCoachWidget";
-import PomodoroStudio from "./components/PomodoroStudio";
 import CategoryIntro from "./components/CategoryIntro";
-import OnboardingWizard from "./components/OnboardingWizard";
 import PlanBoard from "./components/PlanBoard";
 import BackgroundScene from "./components/BackgroundScene";
 import GlobalStyles from "./components/GlobalStyles";
+import { InlineFallback, FabFallback, OverlayFallback } from "./components/LazyFallback";
+
+// İlk boyamada (intro ekranı) KESİNLİKLE gerekmeyen, yalnızca kullanıcı
+// etkileşimiyle açılan panel/modal bileşenleri — ayrı chunk'lara bölünür
+// (React.lazy) ki ana bundle'ın parse/derleme yükü küçülsün.
+//
+// GÖRÜNÜM İZOLASYONU (View Isolation): TaskDrawer/RoutinesPopover/AuthModal/
+// TemplateHub/MyPlansHub/RhythmStudio artık KOŞULLU mount ediliyor
+// (`{open && <Suspense>...}`, aşağıda) — panel kapanır kapanmaz TÜMÜYLE
+// unmount olur: içindeki her useEffect/interval/event listener React'in
+// temizleme (cleanup) mekanizmasıyla anında söker, hiçbir arka plan state
+// güncellemesi/CPU çalışması kalmaz. Kullanıcı o an ekranda GÖRÜNEN tek bir
+// panel dışında hiçbir şey render edilmiyor. Bunun bilinen, kabul edilmiş
+// bedeli: bu panellerin kendi iç state'i (ör. TaskDrawer'ın arama kutusu,
+// TemplateHub'ın seçili sekmesi) her kapanışta sıfırlanır — düşük riskli/
+// beklenen bir UX (arama kutusunun sıfırlanması, ör. AuthModal'ın formu
+// sıfırlaması gibi çoğu zaman zaten İSTENEN bir davranış).
+//
+// PomodoroStudio + PrintModal/PrintablePlan İSTİSNA — bkz. aşağıdaki
+// render bloklarındaki yorumlar: Pomodoro'nun sayacı kapalıyken de GERÇEK
+// ZAMANDA saymaya devam etmesi gerektiği için (bkz. PomodoroStudio.jsx),
+// PrintablePlan ise `window.print()` tetiklendiği anda DOM'da olması
+// gerektiği için hâlâ UNCONDITIONAL mount + `fallback={null}` kullanır.
+const AuthModal = lazy(() => import("./components/AuthModal"));
+const TaskDrawer = lazy(() => import("./components/TaskDrawer"));
+const RoutinesPopover = lazy(() => import("./components/RoutinesPopover"));
+const PrintModal = lazy(() => import("./components/PrintModal"));
+const PrintablePlan = lazy(() => import("./components/PrintablePlan"));
+const TemplateHub = lazy(() => import("./components/TemplateHub"));
+const MyPlansHub = lazy(() => import("./components/MyPlansHub"));
+const AiCoachWidget = lazy(() => import("./components/AiCoachWidget"));
+const PomodoroStudio = lazy(() => import("./components/PomodoroStudio"));
+const OnboardingWizard = lazy(() => import("./components/OnboardingWizard"));
+const RhythmStudio = lazy(() => import("./components/RhythmStudio"));
 
 export default function App() {
   const auth = useAuth();
@@ -34,6 +58,7 @@ export default function App() {
   const [plansOpen, setPlansOpen] = useState(false);
   const [pomodoroOpen, setPomodoroOpen] = useState(false);
   const [pomodoroInitialTask, setPomodoroInitialTask] = useState(null);
+  const [rhythmOpen, setRhythmOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [printRange, setPrintRange] = useState(Infinity);
   const ps = usePlanStudio({ user: auth.user, onRequireAuth: () => setAuthOpen(true) });
@@ -42,53 +67,67 @@ export default function App() {
   // Bugün / Rutinler / Şablon Keşfet / Planlarım / Pomodoro panellerinden aynı
   // anda yalnızca biri açık olur; tetiklendiklerinde hamburger menüsü de kapanır
   // (mobilde Hızlı Erişim'den açılan paneller için gerekli, masaüstünde zararsız).
-  const closeAllPanels = () => {
+  // Tüm bu handler'lar useCallback ile sarılı — Header/DrawerMenu artık memo
+  // olduğundan (bkz. Header.jsx/DrawerMenu.jsx), referansları stabil kalmazsa
+  // memo hiçbir şeyi atlayamaz; asıl amaç "goal" gibi sık değişen state'lerin
+  // Header/DrawerMenu'yü gereksiz yere yeniden render etmesini engellemek.
+  const closeAllPanels = useCallback(() => {
     setTaskDrawerOpen(false);
     setRoutinesOpen(false);
     setHubOpen(false);
     setPlansOpen(false);
     setPomodoroOpen(false);
-  };
-  const toggleTaskDrawer = () => {
+    setRhythmOpen(false);
+  }, []);
+  const toggleTaskDrawer = useCallback(() => {
     const next = !taskDrawerOpen;
     closeAllPanels();
     ps.setMenuOpen(false);
     setTaskDrawerOpen(next);
-  };
-  const toggleRoutines = () => {
+  }, [taskDrawerOpen, closeAllPanels, ps.setMenuOpen]);
+  const toggleRoutines = useCallback(() => {
     const next = !routinesOpen;
     closeAllPanels();
     ps.setMenuOpen(false);
     setRoutinesOpen(next);
-  };
-  const toggleHub = () => {
+  }, [routinesOpen, closeAllPanels, ps.setMenuOpen]);
+  const toggleHub = useCallback(() => {
     const next = !hubOpen;
     closeAllPanels();
     ps.setMenuOpen(false);
     setHubOpen(next);
-  };
-  const togglePlans = () => {
+  }, [hubOpen, closeAllPanels, ps.setMenuOpen]);
+  const togglePlans = useCallback(() => {
     const next = !plansOpen;
     closeAllPanels();
     ps.setMenuOpen(false);
     setPlansOpen(next);
-  };
-  const togglePomodoro = () => {
+  }, [plansOpen, closeAllPanels, ps.setMenuOpen]);
+  const togglePomodoro = useCallback(() => {
     const next = !pomodoroOpen;
     closeAllPanels();
     ps.setMenuOpen(false);
     setPomodoroOpen(next);
-  };
+  }, [pomodoroOpen, closeAllPanels, ps.setMenuOpen]);
+  const toggleRhythm = useCallback(() => {
+    const next = !rhythmOpen;
+    closeAllPanels();
+    ps.setMenuOpen(false);
+    setRhythmOpen(next);
+  }, [rhythmOpen, closeAllPanels, ps.setMenuOpen]);
   // Görev kartındaki "Başlat" — Pomodoro Studio'yu bu görev seçiliyken açar
   // (bkz. PomodoroStudio.jsx `initialTask` prop'u). Tam görev objesi TaskCard'dan
   // geldiği için PomodoroStudio kendi başına ayrı bir plan/görev fetch'i
   // yapmak zorunda kalmıyor — tek doğruluk kaynağı çağıran yerdeki veridir.
-  const startPomodoroForTask = (task) => {
-    setPomodoroInitialTask(task);
-    closeAllPanels();
-    ps.setMenuOpen(false);
-    setPomodoroOpen(true);
-  };
+  const startPomodoroForTask = useCallback(
+    (task) => {
+      setPomodoroInitialTask(task);
+      closeAllPanels();
+      ps.setMenuOpen(false);
+      setPomodoroOpen(true);
+    },
+    [closeAllPanels, ps.setMenuOpen]
+  );
 
   // Dokunsal geri bildirim: herhangi bir butona basıldığında hafif mikro titreşim
   // (haptics açıksa). Prop-drilling yerine tek bir global dinleyici.
@@ -108,6 +147,28 @@ export default function App() {
 
   // Intro/loading/error ekranları CategoryIntro içinde, plan ekranı PlanBoard'da.
   const onIntroLike = stage === STAGE_INTRO || stage === STAGE_LOADING || stage === STAGE_ERROR;
+
+  // Header/DrawerMenu'ye geçen geri kalan tekil handler'lar — memo'nun etkili
+  // olması için bunlar da stabil referanslı olmalı (bkz. yukarıdaki toggle*).
+  const openAuth = useCallback(() => setAuthOpen(true), []);
+  const requestSignOut = useCallback(() => setLogoutConfirmOpen(true), []);
+  const toggleHamburger = useCallback(() => ps.setMenuOpen((v) => !v), [ps.setMenuOpen]);
+  const closeHamburger = useCallback(() => ps.setMenuOpen(false), [ps.setMenuOpen]);
+  const onLogoClick = useCallback(() => {
+    closeAllPanels();
+    ps.setMenuOpen(false);
+    ps.resetToIntro();
+  }, [closeAllPanels, ps.setMenuOpen, ps.resetToIntro]);
+  const onToggleReminders = useCallback(() => ps.setRemindersOn((v) => !v), [ps.setRemindersOn]);
+  const onToggleHaptics = useCallback(() => ps.setHapticsOn((v) => !v), [ps.setHapticsOn]);
+  const onDeletePlan = useCallback(() => {
+    ps.setMenuOpen(false);
+    setDeleteOpen(true);
+  }, [ps.setMenuOpen]);
+  const onDrawerSignOut = useCallback(() => {
+    ps.setMenuOpen(false);
+    setLogoutConfirmOpen(true);
+  }, [ps.setMenuOpen]);
 
   return (
     <div className="w-full" style={{ background: "var(--bg-app)" }}>
@@ -136,43 +197,36 @@ export default function App() {
           onHubClick={toggleHub}
           plansActive={plansOpen}
           onPlansClick={togglePlans}
+          rhythmActive={rhythmOpen}
+          onRhythmClick={toggleRhythm}
           pomodoroActive={pomodoroOpen}
           onPomodoroClick={togglePomodoro}
-          onAuthClick={() => setAuthOpen(true)}
-          onSignOut={() => setLogoutConfirmOpen(true)}
-          onMenuToggle={() => ps.setMenuOpen((v) => !v)}
-          onLogoClick={() => {
-            closeAllPanels();
-            ps.setMenuOpen(false);
-            ps.resetToIntro();
-          }}
+          onAuthClick={openAuth}
+          onSignOut={requestSignOut}
+          onMenuToggle={toggleHamburger}
+          onLogoClick={onLogoClick}
         />
 
         <DrawerMenu
           open={ps.menuOpen}
-          onClose={() => ps.setMenuOpen(false)}
+          onClose={closeHamburger}
           accent={mode.accent}
           accentSoft={mode.accentSoft}
           user={auth.user}
           savedPlansCount={ps.savedPlans.length}
           remindersOn={ps.remindersOn}
-          onToggleReminders={() => ps.setRemindersOn((v) => !v)}
+          onToggleReminders={onToggleReminders}
           hapticsOn={ps.hapticsOn}
-          onToggleHaptics={() => ps.setHapticsOn((v) => !v)}
+          onToggleHaptics={onToggleHaptics}
           onNewPlan={ps.startNewPlan}
-          onDeletePlan={() => {
-            ps.setMenuOpen(false);
-            setDeleteOpen(true);
-          }}
+          onDeletePlan={onDeletePlan}
           onOpenHub={toggleHub}
           onOpenTasks={toggleTaskDrawer}
           onOpenRoutines={toggleRoutines}
           onOpenPlans={togglePlans}
+          onOpenRhythm={toggleRhythm}
           onOpenPomodoro={togglePomodoro}
-          onSignOut={() => {
-            ps.setMenuOpen(false);
-            setLogoutConfirmOpen(true);
-          }}
+          onSignOut={onDrawerSignOut}
         />
 
         <main
@@ -202,17 +256,19 @@ export default function App() {
           )}
 
           {stage === STAGE_WIZARD && (
-            <OnboardingWizard
-              accent={mode.accent}
-              accentSoft={mode.accentSoft}
-              questions={ps.questions}
-              wizardStep={ps.wizardStep}
-              currentAnswer={ps.currentAnswer}
-              onSetAnswer={ps.setAnswer}
-              onPrev={ps.goPrevQuestion}
-              onNext={ps.goNextQuestion}
-              onFinish={ps.finalizeAndGenerate}
-            />
+            <Suspense fallback={<InlineFallback />}>
+              <OnboardingWizard
+                accent={mode.accent}
+                accentSoft={mode.accentSoft}
+                questions={ps.questions}
+                wizardStep={ps.wizardStep}
+                currentAnswer={ps.currentAnswer}
+                onSetAnswer={ps.setAnswer}
+                onPrev={ps.goPrevQuestion}
+                onNext={ps.goNextQuestion}
+                onFinish={ps.finalizeAndGenerate}
+              />
+            </Suspense>
           )}
 
           {stage === STAGE_PLAN && (
@@ -235,20 +291,43 @@ export default function App() {
         </main>
       </div>
 
-      {/* Görevler ve Planlar (soldan kayan neon çekmece) + Rutinler popover'ı
-          (aynı anda yalnızca biri açık) */}
-      <TaskDrawer open={taskDrawerOpen} userId={auth.user?.id} onClose={() => setTaskDrawerOpen(false)} />
-      <RoutinesPopover open={routinesOpen} userId={auth.user?.id} onClose={() => setRoutinesOpen(false)} />
+      {/* Görevler ve Planlar (soldan kayan neon çekmece) — koşullu mount:
+          kapalıyken DOM'da hiç yok. */}
+      {taskDrawerOpen && (
+        <Suspense fallback={<OverlayFallback z={99} />}>
+          <TaskDrawer
+            open={taskDrawerOpen}
+            userId={auth.user?.id}
+            onClose={() => setTaskDrawerOpen(false)}
+            onOpenRhythm={() => {
+              setTaskDrawerOpen(false);
+              setRhythmOpen(true);
+            }}
+          />
+        </Suspense>
+      )}
 
-      <AuthModal
-        open={authOpen}
-        accent={mode.accent}
-        onClose={() => setAuthOpen(false)}
-        onSignIn={auth.signIn}
-        onSignUp={auth.signUp}
-        onGoogle={auth.signInWithGoogle}
-        onSuccess={() => setAuthOpen(false)}
-      />
+      {/* Rutinler popover'ı — koşullu mount. */}
+      {routinesOpen && (
+        <Suspense fallback={<OverlayFallback z={70} />}>
+          <RoutinesPopover open={routinesOpen} userId={auth.user?.id} onClose={() => setRoutinesOpen(false)} />
+        </Suspense>
+      )}
+
+      {/* Giriş/Kayıt modalı — koşullu mount. */}
+      {authOpen && (
+        <Suspense fallback={<OverlayFallback z={80} />}>
+          <AuthModal
+            open={authOpen}
+            accent={mode.accent}
+            onClose={() => setAuthOpen(false)}
+            onSignIn={auth.signIn}
+            onSignUp={auth.signUp}
+            onGoogle={auth.signInWithGoogle}
+            onSuccess={() => setAuthOpen(false)}
+          />
+        </Suspense>
+      )}
 
       <ConfirmModal
         open={logoutConfirmOpen}
@@ -272,32 +351,62 @@ export default function App() {
         onClose={() => setDeleteOpen(false)}
       />
 
-      {/* Şablon Keşfet — hazır rota kütüphanesi */}
-      <TemplateHub open={hubOpen} onClose={() => setHubOpen(false)} onUseTemplate={ps.startFromTemplate} />
+      {/* Şablon Keşfet — hazır rota kütüphanesi. Koşullu mount. */}
+      {hubOpen && (
+        <Suspense fallback={<OverlayFallback z={90} />}>
+          <TemplateHub open={hubOpen} onClose={() => setHubOpen(false)} onUseTemplate={ps.startFromTemplate} />
+        </Suspense>
+      )}
 
-      {/* Planlarım — tüm kayıtlı planlar, ilerlemeleriyle */}
-      <MyPlansHub
-        open={plansOpen}
-        userId={auth.user?.id}
-        onOpenPlan={ps.openSavedPlan}
-        onClose={() => setPlansOpen(false)}
-      />
+      {/* Planlarım — tüm kayıtlı planlar, ilerlemeleriyle. Koşullu mount. */}
+      {plansOpen && (
+        <Suspense fallback={<OverlayFallback z={90} />}>
+          <MyPlansHub
+            open={plansOpen}
+            userId={auth.user?.id}
+            onOpenPlan={ps.openSavedPlan}
+            onClose={() => setPlansOpen(false)}
+          />
+        </Suspense>
+      )}
 
-      {/* Pomodoro & Focus Studio — herkese açık (Şablon Keşfet gibi) */}
-      <PomodoroStudio open={pomodoroOpen} userId={auth.user?.id} initialTask={pomodoroInitialTask} onClose={() => setPomodoroOpen(false)} />
+      {/* Pomodoro & Focus Studio — BİLEREK UNCONDITIONAL mount (Görünüm
+          İzolasyonu'nun tek istisnası): sayacı Date.now() tabanlı hedef
+          bitiş zaman damgasıyla çalışır (bkz. PomodoroStudio.jsx
+          CountdownDisplay) — Studio kapalıyken de `running` true kaldığı
+          sürece GERÇEK ZAMANDA saymaya devam etmesi gerekir. Koşullu mount
+          edilirse her kapanışta unmount olup sayaç state'ini kaybederdi.
+          Görünürlük `display:none` ile yönetilir (bkz. o dosyadaki kök
+          döngü yorumu) — DOM bir kez kurulur, gizliyken tarayıcı layout/
+          paint/animasyon maliyeti sıfıra yakındır, yalnızca zamanlayıcının
+          kendi JS interval'i (bilinçli olarak) çalışmaya devam eder. */}
+      <Suspense fallback={null}>
+        <PomodoroStudio open={pomodoroOpen} userId={auth.user?.id} initialTask={pomodoroInitialTask} onClose={() => setPomodoroOpen(false)} />
+      </Suspense>
+
+      {/* 🌙 Ritim & Gün Sonu — AI günlük rapor + gün sonu otomatik ölçekleme +
+          analitik grafikler. Koşullu mount: kapalıyken 4 SVG grafiğin hiçbiri
+          DOM'da/bellekte değil, hiçbir fetch/hesaplama tetiklenmez. */}
+      {rhythmOpen && (
+        <Suspense fallback={<OverlayFallback z={90} />}>
+          <RhythmStudio open={rhythmOpen} userId={auth.user?.id} onClose={() => setRhythmOpen(false)} />
+        </Suspense>
+      )}
 
       {/* AI Koç — yalnızca PlanBoard ekranındayken (yalnızca `dbPlan` kontrolü
           yetersizdi: "‹ Ana Sayfa" ile intro'ya dönünce dbPlan temizlenmediği
           için widget CategoryIntro/OnboardingWizard'ın alt sticky "Başla" /
           "Planı Oluştur" butonunun üzerine biniyordu). */}
       {stage === STAGE_PLAN && ps.dbPlan && (
-        <AiCoachWidget
-          plan={ps.dbPlan}
-          userId={auth.user?.id}
-          onApplyAction={ps.applyCoachAction}
-          onSendMessage={ps.sendCoachMessage}
-          onJumpToPlan={ps.openSavedPlan}
-        />
+        <Suspense fallback={<FabFallback />}>
+          <AiCoachWidget
+            plan={ps.dbPlan}
+            userId={auth.user?.id}
+            onApplyAction={ps.applyCoachAction}
+            onSendMessage={ps.sendCoachMessage}
+            onJumpToPlan={ps.openSavedPlan}
+          />
+        </Suspense>
       )}
 
       {/* Mobilde yüzen bir Pomodoro butonu YOK — ekranın üzerinde gezinip
@@ -305,21 +414,23 @@ export default function App() {
           gridinden (mobil) ve Header'dan (masaüstü) zaten erişilebilir. */}
 
       {/* PDF / Yazdır — aralık seçimi + yazdır */}
-      <PrintModal
-        open={printOpen}
-        accent={mode.accent}
-        maxDays={ps.weeks.reduce((n, w) => n + (w.days?.length || 0), 0)}
-        onExport={(days) => {
-          setPrintRange(days);
-          setPrintOpen(false);
-          // DOM güncellensin, sonra yazdır.
-          setTimeout(() => window.print(), 60);
-        }}
-        onClose={() => setPrintOpen(false)}
-      />
+      <Suspense fallback={null}>
+        <PrintModal
+          open={printOpen}
+          accent={mode.accent}
+          maxDays={ps.weeks.reduce((n, w) => n + (w.days?.length || 0), 0)}
+          onExport={(days) => {
+            setPrintRange(days);
+            setPrintOpen(false);
+            // DOM güncellensin, sonra yazdır.
+            setTimeout(() => window.print(), 60);
+          }}
+          onClose={() => setPrintOpen(false)}
+        />
 
-      {/* Baskı şablonu — ekranda gizli, yalnızca yazdırmada görünür */}
-      <PrintablePlan plan={ps.dbPlan} routines={ps.routines} weeks={ps.weeks} days={printRange} />
+        {/* Baskı şablonu — ekranda gizli, yalnızca yazdırmada görünür */}
+        <PrintablePlan plan={ps.dbPlan} routines={ps.routines} weeks={ps.weeks} days={printRange} />
+      </Suspense>
 
       <GlobalStyles />
     </div>

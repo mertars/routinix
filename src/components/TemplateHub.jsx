@@ -119,7 +119,7 @@ export default function TemplateHub({ open, onClose, onUseTemplate }) {
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex flex-col animate-[fadeIn_0.2s_ease]"
+      className="blur-cap-mobile fixed inset-0 z-[90] flex flex-col animate-[fadeIn_0.2s_ease]"
       style={{ background: "rgba(var(--glass-rgb), var(--alpha-modal))", backdropFilter: "blur(28px) saturate(150%)", WebkitBackdropFilter: "blur(28px) saturate(150%)" }}
     >
       {/* Üst bar */}

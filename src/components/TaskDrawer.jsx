@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Search, X, CheckCircle2, Circle, ChevronDown, ClipboardList } from "lucide-react";
+import { useState, useEffect, useCallback, memo } from "react";
+import { Search, X, CheckCircle2, Circle, ChevronDown, ClipboardList, BarChart3 } from "lucide-react";
 import { categoryOf } from "../constants";
 import { fetchDashboardData, setTaskCompleted } from "../services/planService";
 import { runWhenIdle } from "../utils/idle";
@@ -39,6 +39,54 @@ function PlanGroup({ plan, cat, defaultOpen, children, count }) {
   );
 }
 
+// Tek görev satırı — memo'lu: `task` referansı (bkz. toggleTask'ın cerrahi
+// güncellemesi — yalnızca dokunulan görev yeni bir obje olur, diğerleri AYNEN
+// korunur) + `active`/`onToggle`/`onSelect` sabit kaldığı sürece, bir
+// checkbox tıklamasında listedeki DİĞER satırlar HİÇ yeniden render olmaz —
+// uzun listede scroll/tik atma anındaki FPS düşüşünün kök nedeni buydu.
+const TaskRow = memo(function TaskRow({ task, active, onSelectTask, onToggle, onSelect }) {
+  return (
+    <div
+      className="flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+      style={active ? { background: `color-mix(in srgb, ${BRAND} 12%, transparent)` } : undefined}
+    >
+      <button
+        onClick={() => onToggle(task.id, !task.is_completed)}
+        className="w-5 h-5 rounded-[6px] border flex items-center justify-center text-[10px] shrink-0"
+        style={{
+          borderColor: task.is_completed ? "#2ED9A3" : "rgba(var(--overlay-rgb),0.25)",
+          background: task.is_completed ? "rgba(46,217,163,0.16)" : "transparent",
+          color: "#2ED9A3",
+        }}
+        aria-label="Tamamlandı olarak işaretle"
+      >
+        {task.is_completed ? "✓" : ""}
+      </button>
+      {onSelectTask ? (
+        <button
+          onClick={() => onSelect(task)}
+          className="flex-1 min-w-0 text-left text-[12.5px] font-medium truncate whitespace-nowrap"
+          style={{
+            color: active ? BRAND : "var(--text-secondary)",
+            textDecoration: task.is_completed ? "line-through" : "none",
+            opacity: task.is_completed ? 0.55 : 1,
+          }}
+        >
+          {active ? "📌 " : ""}
+          {task.title}
+        </button>
+      ) : (
+        <span
+          className="flex-1 min-w-0 text-[12.5px] font-medium truncate whitespace-nowrap text-gray-700 dark:text-white/80"
+          style={{ textDecoration: task.is_completed ? "line-through" : "none", opacity: task.is_completed ? 0.55 : 1 }}
+        >
+          {task.title}
+        </span>
+      )}
+    </div>
+  );
+});
+
 // 📋 TaskDrawer — Ana Sayfa'nın eski "Bugünün Görevleri" popover'ının VE
 // Pomodoro Studio'nun eski gömülü sol panelinin (TaskListPanel) yerini alan
 // TEK, paylaşılan, ekrandan/layout'tan bağımsız Slide-Over çekmece. Soldan
@@ -62,7 +110,7 @@ function PlanGroup({ plan, cat, defaultOpen, children, count }) {
 //     yalnızca checkbox tamamlama durumunu değiştirir.
 //   - Pomodoro Studio: `selectedTaskId` + `onSelectTask` DA verilir — satıra
 //     dokunmak o görevi "Aktif Görev" yapar ve drawer kendiliğinden kapanır.
-export default function TaskDrawer({ open, userId, onClose, selectedTaskId, onSelectTask }) {
+export default function TaskDrawer({ open, userId, onClose, selectedTaskId, onSelectTask, onOpenRhythm }) {
   const [plans, setPlans] = useState([]);
   const [search, setSearch] = useState("");
   const [statusTab, setStatusTab] = useState("pending"); // "pending" | "completed"
@@ -78,6 +126,46 @@ export default function TaskDrawer({ open, userId, onClose, selectedTaskId, onSe
     };
   }, [open, userId]);
 
+  // Kendi kendine yeterli tamamlama tikleme: yerel `plans`'ı hemen (optimistik)
+  // günceller, kalıcılığı boşta kalan ana thread'e ertelenmiş şekilde yapar
+  // (bkz. utils/idle.js) — bu drawer'ın kendi çektiği veriyi doğrudan
+  // güncellediği için dışarıdan bir callback'e ihtiyaç yok. YALNIZCA dokunulan
+  // planın/görevin nesnesi yeniden oluşturulur (bkz. usePlanStudio.toggleTask
+  // ile AYNI cerrahi güncelleme deseni) — diğer planların/görevlerin referansı
+  // AYNEN korunur ki aşağıdaki memoized TaskRow'lar bir tık sırasında
+  // dokunulmayan satırları render ETMESİN.
+  //
+  // NOT: Bu iki useCallback, aşağıdaki `if (!open) return null;`'DAN ÖNCE
+  // tanımlı olmak ZORUNDA — React hook'ları HER render'da AYNI sırada
+  // çağrılmalı. Daha önce bu ikisi early return'ün ALTINDAYDI: drawer kapalı
+  // (open=false) ilk render'da hiç çağrılmıyorlardı, açılınca (open=true)
+  // birden çağrılmaya başlıyorlardı — "Rendered more hooks than during the
+  // previous render" hatasıyla uygulamayı ANINDA çökertiyordu (Görevler/Görev
+  // Seçin butonuna her basışta). Kök neden buydu.
+  const toggleTask = useCallback((taskId, nextVal) => {
+    setPlans((prev) => {
+      const planIdx = prev.findIndex((p) => (p.tasks || []).some((t) => t.id === taskId));
+      if (planIdx === -1) return prev;
+      const plan = prev[planIdx];
+      const nextTasks = plan.tasks.map((t) => (t.id === taskId ? { ...t, is_completed: nextVal } : t));
+      const next = prev.slice();
+      next[planIdx] = { ...plan, tasks: nextTasks };
+      return next;
+    });
+    runWhenIdle(() => {
+      setTaskCompleted(taskId, nextVal).catch((err) => logger.error("TASK_DRAWER", "Görev durumu güncellenemedi", { taskId, error: err?.message }));
+    });
+  }, []);
+
+  const selectTask = useCallback(
+    (task) => {
+      if (!onSelectTask) return;
+      onSelectTask(task);
+      onClose();
+    },
+    [onSelectTask, onClose]
+  );
+
   if (!open) return null;
 
   const term = search.trim().toLocaleLowerCase("tr");
@@ -92,23 +180,6 @@ export default function TaskDrawer({ open, userId, onClose, selectedTaskId, onSe
     })
     .filter((p) => p.filteredTasks.length > 0);
   const totalMatches = groups.reduce((n, p) => n + p.filteredTasks.length, 0);
-
-  // Kendi kendine yeterli tamamlama tikleme: yerel `plans`'ı hemen (optimistik)
-  // günceller, kalıcılığı boşta kalan ana thread'e ertelenmiş şekilde yapar
-  // (bkz. utils/idle.js) — bu drawer'ın kendi çektiği veriyi doğrudan
-  // güncellediği için dışarıdan bir callback'e ihtiyaç yok.
-  const toggleTask = (taskId, nextVal) => {
-    setPlans((prev) => prev.map((p) => ({ ...p, tasks: (p.tasks || []).map((t) => (t.id === taskId ? { ...t, is_completed: nextVal } : t)) })));
-    runWhenIdle(() => {
-      setTaskCompleted(taskId, nextVal).catch((err) => logger.error("TASK_DRAWER", "Görev durumu güncellenemedi", { taskId, error: err?.message }));
-    });
-  };
-
-  const selectTask = (task) => {
-    if (!onSelectTask) return;
-    onSelectTask(task);
-    onClose();
-  };
 
   return (
     <>
@@ -128,13 +199,26 @@ export default function TaskDrawer({ open, userId, onClose, selectedTaskId, onSe
             <ClipboardList className="w-5 h-5" style={{ color: BRAND }} />
             Görevler ve Planlar
           </h3>
-          <button
-            onClick={onClose}
-            aria-label="Kapat"
-            className="p-2 rounded-lg text-gray-400 hover:text-gray-900 dark:text-white/40 dark:hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* 📊 Ritim & Gün Sonu — kısayol; TaskDrawer'ı kapatıp RhythmStudio'yu açar. */}
+            {onOpenRhythm && (
+              <button
+                onClick={onOpenRhythm}
+                aria-label="Ritim ve Gün Sonu Analizi"
+                title="Ritim & Gün Sonu"
+                className="p-2 rounded-lg text-gray-400 hover:text-[#A78BFA] dark:text-white/40 dark:hover:text-[#A78BFA] transition-colors"
+              >
+                <BarChart3 className="w-5 h-5" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              aria-label="Kapat"
+              className="p-2 rounded-lg text-gray-400 hover:text-gray-900 dark:text-white/40 dark:hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* 2. Arama + sekmeler — sabit yükseklik */}
@@ -205,50 +289,16 @@ export default function TaskDrawer({ open, userId, onClose, selectedTaskId, onSe
               const cat = categoryOf(p.mode);
               return (
                 <PlanGroup key={p.id} plan={p} cat={cat} defaultOpen={groups.length <= 2} count={p.filteredTasks.length}>
-                  {p.filteredTasks.map((t) => {
-                    const active = t.id === selectedTaskId;
-                    return (
-                      <div
-                        key={t.id}
-                        className="flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
-                        style={active ? { background: `color-mix(in srgb, ${BRAND} 12%, transparent)` } : undefined}
-                      >
-                        <button
-                          onClick={() => toggleTask(t.id, !t.is_completed)}
-                          className="w-5 h-5 rounded-[6px] border flex items-center justify-center text-[10px] shrink-0"
-                          style={{
-                            borderColor: t.is_completed ? "#2ED9A3" : "rgba(var(--overlay-rgb),0.25)",
-                            background: t.is_completed ? "rgba(46,217,163,0.16)" : "transparent",
-                            color: "#2ED9A3",
-                          }}
-                          aria-label="Tamamlandı olarak işaretle"
-                        >
-                          {t.is_completed ? "✓" : ""}
-                        </button>
-                        {onSelectTask ? (
-                          <button
-                            onClick={() => selectTask(t)}
-                            className="flex-1 min-w-0 text-left text-[12.5px] font-medium truncate whitespace-nowrap"
-                            style={{
-                              color: active ? BRAND : "var(--text-secondary)",
-                              textDecoration: t.is_completed ? "line-through" : "none",
-                              opacity: t.is_completed ? 0.55 : 1,
-                            }}
-                          >
-                            {active ? "📌 " : ""}
-                            {t.title}
-                          </button>
-                        ) : (
-                          <span
-                            className="flex-1 min-w-0 text-[12.5px] font-medium truncate whitespace-nowrap text-gray-700 dark:text-white/80"
-                            style={{ textDecoration: t.is_completed ? "line-through" : "none", opacity: t.is_completed ? 0.55 : 1 }}
-                          >
-                            {t.title}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {p.filteredTasks.map((t) => (
+                    <TaskRow
+                      key={t.id}
+                      task={t}
+                      active={t.id === selectedTaskId}
+                      onSelectTask={onSelectTask}
+                      onToggle={toggleTask}
+                      onSelect={selectTask}
+                    />
+                  ))}
                 </PlanGroup>
               );
             })

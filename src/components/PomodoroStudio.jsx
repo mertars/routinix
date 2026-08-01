@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { Timer as TimerIcon, Music2, ListMusic, Play, Pause, X, ClipboardList } from "lucide-react";
 import { tapFeedback } from "../lib/haptics";
 import logger from "../utils/logger";
+import { logFocusSession } from "../services/rhythmService";
 import TaskDrawer from "./TaskDrawer";
 
 const DEFAULT_WORK_MIN = 25;
@@ -201,32 +202,65 @@ function DurationSteppers({ workMin, breakMin, running, adjustDuration }) {
   );
 }
 
-// ⏱️ İzole sayaç bileşeni — saniyede bir değişen `secondsLeft` state'ini ve
-// ilgili setTimeout zincirini TEK BAŞINA taşır. Böylece "tick" her saniye
-// SADECE bu küçük yaprak bileşeni re-render eder; PomodoroStudio'nun geri
-// kalanı (üst bar, müzik popover'ları, TaskDrawer) saniyede bir yeniden
-// çizilmez. `resetNonce` ebeveynin "Sıfırla" tıklamasını bu bileşene
-// iletmenin tek yolu (secondsLeft artık burada yaşadığı için ebeveyn onu
-// doğrudan set edemez). Mod tamamlanınca `onModeComplete` ile ebeveyne haber
-// verilir (mod/running değişimi orada, nadiren tetiklenen state'te kalır).
+// ⏱️ İzole sayaç bileşeni — ticking state'ini TEK BAŞINA taşır (bkz. yukarısı:
+// bu sayede "tick" her saniye SADECE bu küçük yaprak bileşeni re-render eder,
+// PomodoroStudio'nun geri kalanı saniyede bir yeniden çizilmez). `resetNonce`
+// ebeveynin "Sıfırla" tıklamasını bu bileşene iletmenin tek yolu (secondsLeft
+// burada yaşadığı için ebeveyn onu doğrudan set edemez). Mod tamamlanınca
+// `onModeComplete` ile ebeveyne haber verilir.
+//
+// Zaman kaynağı Date.now() TABANLI (setInterval'in "her tick'te 1 azalt"
+// yaklaşımı DEĞİL): `targetEndRef` çalışmaya başlarken/devam ederken hedef
+// BİTİŞ zaman damgasını tutar, her tick (ve her `visibilitychange`) o
+// damgadan Date.now() farkını YENİDEN hesaplar. Böylece panel kapansa, sekme
+// arka plana alınsa ya da telefon ekranı kilitlense (tarayıcı setInterval'i
+// kısıtlayıp/atlasa) bile — geri dönüldüğünde sayaç "donmuş" göstermez,
+// gerçekten geçen süre kadar düşmüş olarak devam eder.
 const CountdownDisplay = memo(function CountdownDisplay({ mode, workMin, breakMin, running, accent, boost, resetNonce, onModeComplete }) {
   const totalForMode = (mode === "work" ? workMin : breakMin) * 60;
   const [secondsLeft, setSecondsLeft] = useState(totalForMode);
+  const targetEndRef = useRef(null);
 
   useEffect(() => {
-    if (!running) setSecondsLeft(totalForMode);
+    if (!running) {
+      setSecondsLeft(totalForMode);
+      targetEndRef.current = null;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, workMin, breakMin, resetNonce]);
 
   useEffect(() => {
     if (!running) return;
-    if (secondsLeft <= 0) {
-      onModeComplete();
-      return;
+    // Başlatılırken/devam ettirilirken (duraklatılmış `secondsLeft`'ten) hedef
+    // bitiş zaman damgasını BİR KEZ hesapla — sonraki her tick bu SABİT hedefe
+    // göre kalan süreyi yeniden türetir, üst üste biriken bir sayaç DEĞİL.
+    if (targetEndRef.current == null) {
+      targetEndRef.current = Date.now() + secondsLeft * 1000;
     }
-    const id = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => clearTimeout(id);
-  }, [running, secondsLeft, mode, workMin, breakMin, onModeComplete]);
+    let intervalId = null;
+    const recompute = () => {
+      // `targetEndRef` null'a düştüyse bu tick zaten tamamlanmayı tetikledi
+      // (ör. interval'in bir sonraki ateşlemesiyle aynı ana denk gelen bir
+      // `visibilitychange` olayı) — ikinci kez `onModeComplete` çağırma.
+      if (targetEndRef.current == null) return;
+      const remaining = Math.max(0, Math.ceil((targetEndRef.current - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+      if (remaining <= 0) {
+        if (intervalId) clearInterval(intervalId);
+        targetEndRef.current = null;
+        onModeComplete();
+      }
+    };
+    recompute(); // sekmeye/panele geri dönüşte bir sonraki tick'i beklemeden anında doğru değeri göster
+    intervalId = setInterval(recompute, 1000);
+    document.addEventListener("visibilitychange", recompute);
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", recompute);
+      targetEndRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, onModeComplete]);
 
   const pct = totalForMode > 0 ? Math.max(0, Math.min(100, Math.round((1 - secondsLeft / totalForMode) * 100))) : 0;
   const ringCircumference = 2 * Math.PI * 88;
@@ -417,6 +451,39 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
   const ytPlayerRef = useRef(null);
   const ytContainerRef = useRef(null);
 
+  // Süre bittiğinde CountdownDisplay tarafından çağrılır — mod/running
+  // değişimi burada, PomodoroStudio'nun (nadiren re-render olan) state'inde
+  // kalır; yeni mod'un süresi CountdownDisplay'in kendi mode-izleme efektiyle
+  // otomatik ayarlanır. (Diğer hook'larla birlikte, olası bir erken return'ün
+  // ÜSTÜNDE tanımlı — aksi halde Studio kapalıyken bu hook hiç çağrılmaz ve
+  // açılışta React'in hook sırası kuralını ihlal eder.)
+  const handleModeComplete = useCallback(() => {
+    tapFeedback([40, 60, 40]);
+    // Yalnızca TAM tamamlanan (sıfıra inen, yarıda bırakılmayan) bir "work"
+    // aralığı bir odak seansı olarak kaydedilir — "Rhythm & Insights"
+    // modülündeki Derin Odak Hacmi/Pik Verimlilik grafiklerinin tek gerçek
+    // veri kaynağı budur. Kayıt boşta kalan ana thread'i BLOKLAMAZ (fire-
+    // and-forget, hata olursa kullanıcının akışı kesilmez, yalnızca loglanır).
+    // `startedAt` gerçek saatten `workMin` çıkarılarak yaklaşık hesaplanır —
+    // aradaki olası duraklatmalar (Date.now() tabanlı sayaç sayesinde) TOPLAM
+    // sayılan süreyi etkilemez, yalnızca duvar saatindeki "başlangıç anı"
+    // tahminidir.
+    if (mode === "work" && userId) {
+      const endedAt = new Date();
+      const startedAt = new Date(endedAt.getTime() - workMin * 60000);
+      logFocusSession({
+        userId,
+        taskId: selectedTask?.id ?? null,
+        planId: selectedTask?.plan_id ?? null,
+        startedAt: startedAt.toISOString(),
+        endedAt: endedAt.toISOString(),
+        durationMin: workMin,
+      }).catch((err) => logger.warn("POMODORO", "Odak seansı kaydedilemedi", { error: err?.message }));
+    }
+    setMode((m) => (m === "work" ? "break" : "work"));
+    setRunning(false);
+  }, [mode, workMin, userId, selectedTask]);
+
   // Görev kartındaki "Başlat" ile açılmışsa (initialTask — tam görev objesi,
   // ayrı bir fetch gerekmez), o görevi otomatik olarak Aktif Görev yapar.
   useEffect(() => {
@@ -470,8 +537,6 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
     setTrackIndex(0);
   }, [open]);
 
-  if (!open) return null;
-
   const accent = ACCENT[mode];
   const trackLabel = ytTitle || PLAYLIST[trackIndex].label;
 
@@ -495,16 +560,6 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
     if (running || nextMode === mode) return;
     setMode(nextMode);
   };
-
-  // Süre bittiğinde CountdownDisplay tarafından çağrılır — mod/running
-  // değişimi burada, PomodoroStudio'nun (nadiren re-render olan) state'inde
-  // kalır; yeni mod'un süresi CountdownDisplay'in kendi mode-izleme efektiyle
-  // otomatik ayarlanır.
-  const handleModeComplete = useCallback(() => {
-    tapFeedback([40, 60, 40]);
-    setMode((m) => (m === "work" ? "break" : "work"));
-    setRunning(false);
-  }, []);
 
   const toggleYoutube = () => {
     if (!ytPlayerRef.current) return;
@@ -536,8 +591,20 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
     onOpenTaskDrawer: () => setTaskDrawerOpen(true),
   };
 
+  // NOT: `open` false iken artık `return null` YAPILMIYOR — CountdownDisplay
+  // (sayaç state'inin sahibi) bu ağacın bir parçası olduğundan, erken return
+  // onu her kapatışta unmount edip sıfırlardı. Bunun yerine `display:none`
+  // ile tamamen görünmez/etkileşimsiz yapılır — DOM bir kez kurulur, tarayıcı
+  // gizliyken layout/paint maliyeti yaklaşık sıfırdır. CountdownDisplay artık
+  // Date.now() tabanlı hedef bitiş zaman damgasıyla çalıştığından, Studio
+  // kapalıyken/sekme arka plandayken/telefon kilitliyken de `running` true
+  // kaldığı sürece GERÇEK ZAMANDA saymaya devam eder — geri dönüldüğünde
+  // kaldığı yerde "donmuş" değil, gerçekten geçen süre kadar düşmüş görünür.
   return (
-    <div className="fixed inset-0 z-[90] flex flex-col transition-colors duration-700" style={{ background: isFocusMode ? "var(--pomo-bg-focus)" : "var(--pomo-bg)" }}>
+    <div
+      className="fixed inset-0 z-[90] flex flex-col transition-colors duration-700"
+      style={{ display: open ? "flex" : "none", background: isFocusMode ? "var(--pomo-bg-focus)" : "var(--pomo-bg)" }}
+    >
       {/* YouTube oynatıcı — görünmez (1x1), arkada gerçekten çalar. */}
       <div ref={ytContainerRef} style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none", overflow: "hidden" }} />
 

@@ -264,3 +264,75 @@ $$;
 
 revoke all on function public.decrement_user_quota(uuid, date, int) from public;
 grant execute on function public.decrement_user_quota(uuid, date, int) to service_role;
+
+-- =====================================================================
+-- 7) focus_sessions — Pomodoro'da TAMAMLANMIŞ (yarıda bırakılmamış) her
+--    odaklanma (work) aralığının ham kaydı. Bu tablo yukarıdaki DROP
+--    bloğuna DAHİL DEĞİL. "Rhythm & Insights" panelindeki Derin Odak Hacmi
+--    ve Pik Verimlilik Saatleri grafiklerinin TEK gerçek veri kaynağıdır —
+--    öncesinde bu veriyi tutan hiçbir tablo yoktu, bu yüzden grafikler bu
+--    tablo aktif oldukça (bugünden itibaren) dolmaya başlar; geriye dönük
+--    veri YOKTUR.
+--    Client (anon key + kullanıcı JWT'si) kendi seansını DOĞRUDAN ekler
+--    (bkz. src/services/rhythmService.js) — logs tablosundaki insert
+--    deseniyle aynı: düşük riskli, kullanıcının SADECE kendi satırını
+--    oluşturabildiği, sonradan değiştirilemeyen (update/delete policy'si
+--    YOK) bir olay kaydı.
+-- =====================================================================
+create table if not exists public.focus_sessions (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references auth.users (id) on delete cascade,
+  task_id      uuid references public.tasks (id) on delete set null,
+  plan_id      uuid references public.plans (id) on delete set null,
+  started_at   timestamptz not null,
+  ended_at     timestamptz not null,
+  duration_min int not null check (duration_min > 0),
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists focus_sessions_user_id_idx on public.focus_sessions (user_id);
+create index if not exists focus_sessions_started_at_idx on public.focus_sessions (started_at desc);
+create index if not exists focus_sessions_plan_id_idx on public.focus_sessions (plan_id);
+
+alter table public.focus_sessions enable row level security;
+
+create policy "focus_sessions_select_own" on public.focus_sessions
+  for select using (auth.uid() = user_id);
+create policy "focus_sessions_insert_own" on public.focus_sessions
+  for insert with check (auth.uid() = user_id);
+-- Bilerek YOK: update/delete policy'si. Tamamlanmış bir odak seansı
+-- geçmişe dönük değiştirilemez/silinemez — grafiklerin bütünlüğü için.
+
+-- =====================================================================
+-- 8) daily_reports — "Ritim & Gün Sonu" modülünün AI raporu + o günün
+--    donmuş (snapshot) istatistikleri. Bu tablo yukarıdaki DROP bloğuna
+--    DAHİL DEĞİL. Bir kullanıcının bir takvim gününde EN FAZLA bir raporu
+--    olur (unique constraint) — yeniden üretmek var olan satırı GÜNCELLER
+--    (upsert), çoğaltmaz.
+--    user_quotas ile AYNI güvenlik deseni: yalnızca service_role (bkz.
+--    api/rhythm-report.js) yazabilir — AI çağrısı + istatistik hesaplaması
+--    sunucuda, doğrulanmış kullanıcının GERÇEK verisiyle yapılır; client
+--    yalnızca kendi geçmiş raporlarını OKUYABİLİR.
+-- =====================================================================
+create table if not exists public.daily_reports (
+  id                uuid primary key default gen_random_uuid(),
+  user_id           uuid not null references auth.users (id) on delete cascade,
+  report_date       date not null default current_date,
+  summary_text      text not null,
+  tomorrow_focus    jsonb not null default '[]'::jsonb,
+  stats             jsonb not null default '{}'::jsonb,
+  rescheduled_count int not null default 0,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  unique (user_id, report_date)
+);
+
+create index if not exists daily_reports_user_id_idx on public.daily_reports (user_id);
+create index if not exists daily_reports_report_date_idx on public.daily_reports (report_date desc);
+
+alter table public.daily_reports enable row level security;
+
+create policy "daily_reports_select_own" on public.daily_reports
+  for select using (auth.uid() = user_id);
+-- Bilerek YOK: insert/update/delete policy'si. Yalnızca service_role
+-- (api/rhythm-report.js) yazabilir — user_quotas'taki aynı gerekçe.

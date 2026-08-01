@@ -1,4 +1,4 @@
-import { useState, memo } from "react";
+import { useState, useMemo, memo } from "react";
 import { MONO_FONT, categoryOf } from "../constants";
 import Accordion from "./Accordion";
 import TaskCard from "./TaskCard";
@@ -12,7 +12,7 @@ import { isRoutineChecked, setRoutineChecked } from "../utils/routineCheckin";
 // (event bubbling durdurulur) günlük check-in'i değiştirir — bu durum
 // RoutinesPopover.jsx ile PAYLAŞILAN localStorage anahtarı üzerinden
 // (bkz. utils/routineCheckin.js) her iki yüzeyde de tutarlı kalır.
-function RoutineCard({ routine, accent, soft, onOpenDetail }) {
+function RoutineCardImpl({ routine, accent, soft, onOpenDetail }) {
   const [on, setOn] = useState(() => isRoutineChecked(routine.id));
   const toggle = (e) => {
     e.stopPropagation();
@@ -50,6 +50,12 @@ function RoutineCard({ routine, accent, soft, onOpenDetail }) {
     </div>
   );
 }
+// `onOpenDetail` (setDetailRoutine, referansı sabit) + `routine`/`accent`/`soft`
+// sabit kaldığı sürece, bir rutin kartındaki check-in tıklaması diğer rutin
+// kartlarını yeniden render ETMEZ (kendi `on` state'i yerel olduğundan zaten
+// izole; memo burada kart listesinin ÜST render'ının — ör. accordion aç/kapa —
+// gereksiz yere TÜM kartları tekrar çizmesini engeller).
+const RoutineCard = memo(RoutineCardImpl);
 
 // "Pill Calendar" — minimalist, dikey hap biçimli gün rozeti. Aktif gün
 // aksan renkle dolu/fosforlu bir dolgu + glow taşır; diğerleri sade tonal
@@ -108,6 +114,38 @@ export default function PlanBoard({
 }) {
   const [activeDay, setActiveDay] = useState(null);
   const [detailRoutine, setDetailRoutine] = useState(null);
+
+  // Yüklü (AI/DB) günleri gün no → gün verisi eşlemesine çevir + takvim
+  // hücrelerini üret. `weeks`/`plan.total_days` değişmediği sürece (ör. yalnızca
+  // `activeDay` değiştiğinde) tekrar hesaplanmaz — useMemo.
+  //
+  // NOT: Bu hook, aşağıdaki `if (!plan) return null;`'DAN ÖNCE tanımlı olmak
+  // ZORUNDA — React hook'ları her render'da AYNI sırada çağrılmalı; bir
+  // hook'u koşullu bir early return'ün ALTINA koymak (plan bir render'da null,
+  // başka bir render'da dolu gelirse) "Rendered more/fewer hooks than during
+  // the previous render" hatasıyla bileşeni çökertir — bkz. TaskDrawer.jsx'te
+  // aynı hata sınıfının canlıda tespit edilip düzeltildiği not. `plan` henüz
+  // null olabileceğinden içeride `plan?.total_days` ile korunuyor.
+  const { loadedDays, targetDays, calendar, firstLockedDay } = useMemo(() => {
+    const days = weeks
+      .flatMap((w) => w.days.map((d) => ({ ...d, weekNumber: w.weekNumber })))
+      .sort((a, b) => a.dayNumber - b.dayNumber);
+    const byDay = new Map(days.map((d) => [d.dayNumber, d]));
+    const maxLoaded = days.length ? days[days.length - 1].dayNumber : 0;
+    // Kullanıcının hedefine göre toplam gün sayısı — takvim TAM olarak bu kadar
+    // kutucuk üretir. Sabit "8 gün / +7 kilitli" mantığı yok. total_days yoksa
+    // (eski planlar) yüklü son güne düşer, o da yoksa 7.
+    const target = Number(plan?.total_days) || Math.max(maxLoaded, 7);
+    // Tam target kadar hücre: yüklüyse gerçek veri, değilse kilitli placeholder.
+    // (Veri fazladan gün içeriyorsa Map araması target'ı aşmadığı için doğal kesilir.)
+    const cells = Array.from({ length: target }, (_, i) => {
+      const dayNumber = i + 1;
+      const loaded = byDay.get(dayNumber);
+      return loaded ? { ...loaded, locked: false } : { dayNumber, tasks: [], locked: true };
+    });
+    return { loadedDays: days, targetDays: target, calendar: cells, firstLockedDay: maxLoaded + 1 };
+  }, [weeks, plan?.total_days]);
+
   if (!plan) return null;
 
   const cat = categoryOf(plan.mode);
@@ -117,27 +155,6 @@ export default function PlanBoard({
   // Pomodoro rozeti YALNIZCA odak/çalışma gerektiren içerikte anlamlı —
   // tatil/fitness/genel rutinde zamanlama kavramı yok, zorunlu göstermiyoruz.
   const showPomodoro = plan.mode === "software";
-
-  // Yüklü (AI/DB) günleri gün no → gün verisi eşlemesine çevir.
-  const loadedDays = weeks
-    .flatMap((w) => w.days.map((d) => ({ ...d, weekNumber: w.weekNumber })))
-    .sort((a, b) => a.dayNumber - b.dayNumber);
-  const loadedByDay = new Map(loadedDays.map((d) => [d.dayNumber, d]));
-  const maxLoadedDay = loadedDays.length ? loadedDays[loadedDays.length - 1].dayNumber : 0;
-
-  // Kullanıcının hedefine göre toplam gün sayısı — takvim TAM olarak bu kadar
-  // kutucuk üretir. Sabit "8 gün / +7 kilitli" mantığı yok. total_days yoksa
-  // (eski planlar) yüklü son güne düşer, o da yoksa 7.
-  const targetDays = Number(plan.total_days) || Math.max(maxLoadedDay, 7);
-
-  // Tam targetDays kadar hücre: yüklüyse gerçek veri, değilse kilitli placeholder.
-  // (Veri fazladan gün içeriyorsa Map araması targetDays'i aşmadığı için doğal kesilir.)
-  const calendar = Array.from({ length: targetDays }, (_, i) => {
-    const dayNumber = i + 1;
-    const loaded = loadedByDay.get(dayNumber);
-    return loaded ? { ...loaded, locked: false } : { dayNumber, tasks: [], locked: true };
-  });
-  const firstLockedDay = maxLoadedDay + 1; // yükleme göstergesi için
 
   // Aktif gün: seçili olan hâlâ yüklüyse onu, değilse ilk yüklü günü kullan.
   const effectiveActiveDay =
@@ -151,9 +168,10 @@ export default function PlanBoard({
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-[fadeIn_0.4s_ease]">
-      {/* Başlık + genel ilerleme */}
-      <div className="glass rounded-2xl p-4 md:p-5" style={{ borderColor: `${accent}33` }}>
+    <div className="w-full animate-[fadeIn_0.4s_ease]">
+      {/* Başlık + genel ilerleme — tam genişlik, grid'in üstünde (RhythmStudio'nun
+          tarih şeridiyle aynı desen: gezinme/özet üstte, çalışma alanı altta grid). */}
+      <div className="glass rounded-2xl p-4 md:p-5 mb-6" style={{ borderColor: `${accent}33` }}>
         <div className="flex items-center justify-between mb-3">
           <button onClick={onBack} className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
             ‹ Ana Sayfa
@@ -212,114 +230,126 @@ export default function PlanBoard({
         </div>
       </div>
 
-      {/* Genel rutinler — okunaklı, tam genişlikte kartlar (accordion içinde) */}
-      {routines.length > 0 && (
-        <Accordion title="Genel Rutinler" icon="🔁" accent={accent} defaultOpen>
-          <div className="flex flex-col gap-2.5">
-            {routines.map((r, i) => (
-              <RoutineCard key={r.id || i} routine={r} accent={accent} soft={soft} onOpenDetail={setDetailRoutine} />
-            ))}
+      {/* 12 Kolonlu Dashboard Izgarası — mobilde (<lg) tek kolon (takvim →
+          günün görevleri → rutinler sırasıyla), masaüstünde (≥lg) 8+4:
+          sol ana akış (takvim + aktif günün görevleri), sağ yan panel
+          (genel rutinler) — RhythmStudio.jsx ile AYNI grid deseni. */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* ============ SOL / ANA AKIŞ — lg:col-span-8 ============ */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          {/* Takvim rozet şeridi */}
+          <div className="glass rounded-2xl p-4 md:p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-faint)]">
+                Performans Çerçevesi · {targetDays} gün
+              </p>
+              {nextWeekError && (
+                <span className="text-[10.5px] font-medium" style={{ color: "#F0827A" }}>
+                  {nextWeekError}
+                </span>
+              )}
+            </div>
+            {/* Tam olarak targetDays kadar kutucuk: yüklü günler dolu, kalanlar kilitli. */}
+            <div className="edge-fade-x flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 md:-mx-5 md:px-5" style={{ scrollSnapType: "x proximity" }}>
+              {calendar.map((cell) =>
+                cell.locked ? (
+                  <button
+                    key={`lock-${cell.dayNumber}`}
+                    onClick={onLoadNextWeek}
+                    disabled={loadingNextWeek}
+                    className="shrink-0 flex flex-col items-center gap-1.5 disabled:opacity-70"
+                    aria-label={`${cell.dayNumber}. gün kilitli — sonraki haftayı aç`}
+                  >
+                    <div className="frost-lock w-11 h-16 rounded-2xl flex items-center justify-center">
+                      <span className="text-[15px]" style={{ filter: "grayscale(0.3)", opacity: 0.85 }}>
+                        {loadingNextWeek && cell.dayNumber === firstLockedDay ? "⏳" : "🔒"}
+                      </span>
+                    </div>
+                    <span className="text-[9px] font-semibold" style={{ color: "var(--text-faint)", fontFamily: MONO_FONT }}>
+                      {cell.dayNumber}
+                    </span>
+                  </button>
+                ) : (
+                  <DayPill
+                    key={cell.dayNumber}
+                    day={cell.dayNumber}
+                    pct={dayPct(cell)}
+                    active={cell.dayNumber === effectiveActiveDay}
+                    accent={accent}
+                    onSelect={setActiveDay}
+                  />
+                )
+              )}
+            </div>
+            <p className="mt-2.5 text-[11px] text-[var(--text-faint)] leading-relaxed">
+              🔒 Kilitli güne dokunarak bir sonraki haftanın stratejisini aç.
+            </p>
           </div>
-        </Accordion>
-      )}
 
-      {/* Takvim rozet şeridi */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-faint)]">
-            Performans Çerçevesi · {targetDays} gün
-          </p>
-          {nextWeekError && (
-            <span className="text-[10.5px] font-medium" style={{ color: "#F0827A" }}>
-              {nextWeekError}
-            </span>
-          )}
-        </div>
-        {/* Tam olarak targetDays kadar kutucuk: yüklü günler dolu, kalanlar kilitli. */}
-        <div className="edge-fade-x flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 md:-mx-8 md:px-8" style={{ scrollSnapType: "x proximity" }}>
-          {calendar.map((cell) =>
-            cell.locked ? (
-              <button
-                key={`lock-${cell.dayNumber}`}
-                onClick={onLoadNextWeek}
-                disabled={loadingNextWeek}
-                className="shrink-0 flex flex-col items-center gap-1.5 disabled:opacity-70"
-                aria-label={`${cell.dayNumber}. gün kilitli — sonraki haftayı aç`}
-              >
-                <div className="frost-lock w-11 h-16 rounded-2xl flex items-center justify-center">
-                  <span className="text-[15px]" style={{ filter: "grayscale(0.3)", opacity: 0.85 }}>
-                    {loadingNextWeek && cell.dayNumber === firstLockedDay ? "⏳" : "🔒"}
+          {/* Günün Stratejik Adımları */}
+          {activeDayObj && (
+            <div key={effectiveActiveDay} className="glass rounded-2xl p-4 md:p-5 day-reveal flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="text-[10.5px] font-bold px-2.5 py-1 rounded-full"
+                    style={{ background: soft, color: accent, fontFamily: MONO_FONT }}
+                  >
+                    {effectiveActiveDay}. GÜN
+                  </span>
+                  <span className="text-[11px] text-[var(--text-faint)]" style={{ fontFamily: MONO_FONT }}>
+                    {activeDayObj.weekNumber}. hafta
                   </span>
                 </div>
-                <span className="text-[9px] font-semibold" style={{ color: "var(--text-faint)", fontFamily: MONO_FONT }}>
-                  {cell.dayNumber}
-                </span>
-              </button>
-            ) : (
-              <DayPill
-                key={cell.dayNumber}
-                day={cell.dayNumber}
-                pct={dayPct(cell)}
-                active={cell.dayNumber === effectiveActiveDay}
-                accent={accent}
-                onSelect={setActiveDay}
-              />
-            )
+              </div>
+              <h2 className="text-[15px] font-bold tracking-tight text-[var(--text-primary)] text-left -mt-1.5">Günün Stratejik Adımları</h2>
+
+              {activeDayObj.tasks.length > 0 && activeDayObj.tasks.every((t) => t.is_completed) && (
+                <div
+                  className="rounded-xl border px-4 py-3 text-[12.5px] font-medium leading-relaxed text-left"
+                  style={{ borderColor: "rgba(46,217,163,0.3)", background: "rgba(46,217,163,0.08)", color: "#7DE9C3" }}
+                >
+                  ✅ Bugünkü disiplin halkan tamamlandı. Zarif bir tutarlılık — devam et.
+                </div>
+              )}
+
+              {/* Tek sütun, minimalist tek-satır liste (mikro-arayüz) — detaylar
+                  varsayılan gizli, karta dokununca Drawer/Bottom Sheet ile açılır
+                  (bkz. TaskCard.jsx). Her satır memoized — dokunulmayan görevler
+                  bir tık sırasında hiç render edilmez (bkz. usePlanStudio.toggleTask). */}
+              <div className="task-grid flex flex-col gap-2.5">
+                {activeDayObj.tasks.map((t) => (
+                  <TaskCard
+                    key={t.id}
+                    task={t}
+                    accent={accent}
+                    soft={soft}
+                    isVacation={isVacation}
+                    showPomodoro={showPomodoro}
+                    onToggle={onToggleTask}
+                    onStartPomodoro={onStartPomodoro}
+                  />
+                ))}
+              </div>
+            </div>
           )}
         </div>
-        <p className="mt-2.5 text-[11px] text-[var(--text-faint)] leading-relaxed">
-          🔒 Kilitli güne dokunarak bir sonraki haftanın stratejisini aç.
-        </p>
+
+        {/* ============ SAĞ / YAN PANEL — lg:col-span-4 ============ */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          {/* Genel rutinler — okunaklı, tam genişlikte kartlar (Accordion kendi
+              glass/rounded-2xl kabuğunu zaten taşıyor — ayrıca sarmalanmaz). */}
+          {routines.length > 0 && (
+            <Accordion title="Genel Rutinler" icon="🔁" accent={accent} defaultOpen>
+              <div className="flex flex-col gap-2.5">
+                {routines.map((r, i) => (
+                  <RoutineCard key={r.id || i} routine={r} accent={accent} soft={soft} onOpenDetail={setDetailRoutine} />
+                ))}
+              </div>
+            </Accordion>
+          )}
+        </div>
       </div>
-
-      {/* Günün Stratejik Adımları */}
-      {activeDayObj && (
-        <div key={effectiveActiveDay} className="day-reveal flex flex-col gap-4">
-          {/* Aktif günün arkasından sızan hafif neon aura */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span
-                className="text-[10.5px] font-bold px-2.5 py-1 rounded-full"
-                style={{ background: soft, color: accent, fontFamily: MONO_FONT }}
-              >
-                {effectiveActiveDay}. GÜN
-              </span>
-              <span className="text-[11px] text-[var(--text-faint)]" style={{ fontFamily: MONO_FONT }}>
-                {activeDayObj.weekNumber}. hafta
-              </span>
-            </div>
-          </div>
-          <h2 className="text-[15px] font-bold tracking-tight text-[var(--text-primary)] -mt-1.5">Günün Stratejik Adımları</h2>
-
-          {activeDayObj.tasks.length > 0 && activeDayObj.tasks.every((t) => t.is_completed) && (
-            <div
-              className="rounded-xl border px-4 py-3 text-[12.5px] font-medium leading-relaxed"
-              style={{ borderColor: "rgba(46,217,163,0.3)", background: "rgba(46,217,163,0.08)", color: "#7DE9C3" }}
-            >
-              ✅ Bugünkü disiplin halkan tamamlandı. Zarif bir tutarlılık — devam et.
-            </div>
-          )}
-
-          {/* Tek sütun, minimalist tek-satır liste (mikro-arayüz) — detaylar
-              varsayılan gizli, karta dokununca Drawer/Bottom Sheet ile açılır
-              (bkz. TaskCard.jsx). Her satır memoized — dokunulmayan görevler
-              bir tık sırasında hiç render edilmez (bkz. usePlanStudio.toggleTask). */}
-          <div className="task-grid flex flex-col gap-2.5">
-            {activeDayObj.tasks.map((t) => (
-              <TaskCard
-                key={t.id}
-                task={t}
-                accent={accent}
-                soft={soft}
-                isVacation={isVacation}
-                showPomodoro={showPomodoro}
-                onToggle={onToggleTask}
-                onStartPomodoro={onStartPomodoro}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
       <RoutineDetailModal
         open={!!detailRoutine}

@@ -257,6 +257,23 @@ export default function GlobalStyles() {
         .frost-lock { backdrop-filter: blur(4px) saturate(110%); -webkit-backdrop-filter: blur(4px) saturate(110%); }
       }
 
+      /* --- Ağır (20-28px blur + saturate) modal/popover panelleri: bunlar
+         inline style ile yazıldığı için yukarıdaki .glass/.category-card
+         mobil-indirgeme kuralı onları kapsamıyordu — iOS Safari'de
+         backdrop-filter (özellikle saturate ile birlikte) tek başına en
+         pahalı GPU efektlerinden biri. Bu sınıf, panelin kendi inline
+         style'ının (masaüstünde aynı kalır) üzerine yalnızca mobilde/dokunma
+         cihazlarında önemli/important ile daha hafif bir değer bindirir —
+         görsel katman hiyerarşisi (chrome < card < modal) ve masaüstü
+         görünüm BİREBİR aynı kalır, yalnızca dokunmatik cihazdaki piksel
+         maliyeti düşer. */
+      @media (max-width: 767px), (hover: none) and (pointer: coarse) {
+        .blur-cap-mobile {
+          backdrop-filter: blur(10px) saturate(130%) !important;
+          -webkit-backdrop-filter: blur(10px) saturate(130%) !important;
+        }
+      }
+
       /* --- Accordion (grid-rows tekniği ile yumuşak aç/kapa) --- */
       .accordion-body {
         display: grid;

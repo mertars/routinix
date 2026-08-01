@@ -11,7 +11,7 @@ export default function FocusSidePanel({ open, onClose, side = "right", title, i
     <>
       <div className="fixed inset-0 z-[94] bg-black/40 backdrop-blur-[2px] animate-[fadeIn_0.2s_ease]" onClick={onClose} />
       <div
-        className={`focus-panel focus-panel--${side} no-scrollbar`}
+        className={`focus-panel focus-panel--${side} no-scrollbar blur-cap-mobile`}
         style={{
           background: "rgba(var(--glass-rgb), var(--alpha-modal))",
           backdropFilter: "blur(24px) saturate(160%)",

@@ -1,4 +1,5 @@
-import { Timer } from "lucide-react";
+import { memo } from "react";
+import { Timer, BarChart3 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 // ☀️/🌙 Animasyonlu tema değiştirici — güneş/ay ikonu kayarak/dönerek geçiş yapar.
@@ -29,7 +30,12 @@ function ThemeToggle() {
   );
 }
 
-export default function Header({
+// App'in kök state'inde (usePlanStudio) çoğu değişiklik (ör. "goal" alanına
+// her tuş vuruşu) Header'ın props'larını ETKİLEMEZ — App.jsx'teki tüm
+// callback'ler useCallback ile sarılı olduğundan, memo bu durumlarda Header'ın
+// tamamen gereksiz yere yeniden render olmasını (ikon/buton ağacının tekrar
+// hesaplanmasını) engeller.
+function Header({
   modeAccent,
   modeAccentSoft,
   user,
@@ -41,6 +47,8 @@ export default function Header({
   onHubClick,
   plansActive,
   onPlansClick,
+  rhythmActive,
+  onRhythmClick,
   pomodoroActive,
   onPomodoroClick,
   onAuthClick,
@@ -150,6 +158,19 @@ export default function Header({
                   <span className="text-[13px] leading-none">📂</span>
                   Planlarım
                 </button>
+                <button
+                  onClick={onRhythmClick}
+                  className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
+                  style={{
+                    background: rhythmActive ? "rgba(167,139,250,0.20)" : "rgba(167,139,250,0.10)",
+                    color: "#A78BFA",
+                    border: "1px solid rgba(167,139,250,0.40)",
+                    boxShadow: rhythmActive ? "0 0 16px -4px rgba(167,139,250,0.7)" : "0 0 10px -5px rgba(167,139,250,0.6)",
+                  }}
+                >
+                  <BarChart3 className="w-[13px] h-[13px]" strokeWidth={2.25} />
+                  Ritim & Gün Sonu
+                </button>
               </>
             )}
 
@@ -209,3 +230,4 @@ export default function Header({
     </div>
   );
 }
+export default memo(Header);

@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 // Kategoriye göre ambiyans ışığı rengi — plan/görev türüne özgü, kendi başına
 // bir renk sistemi (uygulamanın diğer yerlerindeki kategori "accent" rozet
 // renklerinden BİLİNÇLİ OLARAK bağımsız — buradaki istek belirli bir "doğa/
@@ -25,7 +27,10 @@ const DEFAULT_GLOW = GLOW_BY_CATEGORY.software;
 // olarak tüm ekranı kaplar, içeriğin arkasında durur.
 // prefers-reduced-motion'da hareket durur (renk geçişi buna dahil değil,
 // zararsız/statik bir stil değişimi sayılır).
-export default function BackgroundScene({ category }) {
+// Tek prop'u `category` (primitif string) — memo, App'in kök state'inde
+// alakasız her değişiklikte (ör. yazı yazma) bu ağır SVG'nin yeniden
+// hesaplanmasını engeller; yalnızca kategori GERÇEKTEN değişince re-render olur.
+function BackgroundScene({ category }) {
   const glow = GLOW_BY_CATEGORY[category] || DEFAULT_GLOW;
   return (
     <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
@@ -177,3 +182,4 @@ export default function BackgroundScene({ category }) {
     </div>
   );
 }
+export default memo(BackgroundScene);

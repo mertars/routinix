@@ -77,6 +77,14 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
   const [allPlans, setAllPlans] = useState([]);
   const [selectedPlanId, setSelectedPlanId] = useState(plan?.id || null);
   const scrollRef = useRef(null);
+  // Bu widget koşullu mount edilir (yalnızca STAGE_PLAN+dbPlan iken ağaçta —
+  // bkz. app.jsx). runAction/submitDraft'taki `await`lerden SONRA widget
+  // unmount olmuş olabilir (ör. kullanıcı yanıt beklerken "‹ Ana Sayfa"ya
+  // tıkladı) — bu ref, unmount sonrası setState çağrılmasını engeller.
+  const mountedRef = useRef(true);
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
 
   // Drawer her açıldığında güncel hak durumunu sunucudan çek.
   useEffect(() => {
@@ -148,6 +156,7 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
     setTyping(true);
     await new Promise((r) => setTimeout(r, 550)); // premium "düşünüyor" hissi
     const result = await onApplyAction(action.key);
+    if (!mountedRef.current) return;
     setTyping(false);
     if (typeof result?.remaining === "number") setRemaining(result.remaining);
     if (typeof result?.dailyLimit === "number") setDailyLimit(result.dailyLimit);
@@ -166,6 +175,7 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
     setTyping(true);
 
     const result = await onSendMessage(text, { targetPlanId: selectedPlanId });
+    if (!mountedRef.current) return;
     setTyping(false);
     if (typeof result?.remaining === "number") setRemaining(result.remaining);
     if (typeof result?.dailyLimit === "number") setDailyLimit(result.dailyLimit);
@@ -209,13 +219,13 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
           <button
             onClick={() => setOpen((v) => !v)}
             aria-label="AI Koç'u aç"
-            className="relative w-14 h-14 rounded-full flex items-center justify-center bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-500 ring-2 ring-violet-500/50 animate-pulse transition-transform duration-200 hover:scale-105 active:scale-95"
+            className="relative w-14 h-14 rounded-full flex items-center justify-center bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-500 ring-2 ring-violet-500/50 motion-safe:animate-pulse transition-transform duration-200 hover:scale-105 active:scale-95"
             style={{ boxShadow: "0 10px 34px -10px rgba(124,58,237,0.75), 0 0 24px -6px rgba(124,58,237,0.55)" }}
           >
             <Bot className="w-6 h-6 text-white drop-shadow-sm" strokeWidth={2.25} />
             {/* Canlı durum noktası */}
             <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60" style={{ background: "#2ED9A3" }} />
+              <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full opacity-60" style={{ background: "#2ED9A3" }} />
               <span className="relative inline-flex rounded-full h-3.5 w-3.5 border-2" style={{ background: "#2ED9A3", borderColor: "var(--bg-app)" }} />
             </span>
           </button>
@@ -227,7 +237,7 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
         <>
           <div className="fixed inset-0 z-[95] bg-black/55 backdrop-blur-sm animate-[fadeIn_0.2s_ease]" onClick={() => setOpen(false)} />
           <div
-            className="fixed top-0 right-0 z-[96] h-full w-[92%] max-w-[400px] flex flex-col drawer-panel overflow-hidden"
+            className="blur-cap-mobile fixed top-0 right-0 z-[96] h-full w-[92%] max-w-[400px] flex flex-col drawer-panel overflow-hidden"
             style={{
               background: "rgba(var(--glass-rgb), var(--alpha-modal))",
               backdropFilter: "blur(28px) saturate(160%)",

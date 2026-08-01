@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, startTransition } from "react";
+import { useState, useEffect, useCallback, useMemo, startTransition } from "react";
 import {
   categoryOf,
   STAGE_INTRO,
@@ -108,14 +108,14 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   const goalTooShort = goalTrimmed.length > 0 && goalTrimmed.length < MIN_GOAL_LENGTH;
   const canStart = goalTrimmed.length >= MIN_GOAL_LENGTH;
 
-  const handleCategoryChange = (key) => setCategory(key);
+  const handleCategoryChange = useCallback((key) => setCategory(key), []);
 
-  const resetToIntro = () => {
+  const resetToIntro = useCallback(() => {
     setStage(STAGE_INTRO);
     refreshSavedPlans();
-  };
+  }, [refreshSavedPlans]);
 
-  const startNewPlan = () => {
+  const startNewPlan = useCallback(() => {
     setGoal("");
     setExtraNote("");
     setErrorMsg("");
@@ -128,12 +128,12 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     setMenuOpen(false);
     setTemplateDaysOverride(null);
     setStage(STAGE_INTRO);
-  };
+  }, []);
 
   // Ortak: verilen kategori/hedef için dinamik onboarding sorularını üretip
   // wizard'a geçer. startOnboarding (manuel "Başla") ve startFromTemplate
   // (Şablon Keşfet) bunu paylaşır.
-  const beginOnboarding = async (cat, goalText) => {
+  const beginOnboarding = useCallback(async (cat, goalText) => {
     setErrorMsg("");
     setAnswers({});
     setWizardStep(0);
@@ -146,10 +146,10 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       setQuestions(FALLBACK_QUESTIONS); // dead-end olmasın: güvenli yedek
     }
     setStage(STAGE_WIZARD);
-  };
+  }, []);
 
   // ---- ADIM 1: Intro "Devam Et" → auth gate → dinamik soruları üret → wizard ----
-  const startOnboarding = async () => {
+  const startOnboarding = useCallback(async () => {
     if (!canStart) return;
     // Giriş yoksa AI çağrısı harcamadan önce auth modalını aç.
     if (!user) {
@@ -163,36 +163,39 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     }
     setTemplateDaysOverride(null); // manuel akışta şablon geçersiz kılma uygulanmaz
     await beginOnboarding(category, goal);
-  };
+  }, [canStart, user, onRequireAuth, goal, goalTrimmed, category, beginOnboarding]);
 
   // ---- Şablon Keşfet: "Şablonu Kullan" → hedef+kategori+gün sayısını aktarıp planı anında başlat ----
-  const startFromTemplate = async (template) => {
-    if (!user) {
-      onRequireAuth?.();
-      return;
-    }
-    // State güncellemeleri asenkron olduğundan (kapanış closure'ı state'i geç
-    // görebilir) template değerlerini doğrudan kullanıyoruz; setGoal/setCategory
-    // yalnızca UI'ın (wizard başlığı, geri dönülürse intro) tutarlı görünmesi için.
-    setCategory(template.category);
-    setGoal(template.goal);
-    setTemplateDaysOverride(template.totalDays || null);
-    await beginOnboarding(template.category, template.goal);
-  };
+  const startFromTemplate = useCallback(
+    async (template) => {
+      if (!user) {
+        onRequireAuth?.();
+        return;
+      }
+      // State güncellemeleri asenkron olduğundan (kapanış closure'ı state'i geç
+      // görebilir) template değerlerini doğrudan kullanıyoruz; setGoal/setCategory
+      // yalnızca UI'ın (wizard başlığı, geri dönülürse intro) tutarlı görünmesi için.
+      setCategory(template.category);
+      setGoal(template.goal);
+      setTemplateDaysOverride(template.totalDays || null);
+      await beginOnboarding(template.category, template.goal);
+    },
+    [user, onRequireAuth, beginOnboarding]
+  );
 
   // ---- Wizard etkileşimleri ----
-  const setAnswer = (value) => setAnswers((prev) => ({ ...prev, [wizardStep]: value }));
-  const goNextQuestion = () => setWizardStep((s) => Math.min(questions.length - 1, s + 1));
-  const goPrevQuestion = () => {
+  const setAnswer = useCallback((value) => setAnswers((prev) => ({ ...prev, [wizardStep]: value })), [wizardStep]);
+  const goNextQuestion = useCallback(() => setWizardStep((s) => Math.min(questions.length - 1, s + 1)), [questions.length]);
+  const goPrevQuestion = useCallback(() => {
     if (wizardStep === 0) {
       setStage(STAGE_INTRO);
       return;
     }
     setWizardStep((s) => s - 1);
-  };
+  }, [wizardStep]);
 
   // Wizard cevaplarını + hedefi AI'a bağlam olarak verip planı üretir/kaydeder.
-  const finalizeAndGenerate = async () => {
+  const finalizeAndGenerate = useCallback(async () => {
     if (!user) {
       onRequireAuth?.();
       return;
@@ -222,10 +225,10 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       setErrorMsg(err?.message || "Plan oluşturulurken bir sorun oluştu. Lütfen tekrar dene.");
       setStage(STAGE_ERROR);
     }
-  };
+  }, [user, onRequireAuth, questions, answers, extraNote, category, goal, templateDaysOverride, refreshSavedPlans]);
 
   // ---- LAZY LOAD: sonraki haftayı üret + kaydet + ekle ----
-  const loadNextWeek = async () => {
+  const loadNextWeek = useCallback(async () => {
     if (!dbPlan || loadingNextWeek) return;
     const maxWeek = weeks.reduce((m, w) => Math.max(m, w.weekNumber), 0);
     const targetWeekNumber = maxWeek + 1;
@@ -246,7 +249,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     } finally {
       setLoadingNextWeek(false);
     }
-  };
+  }, [dbPlan, loadingNextWeek, weeks, user]);
 
   // ---- Görev tamamlama (checkbox) — lokal + DB ----
   // Yalnızca dokunulan görevin ait olduğu hafta/gün nesnesi yeniden oluşturulur;
@@ -288,7 +291,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   }, []);
 
   // ---- Kayıtlı bir planı yeniden aç ----
-  const openSavedPlan = async (planId) => {
+  const openSavedPlan = useCallback(async (planId) => {
     setStage(STAGE_LOADING);
     try {
       const { plan, routines: routineRows, tasks } = await fetchPlanDetail(planId);
@@ -302,30 +305,33 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       setErrorMsg(err?.message || "Plan açılırken bir sorun oluştu.");
       setStage(STAGE_ERROR);
     }
-  };
+  }, []);
 
   // ---- Bir planı sil (menüdeki "Plan Sil" akışı) ----
-  const deletePlan = async (planId) => {
-    try {
-      await deletePlanSvc(planId);
-      // Silinen plan o an açıksa aktif ekranı temizleyip intro'ya dön.
-      if (dbPlan?.id === planId) {
-        setDbPlan(null);
-        setRoutines([]);
-        setWeeks([]);
-        setStage(STAGE_INTRO);
+  const deletePlan = useCallback(
+    async (planId) => {
+      try {
+        await deletePlanSvc(planId);
+        // Silinen plan o an açıksa aktif ekranı temizleyip intro'ya dön.
+        if (dbPlan?.id === planId) {
+          setDbPlan(null);
+          setRoutines([]);
+          setWeeks([]);
+          setStage(STAGE_INTRO);
+        }
+        await refreshSavedPlans();
+      } catch (err) {
+        logger.error("PLAN_DELETE", "Plan silinemedi", { planId, error: err?.message });
       }
-      await refreshSavedPlans();
-    } catch (err) {
-      logger.error("PLAN_DELETE", "Plan silinemedi", { planId, error: err?.message });
-    }
-  };
+    },
+    [dbPlan, refreshSavedPlans]
+  );
 
   // Sunucudan (api/coach-action.js) dönen — zaten Supabase'e kalıcılaşmış —
   // task değişikliklerini local `weeks` state'ine optimistic olarak yansıtır.
   // Yalnızca ekranda AÇIK olan plan için çağrılır (başka bir plan mutasyona
   // uğradıysa board'u rahatsız etmeyiz — kullanıcı isterse "Görüntüle" ile geçer).
-  const applyServerTaskChanges = (mutatedTasks = [], newTasks = []) => {
+  const applyServerTaskChanges = useCallback((mutatedTasks = [], newTasks = []) => {
     if (!mutatedTasks.length && !newTasks.length) return;
     setWeeks((prev) => {
       const flat = prev.flatMap((w) => w.days.flatMap((d) => d.tasks));
@@ -334,52 +340,61 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       for (const nt of newTasks) byId.set(nt.id, nt);
       return groupTasksToWeeks([...byId.values()]);
     });
-  };
+  }, []);
 
   // ---- AI Koç: hazır aksiyon çipleri (Planı Hafiflet / Tempoyu Sıkılaştır /
   // Bugün Çok Yoruldum / Gidişatımı Analiz Et) ----
   // Artık TAMAMEN sunucuda (api/coach-action.js, service_role): hak kontrolü/
   // düşümü ve gerçek Supabase mutasyonu orada olur. Client yalnızca sonucu
   // local state'e optimistic olarak uygular. Döner: { ok, consumed, message }.
-  const applyCoachAction = async (actionKey) => {
-    if (!dbPlan) return { ok: false, consumed: false, message: "Önce bir plan açman gerekiyor." };
+  const applyCoachAction = useCallback(
+    async (actionKey) => {
+      if (!dbPlan) return { ok: false, consumed: false, message: "Önce bir plan açman gerekiyor." };
 
-    const result = await callCoachAction({ action: actionKey, targetPlanId: dbPlan.id });
-    if (result?.ok) {
-      applyServerTaskChanges(result.mutatedTasks, result.newTasks);
-      if (result.mutatedTasks?.length || result.newTasks?.length) refreshSavedPlans();
-    }
-    return result;
-  };
+      const result = await callCoachAction({ action: actionKey, targetPlanId: dbPlan.id });
+      if (result?.ok) {
+        applyServerTaskChanges(result.mutatedTasks, result.newTasks);
+        if (result.mutatedTasks?.length || result.newTasks?.length) refreshSavedPlans();
+      }
+      return result;
+    },
+    [dbPlan, applyServerTaskChanges, refreshSavedPlans]
+  );
 
   // ---- AI Koç: serbest metin (Multi-Plan Awareness) ----
   // Sunucu, AI'ın tespit ettiği hedef planı (ya da widget'ın dropdown'dan
   // seçilenini) kendi çözer ve mutasyonu orada yapar. Ekranda açık olan
   // plansa sonucu optimistic yansıtırız; başka bir plansa board'u değiştirmeyiz.
   // Döner: { ok, consumed, message, targetPlanId }.
-  const sendCoachMessage = async (message, { targetPlanId } = {}) => {
-    const text = (message || "").trim();
-    if (!text) return { ok: true, consumed: false, message: "" };
-    if (!user) {
-      onRequireAuth?.();
-      return { ok: false, consumed: false, message: "Devam etmek için giriş yapmalısın." };
-    }
+  const sendCoachMessage = useCallback(
+    async (message, { targetPlanId } = {}) => {
+      const text = (message || "").trim();
+      if (!text) return { ok: true, consumed: false, message: "" };
+      if (!user) {
+        onRequireAuth?.();
+        return { ok: false, consumed: false, message: "Devam etmek için giriş yapmalısın." };
+      }
 
-    const result = await callCoachAction({ action: "freeText", message: text, targetPlanId: targetPlanId || dbPlan?.id });
+      const result = await callCoachAction({ action: "freeText", message: text, targetPlanId: targetPlanId || dbPlan?.id });
 
-    if (result?.ok && result.targetPlanId && result.targetPlanId === dbPlan?.id) {
-      applyServerTaskChanges(result.mutatedTasks, result.newTasks);
-      if (result.mutatedTasks?.length || result.newTasks?.length) refreshSavedPlans();
-    }
+      if (result?.ok && result.targetPlanId && result.targetPlanId === dbPlan?.id) {
+        applyServerTaskChanges(result.mutatedTasks, result.newTasks);
+        if (result.mutatedTasks?.length || result.newTasks?.length) refreshSavedPlans();
+      }
 
-    return result;
-  };
+      return result;
+    },
+    [user, onRequireAuth, dbPlan, applyServerTaskChanges, refreshSavedPlans]
+  );
 
-  // Aktif planın ilerlemesi (tüm haftalar).
-  const allTasks = weeks.flatMap((w) => w.days.flatMap((d) => d.tasks));
-  const totalTasks = allTasks.length;
-  const completedTasks = allTasks.filter((t) => t.is_completed).length;
-  const overallPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  // Aktif planın ilerlemesi (tüm haftalar) — yalnızca `weeks` değiştiğinde
+  // yeniden hesaplanır (ör. wizard/menü state'i değiştiğinde DEĞİL).
+  const { totalTasks, completedTasks, overallPct } = useMemo(() => {
+    const allTasks = weeks.flatMap((w) => w.days.flatMap((d) => d.tasks));
+    const total = allTasks.length;
+    const completed = allTasks.filter((t) => t.is_completed).length;
+    return { totalTasks: total, completedTasks: completed, overallPct: total > 0 ? Math.round((completed / total) * 100) : 0 };
+  }, [weeks]);
 
   const currentAnswer = answers[wizardStep];
 

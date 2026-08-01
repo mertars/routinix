@@ -32,7 +32,7 @@ export default function RoutineDetailModal({ open, onClose, routine, cat, planTi
       <div className="fixed inset-0 z-[85] bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease]" onClick={onClose} />
       <div className="pop-in fixed inset-0 z-[86] flex items-center justify-center px-5" onClick={onClose}>
         <div
-          className="w-full max-w-[420px] rounded-2xl p-5 shadow-2xl"
+          className="blur-cap-mobile w-full max-w-[420px] rounded-2xl p-5 shadow-2xl"
           style={{
             background: "rgba(var(--glass-rgb), var(--alpha-modal))",
             backdropFilter: "blur(20px) saturate(160%)",

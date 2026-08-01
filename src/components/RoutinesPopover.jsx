@@ -64,7 +64,7 @@ export default function RoutinesPopover({ open, userId, onClose }) {
     <>
       <div className="fixed inset-0 z-[65]" onClick={onClose} />
       <div
-        className="pop-in fixed top-[62px] right-3 z-[70] w-[calc(100vw-24px)] max-w-[420px] rounded-2xl p-4 shadow-2xl font-sans"
+        className="pop-in blur-cap-mobile fixed top-[62px] right-3 z-[70] w-[calc(100vw-24px)] max-w-[420px] rounded-2xl p-4 shadow-2xl font-sans"
         style={{
           background: "rgba(var(--glass-rgb), var(--alpha-modal))",
           backdropFilter: "blur(20px) saturate(160%)",
