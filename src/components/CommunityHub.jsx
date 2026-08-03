@@ -48,7 +48,7 @@ const NexusBackground = memo(function NexusBackground() {
 // yeterlidir: `user` (auth kullanıcısı) ve `onPlanCloned` (bir şablon "Planlarıma
 // Ekle" ile anında kopyalanınca çağrılır — usePlanStudio.openSavedPlan'e
 // bağlanır, yeni planı doğrudan açar) alır.
-export default function CommunityHub({ open, user, openMyProfileOnMount, onClose, onPlanCloned }) {
+export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
   const [myProfile, setMyProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [usernameDraft, setUsernameDraft] = useState("");
@@ -99,15 +99,6 @@ export default function CommunityHub({ open, user, openMyProfileOnMount, onClose
       cancelled = true;
     };
   }, [open, user]);
-
-  // DrawerMenu'deki "Profil & İstatistikler" şeridi — genel hub yerine
-  // DOĞRUDAN kullanıcının kendi profil kartını açmak için (bkz. app.jsx
-  // openNexusProfile). Bu bileşen kapanınca TAMAMEN unmount olduğundan
-  // (bkz. dosya başı yorum) `myProfile` her açılışta sıfırdan yüklenir —
-  // bu efekt yalnızca o ilk yükleme anında bir kez tetiklenir.
-  useEffect(() => {
-    if (openMyProfileOnMount && myProfile) setProfileCardTarget(myProfile);
-  }, [openMyProfileOnMount, myProfile]);
 
   useEffect(() => {
     if (!followingOnly || !myProfile) return;

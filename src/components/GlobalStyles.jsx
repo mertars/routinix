@@ -31,6 +31,15 @@ export default function GlobalStyles() {
         from { transform: translateY(100%); }
         to { transform: translateY(0); }
       }
+      /* NexusProfileOverlay.jsx — Bento menüsündeki "Profil & İstatistikler"
+         kartından TAM EKRANA "büyüyerek akan" his: menü kapanırken bu overlay
+         hafif küçük/soluk başlayıp tam boyuta gelir (gerçek shared-element/FLIP
+         animasyonu DEĞİL — projede bunun için bir animasyon kütüphanesi
+         KURULU DEĞİL — ama aynı yönde, tek bir akıcı büyüme hissi verir). */
+      @keyframes fullScreenIn {
+        from { opacity: 0; transform: scale(0.94) translateY(10px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+      }
       @keyframes slideDownSheet {
         from { transform: translateY(0); opacity: 1; }
         to { transform: translateY(100%); opacity: 0.4; }
@@ -373,6 +382,21 @@ export default function GlobalStyles() {
         }
       }
 
+      /* --- DrawerMenu.jsx (Bento kartları): "premium cam" hissi — üstte ince
+         beyaz ışık yansıması (inset highlight) her zaman açık, dokunulunca
+         (:active) üzerine mor neon glow biner. Bu bilinçli olarak AYRI bir
+         sınıf: çağıranlar kendi arka plan/border rengini (gradyan, tema rengi)
+         inline style veya Tailwind sınıfıyla serbestçe belirleyebilsin —
+         yalnızca gölge/geçiş burada tek yerden yönetilir. */
+      .bento-card {
+        box-shadow: inset 0 1px 1px rgba(255,255,255,0.14);
+        transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+      }
+      .bento-card:active {
+        box-shadow: inset 0 1px 1px rgba(255,255,255,0.14), 0 0 20px rgba(168,85,247,0.22);
+        border-color: rgba(168,85,247,0.5);
+      }
+
       /* --- Accordion (grid-rows tekniği ile yumuşak aç/kapa) --- */
       .accordion-body {
         display: grid;
@@ -474,6 +498,7 @@ export default function GlobalStyles() {
       @media (prefers-reduced-motion: reduce) {
         .motion-safe\\:animate-spin { animation: none !important; }
         .drawer-panel, .drawer-panel-left, .focus-sheet, .focus-panel, .task-sheet, .bento-sheet, .pomo-tabbar, .day-reveal, .neon-strip, .pop-in, .chip-fill-pulse, .check-glow { animation: none !important; }
+        .full-screen-in { animation: none !important; }
         .bg-blob--violet, .bg-blob--orange { animation: none !important; }
         .accordion-body { transition: none !important; }
       }

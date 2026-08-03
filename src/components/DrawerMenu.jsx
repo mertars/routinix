@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useMemo } from "react";
-import { Repeat2, Compass, ListChecks, Users2, Timer, BarChart3, User, FolderOpen, ChevronRight, X, Trash2 } from "lucide-react";
+import { Repeat2, Compass, ListChecks, Users2, Timer, BarChart3, User, FolderOpen, ChevronRight, X, Trash2, Plus } from "lucide-react";
 import { MONO_FONT } from "../constants";
 import { fetchDashboardData } from "../services/planService";
 import { isRoutineChecked } from "../utils/routineCheckin";
@@ -13,9 +13,10 @@ function BentoTile({ icon, label, gradient, glow, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="card-glow group relative flex flex-col items-start justify-between gap-2.5 rounded-2xl p-3 h-[74px] text-left bg-white/[0.03] border border-white/10 transition-colors duration-150 active:border-purple-500/50 active:shadow-[0_0_20px_rgba(168,85,247,0.2)]"
+      className="bento-card card-glow group relative flex flex-col items-start justify-between gap-2 rounded-3xl p-3 pb-2.5 text-left border border-white/[0.14]"
+      style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015))" }}
     >
-      <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-white bg-gradient-to-br ${gradient} shadow-lg ${glow}`}>
+      <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-white bg-gradient-to-br ${gradient} shadow-lg ${glow}`}>
         {icon}
       </span>
       <span className="text-[11.5px] font-bold text-white leading-tight">{label}</span>
@@ -123,9 +124,17 @@ function DrawerMenu({
         {/* Kaydırma GEREKTİRMEYECEK şekilde sıkıştırılmış içerik — overflow-y-auto
             yalnızca çok küçük ekran/büyütülmüş yazı tipi gibi uç durumlar için
             bir güvenlik ağı olarak kalır, normal telefonlarda hiç tetiklenmez. */}
-        <div className="flex-1 overflow-y-auto no-scrollbar px-4 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-1.5 flex flex-col gap-2">
+        <div className="flex-1 overflow-y-auto no-scrollbar px-4 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-1.5 flex flex-col gap-1.5">
           {/* Günün İlerlemesi — gerçek rutin check-in verisiyle */}
-          <button type="button" onClick={go(onOpenRoutines)} className="card-glow w-full text-left rounded-3xl p-4 relative overflow-hidden active:border-purple-500/50 active:shadow-[0_0_20px_rgba(168,85,247,0.2)]" style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.35), rgba(99,102,241,0.18))", border: "1px solid rgba(168,85,247,0.35)" }}>
+          <button
+            type="button"
+            onClick={go(onOpenRoutines)}
+            className="bento-card card-glow w-full text-left rounded-3xl p-4 relative overflow-hidden"
+            style={{
+              background: "linear-gradient(135deg, rgba(124,58,237,0.38), rgba(99,102,241,0.2))",
+              border: "1px solid rgba(255,255,255,0.16)",
+            }}
+          >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-[0.08em] px-2 py-1 rounded-full" style={{ background: "rgba(168,85,247,0.25)", color: "#E9D5FF" }}>
                 ☀️ Günün İlerlemesi
@@ -155,32 +164,39 @@ function DrawerMenu({
             )}
           </button>
 
-          {/* Bento grid — kare kartlar */}
+          {/* Direkt aksiyonlar — merkezi, öne çıkan bento kartlar (eski
+              "Ayarlar" akordeonu/toggle'ları bilerek kaldırıldı, bkz. istek
+              notu). Menünün en üst/merkezi bloğu — hero'dan hemen sonra,
+              gezinme grid'inden ÖNCE. */}
           <div className="grid grid-cols-2 gap-2">
-            {bentoTiles.map((t) => (
-              <BentoTile key={t.key} icon={t.icon} label={t.label} gradient={t.gradient} glow={t.glow} onClick={go(t.onClick)} />
-            ))}
-          </div>
-
-          {/* Direkt aksiyonlar — eski "Ayarlar" akordeonu/toggle'ları YOK
-              (bilerek kaldırıldı, bkz. istek notu); yalnızca en sık kullanılan
-              2 aksiyon doğrudan burada. */}
-          <div className="flex gap-2">
             <button
               onClick={go(onNewPlan)}
-              className="flex-1 flex items-center justify-center gap-1.5 rounded-2xl py-3 text-[12.5px] font-bold transition-opacity hover:opacity-90"
-              style={{ background: accent, color: "#0A0E13" }}
+              className="bento-card card-glow flex flex-col items-start justify-between gap-2 rounded-3xl p-3 pb-2.5 text-left border border-white/[0.16]"
+              style={{ background: `linear-gradient(180deg, ${accent}30, ${accent}12)` }}
             >
-              ➕ Plan Ekle
+              <span className="w-8 h-8 rounded-xl flex items-center justify-center shadow-lg" style={{ background: accent, color: "#0A0E13" }}>
+                <Plus className="w-4 h-4" strokeWidth={2.75} />
+              </span>
+              <span className="text-[11.5px] font-bold text-white leading-tight">Plan Ekle</span>
             </button>
             <button
               onClick={go(onDeletePlan)}
               disabled={!savedPlansCount}
-              className="flex-1 flex items-center justify-center gap-1.5 rounded-2xl py-3 text-[12.5px] font-bold transition-opacity hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none"
-              style={{ background: "rgba(244,64,107,0.12)", color: "#FF6E92", border: "1px solid rgba(244,64,107,0.30)" }}
+              className="bento-card card-glow flex flex-col items-start justify-between gap-2 rounded-3xl p-3 pb-2.5 text-left border border-white/[0.14] disabled:opacity-40 disabled:pointer-events-none"
+              style={{ background: "linear-gradient(180deg, rgba(244,64,107,0.22), rgba(244,64,107,0.08))" }}
             >
-              <Trash2 className="w-3.5 h-3.5" /> Planları Yönet
+              <span className="w-8 h-8 rounded-xl flex items-center justify-center text-white bg-gradient-to-br from-rose-500 to-red-700 shadow-lg shadow-rose-500/30">
+                <Trash2 className="w-4 h-4" strokeWidth={2.5} />
+              </span>
+              <span className="text-[11.5px] font-bold text-white leading-tight">Planları Yönet</span>
             </button>
+          </div>
+
+          {/* Bento grid — kare gezinme kartları */}
+          <div className="grid grid-cols-2 gap-2">
+            {bentoTiles.map((t) => (
+              <BentoTile key={t.key} icon={t.icon} label={t.label} gradient={t.gradient} glow={t.glow} onClick={go(t.onClick)} />
+            ))}
           </div>
 
           {/* Planlarım — birden fazla kayıtlı plan arasında GEÇİŞ (DeletePlanModal
@@ -189,7 +205,8 @@ function DrawerMenu({
             <button
               type="button"
               onClick={go(onOpenPlans)}
-              className="card-glow w-full flex items-center gap-3 rounded-2xl px-4 py-3 bg-white/[0.03] border border-white/10 transition-colors duration-150 active:border-purple-500/50 active:shadow-[0_0_20px_rgba(168,85,247,0.2)]"
+              className="bento-card card-glow w-full flex items-center gap-3 rounded-3xl px-4 py-2.5 border border-white/[0.14]"
+              style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015))" }}
             >
               <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-slate-400 to-slate-600 shadow-lg shadow-slate-500/30 text-white shrink-0">
                 <FolderOpen className="w-4 h-4" strokeWidth={2.5} />
@@ -204,7 +221,8 @@ function DrawerMenu({
             <button
               type="button"
               onClick={go(onOpenProfile)}
-              className="card-glow w-full flex items-center gap-3 rounded-2xl px-4 py-3 bg-white/[0.03] border border-white/10 transition-colors duration-150 active:border-purple-500/50 active:shadow-[0_0_20px_rgba(168,85,247,0.2)]"
+              className="bento-card card-glow w-full flex items-center gap-3 rounded-3xl px-4 py-2.5 border border-white/[0.14]"
+              style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015))" }}
             >
               <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-sky-400 to-indigo-600 shadow-lg shadow-indigo-500/30 text-white shrink-0">
                 <User className="w-4 h-4" strokeWidth={2.5} />

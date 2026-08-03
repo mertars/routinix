@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
-import { LayoutGrid } from "lucide-react";
 import { STAGE_INTRO, STAGE_WIZARD, STAGE_LOADING, STAGE_ERROR, STAGE_PLAN } from "./constants";
 import usePlanStudio from "./usePlanStudio";
 import useAuth from "./useAuth";
@@ -53,6 +52,7 @@ const PomodoroStudio = lazy(() => import("./components/PomodoroStudio"));
 const OnboardingWizard = lazy(() => import("./components/OnboardingWizard"));
 const RhythmStudio = lazy(() => import("./components/RhythmStudio"));
 const CommunityHub = lazy(() => import("./components/CommunityHub"));
+const NexusProfileOverlay = lazy(() => import("./components/community/NexusProfileOverlay"));
 
 export default function App() {
   const auth = useAuth();
@@ -79,7 +79,7 @@ export default function App() {
   const [pomodoroInitialTask, setPomodoroInitialTask] = useState(null);
   const [rhythmOpen, setRhythmOpen] = useState(false);
   const [communityOpen, setCommunityOpen] = useState(false);
-  const [communityInitialProfile, setCommunityInitialProfile] = useState(false);
+  const [nexusProfileOpen, setNexusProfileOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [printRange, setPrintRange] = useState(Infinity);
   // Tek, paylaşılan "auth iste" tetikleyicisi — hem düz "Giriş Yap" tıklamaları
@@ -179,15 +179,13 @@ export default function App() {
     ps.setMenuOpen(false);
     setCommunityOpen(next);
   }, [communityOpen, closeAllPanels, ps.setMenuOpen]);
-  // DrawerMenu'deki "Profil & İstatistikler" şeridi — genel Nexus hub'ı
-  // yerine DOĞRUDAN kullanıcının kendi profil kartını açar (bkz. CommunityHub
-  // `openMyProfileOnMount` prop'u, myProfile yüklenir yüklenmez
-  // `setProfileCardTarget(myProfile)` çağırır).
+  // DrawerMenu'deki "Profil & İstatistikler" kartı — ağır CommunityHub'ı
+  // (tüm şablon feed'i + arama) MONTE ETMEDEN, doğrudan hafif bir tam ekran
+  // profil görünümü açar (bkz. NexusProfileOverlay.jsx).
   const openNexusProfile = useCallback(() => {
     closeAllPanels();
     ps.setMenuOpen(false);
-    setCommunityInitialProfile(true);
-    setCommunityOpen(true);
+    setNexusProfileOpen(true);
   }, [closeAllPanels, ps.setMenuOpen]);
   // Görev kartındaki "Başlat" — Pomodoro Studio'yu bu görev seçiliyken açar
   // (bkz. PomodoroStudio.jsx `initialTask` prop'u). Tam görev objesi TaskCard'dan
@@ -341,18 +339,23 @@ export default function App() {
           onOpenProfile={openNexusProfile}
         />
 
-        {/* Yüzen alt-orta "Menü" dock'u — eski header ☰ butonunun yerini
-            aldı (bkz. Header.jsx). Sheet zaten açıkken gizlenir (kendi ✕
-            kapatma butonu var, altta iki tetikleyici üst üste binmesin). */}
+        {/* Ultra-minimal alt tutamaç — eski header ☰ butonunun VE önceki
+            yüzen "Menü" pilinin yerini aldı. Ekranda görünen tek şey ince,
+            yarı saydam bir iOS-tarzı çizgi; dokunma alanı erişilebilirlik
+            için geniştir ama GÖRSEL olarak sıfıra yakın yer kaplar, altındaki
+            içeriği örtmez (arka planı şeffaf/gradyan, opak bir kutu DEĞİL).
+            Sheet zaten açıkken gizlenir (kendi ✕ kapatma butonu var). */}
         {!ps.menuOpen && (
           <button
             onClick={toggleHamburger}
             aria-label="Menü"
-            className="fixed z-40 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full px-5 py-3 text-[13px] font-bold text-white backdrop-blur-lg bg-black/60 border border-white/15 shadow-[0_8px_30px_-8px_rgba(0,0,0,0.6)] transition-transform active:scale-[0.96]"
-            style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
+            className="fixed inset-x-0 bottom-0 z-40 flex justify-center pt-3"
+            style={{
+              paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))",
+              background: "linear-gradient(to top, rgba(0,0,0,0.28), transparent)",
+            }}
           >
-            <LayoutGrid className="w-4 h-4" strokeWidth={2.5} />
-            Menü
+            <span className="w-10 h-[5px] rounded-full bg-white/45" />
           </button>
         )}
 
@@ -515,15 +518,23 @@ export default function App() {
           kopyalanan planı doğrudan usePlanStudio.openSavedPlan ile açar. */}
       {communityOpen && (
         <Suspense fallback={<OverlayFallback z={100} />}>
-          <CommunityHub
-            open={communityOpen}
+          <CommunityHub open={communityOpen} user={auth.user} onClose={() => setCommunityOpen(false)} onPlanCloned={ps.openSavedPlan} />
+        </Suspense>
+      )}
+
+      {/* "Nexus Profilim" tam ekran overlay — DrawerMenu'nün "Profil &
+          İstatistikler" kartından açılır, ağır CommunityHub'ı hiç monte
+          etmeden yalnızca kimlik/istatistik verisini çeker. */}
+      {nexusProfileOpen && (
+        <Suspense fallback={<OverlayFallback z={110} />}>
+          <NexusProfileOverlay
+            open={nexusProfileOpen}
             user={auth.user}
-            openMyProfileOnMount={communityInitialProfile}
-            onClose={() => {
-              setCommunityOpen(false);
-              setCommunityInitialProfile(false);
+            onClose={() => setNexusProfileOpen(false)}
+            onCreateProfile={() => {
+              setNexusProfileOpen(false);
+              toggleCommunity();
             }}
-            onPlanCloned={ps.openSavedPlan}
           />
         </Suspense>
       )}
