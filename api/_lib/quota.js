@@ -4,7 +4,13 @@ import { getSupabaseAdmin } from "./supabaseAdmin.js";
 // sayaç, kullanıcı DevTools'tan localStorage.clear()/manuel silme ile
 // sıfırlanabildiği için güvensizdi. Artık tek kaynak public.user_quotas
 // tablosu; yalnızca bu dosya (service_role ile) yazabilir.
-export const DAILY_LIMIT = 3;
+//
+// 3 → 100: test/tanıtım aşamasında farklı hesapların günlük hakkı hızla
+// tükenip "kota doldu" ekranına düşmesini engellemek için yükseltildi.
+// Sistem BİLEREK tamamen kaldırılmadı — "Premium'a Geç" teşviki ve
+// maliyet koruması (bir hesabın günde sonsuz Gemini çağrısı yapamaması)
+// olarak yapı aynen duruyor, yalnızca eşik gevşetildi.
+export const DAILY_LIMIT = 100;
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
@@ -51,7 +57,11 @@ export async function consumeOne(userId, isAdmin = false) {
   // Satır yoksa önce oluştur (limit ile).
   await getRemaining(userId);
 
-  const { data, error } = await admin.rpc("decrement_user_quota", { p_user_id: userId, p_date: date });
+  const { data, error } = await admin.rpc("decrement_user_quota", {
+    p_user_id: userId,
+    p_date: date,
+    p_default_limit: DAILY_LIMIT,
+  });
   if (!error && typeof data === "number") return data;
 
   // rpc fonksiyonu henüz kurulmadıysa (bkz. migration.sql) güvenli bir

@@ -139,9 +139,11 @@ export async function createEnrichedPlan(userInput = {}) {
 
   const systemInstruction = `${persona}
 
-ÇOK ÖNEMLİ — TOKEN TASARRUFU: Kullanıcının hedefi uzun vadeli (haftalar/aylar) olsa bile ŞU AN sadece genel rutinleri ve YALNIZCA 1. HAFTANIN (7 gün) görevlerini üret. Sonraki haftalar ayrı isteklerle üretilecek, bu yüzden ileri haftaların görevlerini ÜRETME.
+ÇOK ÖNEMLİ — TOKEN TASARRUFU: Kullanıcının hedefi uzun vadeli (haftalar/aylar) olsa bile ŞU AN sadece genel rutinleri ve YALNIZCA 1. HAFTANIN (7 gün) görevlerini DETAYLI üret. Sonraki haftaların GÖREVLERİ ayrı isteklerle üretilecek, bu yüzden ileri haftaların görev DETAYINI üretme.
 
 TOPLAM SÜRE: Hedefte belirtilen ya da hedefe uygun toplam plan süresini GÜN cinsinden hesapla ve "total_days" olarak ver. Kullanıcı açık bir süre belirttiyse ona sadık kal (örn. "6 gün" → 6, "3 hafta" → 21, "6 ay" → ~180, "1 yıl" → ~365). Belirtmemişse hedefe uygun gerçekçi bir toplam gün sayısı seç. total_days pozitif bir tam sayı olmalı.
+
+HAFTALIK İSKELET (week_topics): total_days'i 7'ye bölüp KAÇ HAFTA olduğunu hesapla (örn. 30 gün → 5 hafta, son hafta eksik günlü olabilir) ve HER hafta için kısa (4-8 kelime) bir konu başlığı üret — bu, planın BAŞTAN SONA kaba bir yol haritası/taslağıdır, sonraki haftalar üretilirken tutarlılığı korumak için kullanılacak. week_topics[0], first_week_tasks'ın GERÇEKTE işlediği konuyla uyumlu olmalı (birbirini yalanlamasın). Bu yalnızca kısa başlıklardır, DETAY İÇERMEZ — token maliyeti ihmal edilebilir düzeyde.
 
 ${taskFieldGuide(category)}
 
@@ -151,36 +153,54 @@ Yanıtın SADECE ve KESİNLİKLE aşağıdaki JSON yapısında olmalı, şema d�
   "plan_summary": "planın 1-2 cümlelik özeti ve genel stratejisi (sonraki haftalar bu özete göre üretilecek)",
   "category": "${category}",
   "total_days": 30,
+  "week_topics": ["1. hafta konu başlığı", "2. hafta konu başlığı", "..."],
   "routines": ["genel rutin/prensip 1", "..."],
   "first_week_tasks": [
     { "day": 1, "title": "günün teması", "tasks": [ { } ] }
   ]
 }
-first_week_tasks, total_days 7'den küçükse tam olarak total_days kadar gün; değilse tam olarak 7 gün (day 1..7) içermeli. Dinlenme günleri de bir gündür (fitness'ta boş bırakma, "dinlenme" görevi ver).`;
+first_week_tasks, total_days 7'den küçükse tam olarak total_days kadar gün; değilse tam olarak 7 gün (day 1..7) içermeli. Dinlenme günleri de bir gündür (fitness'ta boş bırakma, "dinlenme" görevi ver). week_topics dizisinin eleman sayısı, total_days'ten hesapladığın toplam hafta sayısına eşit olmalı.`;
 
-  const userPrompt = `${describeUserInput(userInput)}\n\nYukarıdaki bilgilere göre planın toplam süresini (total_days), genel rutinlerini ve 1. haftasını üret.`;
+  const userPrompt = `${describeUserInput(userInput)}\n\nYukarıdaki bilgilere göre planın toplam süresini (total_days), tüm planın haftalık iskeletini (week_topics), genel rutinlerini ve 1. haftasının detayını üret.`;
 
   const parsed = await runJson(systemInstruction, userPrompt, "Plan oluşturma");
   if (!parsed?.plan_title || !Array.isArray(parsed?.first_week_tasks)) {
     throw new Error("Yapay zeka yanıtında beklenen plan alanları eksik.");
   }
+  // week_topics OPSİYONEL kabul edilir (model bazen atlayabilir) — eksikse
+  // sessizce boş dizi bırakılır, YENİ akış BOZULMAZ: fetchNextWeekTasks zaten
+  // week_topics'i "varsa kullan" mantığıyla ele alıyor (bkz. aşağısı).
+  parsed.week_topics = Array.isArray(parsed?.week_topics) ? parsed.week_topics.map((t) => String(t || "").trim()).filter(Boolean) : [];
   return parsed;
 }
 
 // ---------------------------------------------------------------------------
 // 2) Sonraki hafta — SADECE hedef haftanın görevleri (lazy load devamı)
 // ---------------------------------------------------------------------------
-export async function fetchNextWeekTasks({ planTitle, planSummary, mode, targetWeekNumber } = {}) {
+// weekTopic / lastTaskTitle: OPSİYONEL devamlılık bağlamı (bkz. plans.week_topics
+// sütunu + usePlanStudio.js loadNextWeek). İKİSİ DE undefined/null olabilir —
+// bu, "week_topics'i olmayan ESKİ bir plan" ya da bu alanı henüz göndermeyen
+// bir client anlamına gelir; bu durumda prompt AŞAĞIDAKİ satırları hiç
+// içermez ve fonksiyon TAM OLARAK eskisi gibi (bu alanlar hiç eklenmemiş
+// gibi) davranır — GERİYE DÖNÜK UYUMLULUK burada garanti edilir.
+export async function fetchNextWeekTasks({ planTitle, planSummary, mode, targetWeekNumber, weekTopic, lastTaskTitle } = {}) {
   const category = mode || "general";
   const persona = personaFor(category);
   const week = Number(targetWeekNumber) || 1;
   const startDay = (week - 1) * 7 + 1;
   const endDay = startDay + 6;
 
+  const continuityLines = [
+    weekTopic ? `Bu haftanın planın BAŞINDA belirlenen taslak konusu: "${weekTopic}" — görevler bu temaya sadık kalsın, konu dışına çıkma.` : "",
+    lastTaskTitle ? `Önceki hafta EN SON şu konu/görevle bitti: "${lastTaskTitle}". Bu haftaya DOĞRUDAN buradan devam ederek başla — aynı konuyu tekrar etme, konuyu atlayıp ileri gitme.` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
   const systemInstruction = `${persona}
 
 ÇOK ÖNEMLİ — TOKEN TASARRUFU: Sana planın SADECE başlığı ve genel özeti veriliyor; tüm plan geçmişi değil. Görevin YALNIZCA ${week}. haftanın (gün ${startDay}..${endDay}, toplam 7 gün) görevlerini üretmek. Başka hafta ÜRETME. Bu hafta, planın genel akışında ${week}. haftaya denk gelen mantıklı bir ilerleme/zorluk seviyesinde olmalı (önceki haftaların üzerine ekleyen, tekrar etmeyen bir tempo).
-
+${continuityLines ? `\n${continuityLines}\n` : ""}
 ${taskFieldGuide(category)}
 
 Yanıtın SADECE ve KESİNLİKLE şu JSON yapısında olmalı, şema dışına hiçbir metin ekleme. Tüm metinler Türkçe olmalı:

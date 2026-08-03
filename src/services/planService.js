@@ -84,6 +84,10 @@ export async function savePlanToSupabase(aiOutput, userId, mode) {
       title: (aiOutput.plan_title ?? aiOutput.title ?? "").toString().trim() || "İsimsiz Plan",
       summary: aiOutput.plan_summary ?? aiOutput.summary ?? null,
       total_days: Number.isFinite(Number(aiOutput.total_days)) ? Number(aiOutput.total_days) : null,
+      // Haftalık iskelet (bkz. api/_lib/planPrompt.js) — OPSİYONEL: model
+      // üretmediyse/eski bir çağrıdan geldiyse null kalır, sonraki hafta
+      // üretimi (loadNextWeek) bunu zaten "varsa kullan" mantığıyla ele alır.
+      week_topics: Array.isArray(aiOutput.week_topics) && aiOutput.week_topics.length > 0 ? aiOutput.week_topics : null,
     })
     .select()
     .single();

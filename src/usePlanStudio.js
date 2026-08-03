@@ -230,10 +230,21 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   }, [user, onRequireAuth, questions, answers, extraNote, category, goal, templateDaysOverride, refreshSavedPlans]);
 
   // ---- LAZY LOAD: sonraki haftayı üret + kaydet + ekle ----
+  // Devamlılık bağlamı (OPSİYONEL, geriye dönük uyumlu): `weekTopic`,
+  // planın oluşturulduğu anda üretilen haftalık iskeletten (plans.week_topics
+  // — bkz. supabase/plan_week_topics.sql) hedef haftanın taslak konusunu
+  // çeker; `lastTaskTitle`, zaten client'ta elde olan `weeks` state'inden
+  // (EK bir DB sorgusu GEREKMEZ) az önce biten haftanın SON görevinin
+  // başlığını alır. İkisi de yoksa (eski bir plan, week_topics NULL) `undefined`
+  // kalır — planPrompt.js bu durumda promptu HİÇ değiştirmez.
   const loadNextWeek = useCallback(async () => {
     if (!dbPlan || loadingNextWeek) return;
     const maxWeek = weeks.reduce((m, w) => Math.max(m, w.weekNumber), 0);
     const targetWeekNumber = maxWeek + 1;
+    const weekTopic = dbPlan.week_topics?.[targetWeekNumber - 1] || undefined;
+    const lastWeek = weeks.find((w) => w.weekNumber === maxWeek);
+    const lastDay = lastWeek?.days?.[lastWeek.days.length - 1];
+    const lastTaskTitle = lastDay?.tasks?.[lastDay.tasks.length - 1]?.title || undefined;
     setNextWeekError("");
     setLoadingNextWeek(true);
     try {
@@ -242,6 +253,8 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
         planSummary: dbPlan.summary,
         mode: dbPlan.mode,
         targetWeekNumber,
+        weekTopic,
+        lastTaskTitle,
       });
       const rows = await saveWeekTasks(dbPlan.id, user.id, targetWeekNumber, week_tasks);
       setWeeks((prev) => [...prev, ...groupTasksToWeeks(rows)]);
