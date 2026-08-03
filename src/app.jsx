@@ -339,23 +339,29 @@ export default function App() {
           onOpenProfile={openNexusProfile}
         />
 
-        {/* Ultra-minimal alt tutamaç — eski header ☰ butonunun VE önceki
-            yüzen "Menü" pilinin yerini aldı. Ekranda görünen tek şey ince,
-            yarı saydam bir iOS-tarzı çizgi; dokunma alanı erişilebilirlik
-            için geniştir ama GÖRSEL olarak sıfıra yakın yer kaplar, altındaki
-            içeriği örtmez (arka planı şeffaf/gradyan, opak bir kutu DEĞİL).
-            Sheet zaten açıkken gizlenir (kendi ✕ kapatma butonu var). */}
+        {/* Yüzen cam kapsül — eski header ☰ butonunun VE önceki (fazla
+            görünmez kalan) ince tutamaç çizgisinin yerini aldı. Tema-uyumlu
+            (--glass-rgb/--modal-border/--text-primary — hardcoded siyah/beyaz
+            YOK), tıklanabilir olduğu belli ama içeriği örtmeyecek kadar
+            kompakt. Sheet zaten açıkken gizlenir (kendi ✕ kapatma butonu var). */}
         {!ps.menuOpen && (
           <button
             onClick={toggleHamburger}
             aria-label="Menü"
-            className="fixed inset-x-0 bottom-0 z-40 flex justify-center pt-3"
+            className="fixed z-40 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full pl-3.5 pr-4 py-2.5 backdrop-blur-md transition-transform active:scale-95"
             style={{
-              paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))",
-              background: "linear-gradient(to top, rgba(0,0,0,0.28), transparent)",
+              bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
+              background: "rgba(var(--glass-rgb), var(--alpha-modal))",
+              border: "1px solid var(--modal-border)",
+              boxShadow: "0 10px 30px -12px rgba(0,0,0,0.4)",
             }}
           >
-            <span className="w-10 h-[5px] rounded-full bg-white/45" />
+            <span className="text-[15px] leading-none" style={{ color: mode.accent, textShadow: `0 0 10px ${mode.accent}99` }}>
+              ✦
+            </span>
+            <span className="text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
+              Menü
+            </span>
           </button>
         )}
 
