@@ -1,6 +1,34 @@
 import { memo } from "react";
-import { Timer, BarChart3, Users2 } from "lucide-react";
+import { Timer, BarChart3, Users2, ChevronDown, X } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+
+// Header'ın tam ortasındaki "Menü" tetikleyicisi — aşağı bakan, art arda
+// nabız gibi atan iki mikro ok (bkz. GlobalStyles.jsx .menu-trigger-chevron)
+// + mor/siyan neon `drop-shadow` ışıltısı. Panel açıkken oklar "X"e döner.
+// Framer Motion BİLEREK kullanılmadı (bkz. GlobalStyles.jsx yorumu) — Header
+// koşulsuz kök bileşen, saf CSS aynı hissi sıfır bundle maliyetiyle verir.
+function MenuTrigger({ open, onToggle }) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={open ? "Menüyü kapat" : "Menüyü aç"}
+      aria-expanded={open}
+      className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 px-2 py-1"
+    >
+      <span className="text-[10.5px] font-bold uppercase tracking-[0.05em]" style={{ color: "var(--text-secondary)" }}>
+        Menü
+      </span>
+      {open ? (
+        <X className="w-3.5 h-3.5" style={{ color: "#B26BFF", filter: "drop-shadow(0 0 8px rgba(168,85,247,0.6))" }} />
+      ) : (
+        <span className="flex flex-col items-center -space-y-1.5" style={{ filter: "drop-shadow(0 0 8px rgba(168,85,247,0.6)) drop-shadow(0 0 6px rgba(34,211,238,0.4))" }}>
+          <ChevronDown className="menu-trigger-chevron w-3.5 h-3.5" style={{ color: "#B26BFF" }} strokeWidth={2.5} />
+          <ChevronDown className="menu-trigger-chevron w-3.5 h-3.5" style={{ color: "#22D3EE" }} strokeWidth={2.5} />
+        </span>
+      )}
+    </button>
+  );
+}
 
 // ☀️/🌙 Animasyonlu tema değiştirici — güneş/ay ikonu kayarak/dönerek geçiş yapar.
 function ThemeToggle() {
@@ -56,6 +84,8 @@ function Header({
   onAuthClick,
   onSignOut,
   onLogoClick,
+  menuOpen,
+  onMenuToggle,
 }) {
   return (
     // Kroma (arka plan/blur/alt çizgi) TAM GENİŞLİKTE — geniş masaüstü
@@ -67,7 +97,9 @@ function Header({
       className="sticky top-0 z-20 backdrop-blur-md"
       style={{ background: "rgba(var(--glass-rgb), var(--alpha-chrome))", borderBottom: "1px solid var(--border-header)" }}
     >
-      <header className="flex items-center justify-between gap-3 px-4 md:px-6 py-3.5 max-w-7xl mx-auto w-full">
+      <header className="relative flex items-center justify-between gap-3 px-4 md:px-6 py-3.5 max-w-7xl mx-auto w-full">
+        <MenuTrigger open={menuOpen} onToggle={onMenuToggle} />
+
         {/* Logo + marka yazısı: Ana Sayfa'ya döner, basılınca hafifçe küçülür */}
         <button
           onClick={onLogoClick}

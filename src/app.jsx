@@ -320,6 +320,8 @@ export default function App() {
           onAuthClick={openAuth}
           onSignOut={requestSignOut}
           onLogoClick={onLogoClick}
+          menuOpen={ps.menuOpen}
+          onMenuToggle={toggleHamburger}
         />
 
         <DrawerMenu
@@ -327,6 +329,7 @@ export default function App() {
           onClose={closeHamburger}
           accent={mode.accent}
           user={auth.user}
+          planGoal={ps.dbPlan?.summary}
           savedPlansCount={ps.savedPlans.length}
           onNewPlan={ps.startNewPlan}
           onDeletePlan={onDeletePlan}
@@ -339,32 +342,6 @@ export default function App() {
           onOpenPomodoro={togglePomodoro}
           onOpenProfile={openNexusProfile}
         />
-
-        {/* Yüzen cam kapsül — eski header ☰ butonunun VE önceki (fazla
-            görünmez kalan) ince tutamaç çizgisinin yerini aldı. Tema-uyumlu
-            (--glass-rgb/--modal-border/--text-primary — hardcoded siyah/beyaz
-            YOK), tıklanabilir olduğu belli ama içeriği örtmeyecek kadar
-            kompakt. Sheet zaten açıkken gizlenir (kendi ✕ kapatma butonu var). */}
-        {!ps.menuOpen && (
-          <button
-            onClick={toggleHamburger}
-            aria-label="Menü"
-            className="fixed z-40 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full pl-3.5 pr-4 py-2.5 backdrop-blur-md transition-transform active:scale-95"
-            style={{
-              bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
-              background: "rgba(var(--glass-rgb), var(--alpha-modal))",
-              border: "1px solid var(--modal-border)",
-              boxShadow: "0 10px 30px -12px rgba(0,0,0,0.4)",
-            }}
-          >
-            <span className="text-[15px] leading-none" style={{ color: mode.accent, textShadow: `0 0 10px ${mode.accent}99` }}>
-              ✦
-            </span>
-            <span className="text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
-              Menü
-            </span>
-          </button>
-        )}
 
         <main
           className={`flex-1 min-h-0 w-full mx-auto ${

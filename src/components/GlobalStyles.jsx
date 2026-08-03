@@ -23,14 +23,6 @@ export default function GlobalStyles() {
         from { transform: translateY(100%); }
         to { transform: translateY(0); }
       }
-      /* DrawerMenu.jsx (Bento Bottom Sheet) açılış — hafif "geri tepen" (spring)
-         hissi için taşmalı (overshoot) bir bezier eğrisi kullanılır, düz
-         ease-out DEĞİL. cubic-bezier(0.34,1.56,0.64,1) klasik bir "back-out"
-         yaklaşıklamasıdır: eğri 1.0'ı geçici olarak aşıp geri döner. */
-      @keyframes bentoSheetIn {
-        from { transform: translateY(100%); }
-        to { transform: translateY(0); }
-      }
       /* NexusProfileOverlay.jsx — Bento menüsündeki "Profil & İstatistikler"
          kartından TAM EKRANA "büyüyerek akan" his: menü kapanırken bu overlay
          hafif küçük/soluk başlayıp tam boyuta gelir (gerçek shared-element/FLIP
@@ -73,34 +65,37 @@ export default function GlobalStyles() {
       .focus-sheet { animation: slideUpSheet 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
       .day-reveal { animation: dayReveal 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
 
-      /* --- DrawerMenu.jsx: mobilde alttan yukarı yaylı (spring) açılan Bento
-         Bottom Sheet, md'den itibaren sağdan kayan ince bir yan panele
-         dönüşür (FocusSidePanel/TaskDrawer ile AYNI duyarlı desen) — masaüstü
-         kullanımı (hesap/ayarlar erişimi, ☰ her ekran boyutunda görünür)
-         bozulmaz, yalnızca mobildeki eski "demode hamburger" hissi değişir. */
-      .bento-sheet {
+      /* --- DrawerMenu.jsx: "Top-Down Glass Sheet" — Header'ın ortasındaki
+         nöron tetikleyiciden aşağı doğru süzülür (bkz. topSheetIn), tüm ekran
+         boyutlarında AYNI davranış (bu tur artık mobil/masaüstü ayrımı yok —
+         tetikleyici zaten header'da, üstten açılmak her boyutta tutarlı). */
+      @keyframes topSheetIn {
+        from { transform: translateY(-100%); }
+        to { transform: translateY(0); }
+      }
+      .top-sheet {
         position: fixed;
+        top: 0;
         left: 0;
         right: 0;
-        bottom: 0;
         max-height: 86vh;
-        border-radius: 2.25rem 2.25rem 0 0;
-        animation: bentoSheetIn 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+        border-radius: 0 0 2.25rem 2.25rem;
+        animation: topSheetIn 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
       }
-      @media (min-width: 768px) {
-        .bento-sheet {
-          left: auto;
-          top: 0;
-          bottom: 0;
-          right: 0;
-          height: 100%;
-          max-height: none;
-          width: 360px;
-          border-radius: 0;
-          animation: slideInDrawer 0.28s cubic-bezier(0.32, 0.72, 0, 1);
-        }
-        .bento-sheet .bento-drag-handle { display: none; }
+
+      /* --- Header.jsx: ortadaki "Menü" tetikleyicisinin aşağı bakan,
+         art arda (staggered) nabız gibi atan mikro ok animasyonu. Framer
+         Motion BİLEREK kullanılmadı — Header her sayfada koşulsuz monte
+         edilen bir kök bileşen, framer-motion'ı oraya eklemek TÜM
+         kullanıcılar için ana paketi şişirirdi (bkz. MobileActionDeck.jsx'te
+         zaten lazy-load edilen aynı kütüphane). Saf CSS aynı "nabız" hissini
+         sıfır bundle maliyetiyle veriyor. */
+      @keyframes chevronPulse {
+        0%, 100% { transform: translateY(0); opacity: 0.45; }
+        50% { transform: translateY(3px); opacity: 1; }
       }
+      .menu-trigger-chevron { animation: chevronPulse 1.3s ease-in-out infinite; }
+      .menu-trigger-chevron:nth-child(2) { animation-delay: 0.18s; }
 
       .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
       .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -497,8 +492,9 @@ export default function GlobalStyles() {
 
       @media (prefers-reduced-motion: reduce) {
         .motion-safe\\:animate-spin { animation: none !important; }
-        .drawer-panel, .drawer-panel-left, .focus-sheet, .focus-panel, .task-sheet, .bento-sheet, .pomo-tabbar, .day-reveal, .neon-strip, .pop-in, .chip-fill-pulse, .check-glow { animation: none !important; }
+        .drawer-panel, .drawer-panel-left, .focus-sheet, .focus-panel, .task-sheet, .top-sheet, .pomo-tabbar, .day-reveal, .neon-strip, .pop-in, .chip-fill-pulse, .check-glow { animation: none !important; }
         .full-screen-in { animation: none !important; }
+        .menu-trigger-chevron { animation: none !important; }
         .bg-blob--violet, .bg-blob--orange { animation: none !important; }
         .accordion-body { transition: none !important; }
       }

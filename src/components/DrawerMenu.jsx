@@ -1,26 +1,24 @@
-import { memo, useState, useEffect, useMemo } from "react";
-import { Repeat2, Compass, ListChecks, Users2, Timer, BarChart3, User, FolderOpen, ChevronRight, X, Trash2, Plus } from "lucide-react";
+import { memo } from "react";
+import { Repeat2, Compass, ListChecks, Users2, Timer, BarChart3, User, FolderOpen, ChevronRight, Trash2, Plus, Target } from "lucide-react";
 import { MONO_FONT } from "../constants";
-import { fetchDashboardData } from "../services/planService";
-import { isRoutineChecked } from "../utils/routineCheckin";
 
 // Nötr Bento kartı (gezinme kareleri + Planlarım/Profil şeritleri) — arka
-// plan/kenarlık `--overlay-rgb` token'ı üzerinden kurulur: koyu temada bu
-// token BEYAZ (255,255,255), açık temada KOYU LACİVERT (15,23,42) — yani
-// AYNI `rgba(var(--overlay-rgb), 0.05)` ifadesi iki temada da otomatik
-// doğru yönde ince bir "overlay" tonu üretir (bkz. index.css :root /
-// :root[data-theme="light"]). Hardcoded `bg-white/[0.03]` gibi bir değer
-// açık temada TAMAMEN yanlış yöne (neredeyse görünmez) giderdi.
+// plan `--overlay-rgb` token'ı üzerinden (koyu temada beyaz, açık temada
+// koyu lacivert baz — bkz. index.css), kenarlık ise BİLİNÇLİ olarak gerçek
+// Tailwind `dark:` varyantı: açık temada hafif MOR marka tonu, koyu temada
+// nötr beyaz. (@custom-variant dark index.css'te .dark sınıfına bağlı,
+// index.html'in anti-flash script'i <html>'e hem .dark hem data-theme
+// ekliyor — yani `dark:` sınıfları bu projede GERÇEKTEN çalışıyor.)
 const CARD_BG = "rgba(var(--overlay-rgb), 0.05)";
-const CARD_BORDER = "1px solid rgba(var(--overlay-rgb), 0.12)";
+const CARD_BORDER_CLASS = "border border-purple-500/30 dark:border-white/10";
 
 function BentoTile({ icon, label, gradient, glow, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="bento-card card-glow group relative flex flex-col items-start justify-between gap-2 rounded-3xl p-3 pb-2.5 text-left"
-      style={{ background: CARD_BG, border: CARD_BORDER }}
+      className={`bento-card card-glow group relative flex flex-col items-start justify-between gap-2 rounded-3xl p-3 pb-2.5 text-left ${CARD_BORDER_CLASS}`}
+      style={{ background: CARD_BG }}
     >
       <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-white bg-gradient-to-br ${gradient} shadow-lg ${glow}`}>
         {icon}
@@ -37,8 +35,8 @@ function BentoStrip({ icon, iconGradient, iconGlow, label, trailing, onClick }) 
     <button
       type="button"
       onClick={onClick}
-      className="bento-card card-glow w-full flex items-center gap-3 rounded-3xl px-4 py-2.5"
-      style={{ background: CARD_BG, border: CARD_BORDER }}
+      className={`bento-card card-glow w-full flex items-center gap-3 rounded-3xl px-4 py-2.5 ${CARD_BORDER_CLASS}`}
+      style={{ background: CARD_BG }}
     >
       <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-white bg-gradient-to-br ${iconGradient} shadow-lg ${iconGlow} shrink-0`}>
         {icon}
@@ -52,30 +50,33 @@ function BentoStrip({ icon, iconGradient, iconGlow, label, trailing, onClick }) 
   );
 }
 
-// "Hibrit Bento Bottom Sheet" — mobilde alttan yaylı (spring) açılan gezinme
-// paneli (bkz. GlobalStyles.jsx .bento-sheet — md'den itibaren ince bir sağ
-// panele dönüşür). Açılış app.jsx'teki yüzen cam kapsül tetikleyiciden gelir.
+// "Top Bar Neon Trigger & Top-Down Glass Sheet" — Header.jsx'in tam
+// ortasındaki nabız gibi atan ok tetikleyiciden (bkz. Header.jsx
+// MenuTrigger) aşağı doğru süzülerek açılır (bkz. GlobalStyles.jsx
+// .top-sheet). Kapatma AYNI tetikleyiciye tekrar dokunarak (ok ↔ X
+// morph'u) YA DA arka plana dokunarak olur.
 //
-// TEMA: sheet'in kendisi + nötr kartlar TAMAMEN `--glass-rgb`/`--overlay-rgb`/
-// `--text-*` token'larıyla kurulur (bkz. index.css) — hiçbir yerde hardcoded
-// `bg-black`/`text-white` yok. Yalnızca 3 "hero-tier" kart (Günün İlerlemesi,
-// Plan Ekle, Planları Yönet) BİLİNÇLİ olarak kendi katı/opak canlı gradyan
-// zeminini taşır (temaya göre DEĞİL) — sebebi: bu kartlar açık temada
-// sayfanın beyaz zemininin üzerine oturan YARI SAYDAM bir renk katmanı
-// olsaydı (ör. %12 opaklıkta mor), rengi solup üzerindeki beyaz metnin
-// kontrastı açık temada çökerdi. Katı/opak bir renk bloğu bu sorunu temaya
-// bakılmaksızın kökten çözer.
+// TEMA: sheet zemini + kartlar TAMAMEN tema token'ları / gerçek `dark:`
+// varyantlarıyla kurulur — hiçbir yerde hardcoded `bg-black`/`text-white`
+// yok. Yalnızca 2 "hero-tier" aksiyon kartı (Plan Ekle, Planları Yönet)
+// BİLİNÇLİ olarak katı/opak canlı gradyan taşır (temaya göre DEĞİL) — açık
+// temada yarı saydam bir renk katmanı solup üzerindeki beyaz metnin
+// kontrastını çökertirdi; katı bir renk bloğu bunu temaya bakılmaksızın
+// kökten çözer.
 //
-// "Günün İlerlemesi" GERÇEK veriyle çalışır: rutin check-in'leri sunucuda
-// tarih-bazlı SAKLANMIYOR (bkz. utils/routineCheckin.js — bilinçli olarak
-// yalnızca localStorage, günün tarihine göre anahtarlı). Bu yüzden çok
-// günlü bir "seri/streak" sayacı GERÇEK bir veriye dayanamaz — sahte bir
-// rakam göstermek yerine bugünün GERÇEK tamamlanma yüzdesini gösteriyoruz.
+// Not: eski "Günün İlerlemesi" hero'su BİLİNÇLİ olarak kaldırıldı — hem bu
+// menüde hem MobileActionDeck.jsx'te aynı veriyi göstermek gereksiz
+// tekrardı; onun yerini burada, istenen "Hedef Odak Kutusu" aldı (gerçek
+// `planGoal` — plans.summary; uydurma bir "günlük not" özelliği DEĞİL).
+// Gezinme grid'i + Planlarım şeridi bilerek KORUNDU (kullanıcı yeni içerik
+// listesinde yer vermese de, mobilde bunlara başka bir erişim yolu yok —
+// sessizce kaldırmak gerçek bir işlev kaybı olurdu).
 function DrawerMenu({
   open,
   onClose,
   accent,
   user,
+  planGoal,
   savedPlansCount,
   onNewPlan,
   onDeletePlan,
@@ -88,28 +89,6 @@ function DrawerMenu({
   onOpenPomodoro,
   onOpenProfile,
 }) {
-  const [todayRoutines, setTodayRoutines] = useState(null);
-
-  useEffect(() => {
-    if (!open || !user) {
-      setTodayRoutines(null);
-      return;
-    }
-    let cancelled = false;
-    fetchDashboardData(user.id)
-      .then((plans) => !cancelled && setTodayRoutines(plans.flatMap((p) => p.routines || [])))
-      .catch(() => !cancelled && setTodayRoutines([]));
-    return () => {
-      cancelled = true;
-    };
-  }, [open, user]);
-
-  const { doneCount, totalCount, todayPct } = useMemo(() => {
-    const list = todayRoutines || [];
-    const done = list.filter((r) => isRoutineChecked(r.id)).length;
-    return { doneCount: done, totalCount: list.length, todayPct: list.length > 0 ? Math.round((done / list.length) * 100) : 0 };
-  }, [todayRoutines]);
-
   if (!open) return null;
 
   const go = (fn) => () => {
@@ -129,65 +108,27 @@ function DrawerMenu({
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease]" onClick={onClose} />
-      <div
-        className="bento-sheet blur-cap-mobile fixed z-50 flex flex-col backdrop-blur-2xl no-scrollbar"
-        style={{
-          background: "rgba(var(--glass-rgb), var(--alpha-modal))",
-          border: "1px solid var(--modal-border)",
-          boxShadow: "0 -24px 60px -24px rgba(0,0,0,0.45)",
-        }}
-      >
+      <div className="top-sheet blur-cap-mobile z-50 flex flex-col backdrop-blur-2xl bg-white/90 dark:bg-[#0c0d12]/90 border-b border-purple-500/20 shadow-2xl no-scrollbar">
         <div className="neon-strip" />
 
-        <div className="relative shrink-0">
-          {/* Çekme çizgisi — yalnızca mobil bottom-sheet halinde (bkz. .bento-sheet md:hidden override) */}
-          <div className="bento-drag-handle flex justify-center pt-3 pb-1">
-            <div className="w-10 h-1.5 rounded-full" style={{ background: "rgba(var(--overlay-rgb),0.2)" }} />
+        <div className="max-w-2xl mx-auto w-full flex-1 overflow-y-auto no-scrollbar px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-[calc(env(safe-area-inset-top)+14px)] flex flex-col gap-2.5">
+          {/* Hedef Odak Kutusu — gerçek plan hedefi, neon yan ışıltılı cam kutu */}
+          <div
+            className="rounded-2xl p-3.5 backdrop-blur-md"
+            style={{
+              background: "rgba(var(--overlay-rgb),0.045)",
+              boxShadow: "-6px 0 18px -6px rgba(178,107,255,0.4), 6px 0 18px -6px rgba(34,211,238,0.35), 0 0 0 1px rgba(178,107,255,0.3)",
+            }}
+          >
+            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--text-faint)" }}>
+              <Target className="w-3 h-3" /> Bugünkü Odak Noktan
+            </p>
+            <p className="mt-1 text-[13px] font-semibold leading-relaxed line-clamp-2" style={{ color: "var(--text-primary)" }}>
+              {planGoal || "Henüz bir hedef belirlenmedi — yeni bir plan başlat."}
+            </p>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Kapat"
-            className="absolute top-2.5 right-3 w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
-            style={{ background: "rgba(var(--overlay-rgb),0.06)", color: "var(--text-muted)" }}
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
 
-        <div className="flex-1 overflow-y-auto no-scrollbar px-4 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-1.5 flex flex-col gap-2">
-          {/* Günün İlerlemesi — gerçek rutin check-in verisiyle, katı mor/indigo zemin */}
-          <button
-            type="button"
-            onClick={go(onOpenRoutines)}
-            className="bento-card card-glow w-full text-left rounded-3xl p-4 relative overflow-hidden text-white"
-            style={{ background: "linear-gradient(135deg, #7C3AED 0%, #6366F1 100%)", border: "1px solid rgba(255,255,255,0.18)" }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-[0.08em] px-2 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.18)", color: "#F3E8FF" }}>
-                ☀️ Günün İlerlemesi
-              </span>
-              {totalCount > 0 && (
-                <span className="flex items-center gap-1 text-[11px] font-bold" style={{ color: todayPct === 100 ? "#B9F8CF" : "#F3E8FF", fontFamily: MONO_FONT }}>
-                  {todayPct === 100 ? "🔥 Bugün Tamamlandı!" : `${doneCount}/${totalCount} rutin`}
-                </span>
-              )}
-            </div>
-            {totalCount > 0 ? (
-              <>
-                <div className="mt-2.5 text-[22px] font-black leading-none" style={{ fontFamily: MONO_FONT }}>
-                  %{todayPct} <span className="text-[12px] font-bold text-purple-100/80">Tamamlandı</span>
-                </div>
-                <div className="mt-2.5 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.16)" }}>
-                  <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${todayPct}%`, background: "#ffffff" }} />
-                </div>
-              </>
-            ) : (
-              <div className="mt-2.5 text-[13px] font-bold">{user ? "Henüz rutin eklenmedi" : "Giriş yapılmadı"}</div>
-            )}
-          </button>
-
-          {/* Direkt aksiyonlar — büyük, dolgun, katı renkli premium kartlar
-              (eski "Ayarlar" akordeonu/toggle'ları bilerek kaldırıldı). */}
+          {/* Büyük aksiyon kartları — katı/opak, temadan bağımsız kontrast */}
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={go(onNewPlan)}
@@ -214,7 +155,7 @@ function DrawerMenu({
             </button>
           </div>
 
-          {/* Bento grid — kare gezinme kartları */}
+          {/* Bento grid — kare gezinme kartları (korundu, bkz. dosya başı notu) */}
           <div className="grid grid-cols-2 gap-2">
             {bentoTiles.map((t) => (
               <BentoTile key={t.key} icon={t.icon} label={t.label} gradient={t.gradient} glow={t.glow} onClick={go(t.onClick)} />
@@ -233,13 +174,13 @@ function DrawerMenu({
             />
           )}
 
-          {/* Profil & İstatistikler — doğrudan kendi Nexus profiline açılır */}
+          {/* Nexus Profil — doğrudan kendi Nexus profiline açılır */}
           {user && (
             <BentoStrip
               icon={<User className="w-4 h-4" strokeWidth={2.5} />}
               iconGradient="from-sky-400 to-indigo-600"
               iconGlow="shadow-indigo-500/30"
-              label="Profil & İstatistikler"
+              label="Nexus Profilim"
               trailing={
                 <span className="text-[10.5px] font-semibold shrink-0 truncate max-w-[70px]" style={{ color: "var(--text-muted)", fontFamily: MONO_FONT }}>
                   {savedPlansCount} plan
