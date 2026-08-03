@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { LayoutGrid } from "lucide-react";
 import { STAGE_INTRO, STAGE_WIZARD, STAGE_LOADING, STAGE_ERROR, STAGE_PLAN } from "./constants";
 import usePlanStudio from "./usePlanStudio";
 import useAuth from "./useAuth";
@@ -78,6 +79,7 @@ export default function App() {
   const [pomodoroInitialTask, setPomodoroInitialTask] = useState(null);
   const [rhythmOpen, setRhythmOpen] = useState(false);
   const [communityOpen, setCommunityOpen] = useState(false);
+  const [communityInitialProfile, setCommunityInitialProfile] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [printRange, setPrintRange] = useState(Infinity);
   // Tek, paylaşılan "auth iste" tetikleyicisi — hem düz "Giriş Yap" tıklamaları
@@ -177,6 +179,16 @@ export default function App() {
     ps.setMenuOpen(false);
     setCommunityOpen(next);
   }, [communityOpen, closeAllPanels, ps.setMenuOpen]);
+  // DrawerMenu'deki "Profil & İstatistikler" şeridi — genel Nexus hub'ı
+  // yerine DOĞRUDAN kullanıcının kendi profil kartını açar (bkz. CommunityHub
+  // `openMyProfileOnMount` prop'u, myProfile yüklenir yüklenmez
+  // `setProfileCardTarget(myProfile)` çağırır).
+  const openNexusProfile = useCallback(() => {
+    closeAllPanels();
+    ps.setMenuOpen(false);
+    setCommunityInitialProfile(true);
+    setCommunityOpen(true);
+  }, [closeAllPanels, ps.setMenuOpen]);
   // Görev kartındaki "Başlat" — Pomodoro Studio'yu bu görev seçiliyken açar
   // (bkz. PomodoroStudio.jsx `initialTask` prop'u). Tam görev objesi TaskCard'dan
   // geldiği için PomodoroStudio kendi başına ayrı bir plan/görev fetch'i
@@ -220,15 +232,9 @@ export default function App() {
     ps.setMenuOpen(false);
     ps.resetToIntro();
   }, [closeAllPanels, ps.setMenuOpen, ps.resetToIntro]);
-  const onToggleReminders = useCallback(() => ps.setRemindersOn((v) => !v), [ps.setRemindersOn]);
-  const onToggleHaptics = useCallback(() => ps.setHapticsOn((v) => !v), [ps.setHapticsOn]);
   const onDeletePlan = useCallback(() => {
     ps.setMenuOpen(false);
     setDeleteOpen(true);
-  }, [ps.setMenuOpen]);
-  const onDrawerSignOut = useCallback(() => {
-    ps.setMenuOpen(false);
-    setLogoutConfirmOpen(true);
   }, [ps.setMenuOpen]);
 
   // Giriş/Kayıt modalı JSX'i TEK yerde tanımlanır — hem normal uygulama
@@ -314,7 +320,6 @@ export default function App() {
           onPomodoroClick={togglePomodoro}
           onAuthClick={openAuth}
           onSignOut={requestSignOut}
-          onMenuToggle={toggleHamburger}
           onLogoClick={onLogoClick}
         />
 
@@ -322,14 +327,8 @@ export default function App() {
           open={ps.menuOpen}
           onClose={closeHamburger}
           accent={mode.accent}
-          accentSoft={mode.accentSoft}
           user={auth.user}
-          savedPlans={ps.savedPlans}
           savedPlansCount={ps.savedPlans.length}
-          remindersOn={ps.remindersOn}
-          onToggleReminders={onToggleReminders}
-          hapticsOn={ps.hapticsOn}
-          onToggleHaptics={onToggleHaptics}
           onNewPlan={ps.startNewPlan}
           onDeletePlan={onDeletePlan}
           onOpenHub={toggleHub}
@@ -339,8 +338,23 @@ export default function App() {
           onOpenRhythm={toggleRhythm}
           onOpenCommunity={toggleCommunity}
           onOpenPomodoro={togglePomodoro}
-          onSignOut={onDrawerSignOut}
+          onOpenProfile={openNexusProfile}
         />
+
+        {/* Yüzen alt-orta "Menü" dock'u — eski header ☰ butonunun yerini
+            aldı (bkz. Header.jsx). Sheet zaten açıkken gizlenir (kendi ✕
+            kapatma butonu var, altta iki tetikleyici üst üste binmesin). */}
+        {!ps.menuOpen && (
+          <button
+            onClick={toggleHamburger}
+            aria-label="Menü"
+            className="fixed z-40 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full px-5 py-3 text-[13px] font-bold text-white backdrop-blur-lg bg-black/60 border border-white/15 shadow-[0_8px_30px_-8px_rgba(0,0,0,0.6)] transition-transform active:scale-[0.96]"
+            style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
+          >
+            <LayoutGrid className="w-4 h-4" strokeWidth={2.5} />
+            Menü
+          </button>
+        )}
 
         <main
           className={`flex-1 min-h-0 w-full mx-auto ${
@@ -501,7 +515,16 @@ export default function App() {
           kopyalanan planı doğrudan usePlanStudio.openSavedPlan ile açar. */}
       {communityOpen && (
         <Suspense fallback={<OverlayFallback z={100} />}>
-          <CommunityHub open={communityOpen} user={auth.user} onClose={() => setCommunityOpen(false)} onPlanCloned={ps.openSavedPlan} />
+          <CommunityHub
+            open={communityOpen}
+            user={auth.user}
+            openMyProfileOnMount={communityInitialProfile}
+            onClose={() => {
+              setCommunityOpen(false);
+              setCommunityInitialProfile(false);
+            }}
+            onPlanCloned={ps.openSavedPlan}
+          />
         </Suspense>
       )}
 

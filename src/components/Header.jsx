@@ -55,7 +55,6 @@ function Header({
   onPomodoroClick,
   onAuthClick,
   onSignOut,
-  onMenuToggle,
   onLogoClick,
 }) {
   return (
@@ -235,14 +234,6 @@ function Header({
             </button>
           )}
           <ThemeToggle />
-
-          <button
-            onClick={onMenuToggle}
-            aria-label="Menü"
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
-          >
-            <span className="text-xl leading-none">☰</span>
-          </button>
         </div>
       </header>
       {/* Header altından taşan mor/kırmızı neon aura şeridi */}
