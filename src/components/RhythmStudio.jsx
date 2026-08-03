@@ -100,8 +100,10 @@ export default function RhythmStudio({ open, userId, onClose }) {
         setReports(reportRows);
         setSessions(sessionRows);
         setPlans(planRows);
-        if (quotaRes && typeof quotaRes.remaining === "number") {
-          setCoachQuota({ remaining: quotaRes.remaining, dailyLimit: quotaRes.dailyLimit });
+        if (quotaRes?.unlimited) {
+          setCoachQuota({ unlimited: true, remaining: null, dailyLimit: null });
+        } else if (quotaRes && typeof quotaRes.remaining === "number") {
+          setCoachQuota({ unlimited: false, remaining: quotaRes.remaining, dailyLimit: quotaRes.dailyLimit });
         }
       })
       .catch((err) => logger.error("RHYTHM_STUDIO", "Veriler getirilemedi", { userId, error: err?.message }))
@@ -387,8 +389,8 @@ export default function RhythmStudio({ open, userId, onClose }) {
       {coachQuota && (
         <div className="flex items-center justify-between rounded-xl px-3.5 py-3 mb-3" style={{ background: "rgba(var(--overlay-rgb),0.045)" }}>
           <span className="text-[12px] font-semibold text-[var(--text-secondary)]">✨ AI Koç Hakkı</span>
-          <span className="text-[13px] font-bold tabular-nums" style={{ fontFamily: MONO_FONT, color: coachQuota.remaining > 0 ? "#2ED9A3" : "#F0827A" }}>
-            {coachQuota.remaining}/{coachQuota.dailyLimit}
+          <span className="text-[13px] font-bold tabular-nums" style={{ fontFamily: MONO_FONT, color: coachQuota.unlimited || coachQuota.remaining > 0 ? "#2ED9A3" : "#F0827A" }}>
+            {coachQuota.unlimited ? "✨ Sınırsız" : `${coachQuota.remaining}/${coachQuota.dailyLimit}`}
           </span>
         </div>
       )}

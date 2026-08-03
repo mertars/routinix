@@ -51,6 +51,11 @@ export function categoryOf(key) {
   return CATEGORIES[key] || CATEGORIES.general;
 }
 
+// AI Plan Oluşturucu + AI Koç — anonim (misafir) oturumlar için kilitli.
+// usePlanStudio.js (plan üretimi) ve AiCoachWidget.jsx (koç sohbeti) AYNI
+// mesajı paylaşır — AuthModal'da context mesajı olarak gösterilir.
+export const AI_GATE_MESSAGE = "🤖 AI Koç ve Yapay Zeka ile Plan Oluşturma özelliğini kullanabilmek için ücretsiz hesabını tamamla.";
+
 export const STAGE_INTRO = "intro";
 export const STAGE_WIZARD = "wizard";
 export const STAGE_LOADING = "loading";

@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { X, Heart, Copy, BadgeCheck, Send, Check } from "lucide-react";
+import { X, Heart, Copy, BadgeCheck, Send, Check, Share2, Pencil } from "lucide-react";
 import { categoryOf } from "../../constants";
 import { parseStorySections } from "../../utils/formatTemplateStory";
 import { fetchComments, addComment, addReply } from "../../services/commentService";
 import { toggleLike, hasLikedTemplate, recordTemplateClone, cloneTemplateToMyPlans } from "../../services/communityService";
+import { buildTemplateShareMessage } from "../../utils/shareLink";
 import CoverPattern from "./CoverPattern";
 import Avatar from "./Avatar";
+import TemplateTaskEditor from "./TemplateTaskEditor";
 import logger from "../../utils/logger";
 
 function CommentRow({ comment, isTemplateAuthor, onReply }) {
@@ -109,6 +111,14 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
   const [posting, setPosting] = useState(false);
   const [cloneState, setCloneState] = useState("idle"); // idle | loading | success
   const [cloneError, setCloneError] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
+  // "Eklemeden Önce Düzenle" — SharedTemplateView.jsx'teki AYNI akış, Nexus
+  // içinden şablon açan giriş yapmış kullanıcılar için de mevcut.
+  const [editMode, setEditMode] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editTotalDays, setEditTotalDays] = useState(7);
+  const [editRoutines, setEditRoutines] = useState([]);
+  const [editTasks, setEditTasks] = useState([]);
 
   useEffect(() => {
     if (!template) return;
@@ -162,6 +172,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
     setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, replies: [...(c.replies || []), reply] } : c)));
   };
 
+  // "🚀 Planlarıma Ekle" — hiç düzenlemeden, orijinal şablon verisiyle anında klonlar.
   const handleClone = async () => {
     if (!myProfile || !userId || cloneState !== "idle") return;
     setCloneState("loading");
@@ -175,6 +186,70 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
       logger.error("COMMUNITY_DETAIL", "Şablon klonlanamadı", { templateId: template.id, error: err?.message });
       setCloneState("idle");
       setCloneError("Plan kopyalanamadı, tekrar dener misin?");
+    }
+  };
+
+  // "✏️ Planı Düzenle & Öyle Ekle" — edit state'ini o ANDAKİ şablon
+  // değerleriyle doldurup düzenleme moduna geçer.
+  const handleEnterEditMode = () => {
+    setEditTitle(template.title);
+    setEditTotalDays(template.total_days || 7);
+    setEditRoutines((template.preview_routines || []).map((r) => ({ content: r.content || "", frequency: r.frequency || "weekly" })));
+    setEditTasks(
+      (template.template_tasks || []).map((t) => ({
+        day_number: t.day_number || 1,
+        week_number: t.week_number || 1,
+        title: t.title || "",
+        detail: t.detail || "",
+        duration_min: t.duration_min || null,
+        priority: t.priority || null,
+      }))
+    );
+    setCloneError("");
+    setEditMode(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditMode(false);
+    setCloneError("");
+  };
+
+  // "💾 Değişikliklerle Ekle" — yalnızca düzenleme modundan çağrılır.
+  const handleCloneEdited = async () => {
+    if (!myProfile || !userId || cloneState !== "idle") return;
+    setCloneState("loading");
+    setCloneError("");
+    try {
+      const templateForClone = {
+        ...template,
+        title: editTitle.trim() || template.title,
+        total_days: Number(editTotalDays) || template.total_days,
+        preview_routines: editRoutines.filter((r) => r.content.trim()),
+        template_tasks: editTasks.filter((t) => t.title.trim()),
+      };
+      const plan = await cloneTemplateToMyPlans(templateForClone, userId);
+      recordTemplateClone(template.id, myProfile.id);
+      setCloneState("success");
+      onClone?.(plan);
+    } catch (err) {
+      logger.error("COMMUNITY_DETAIL", "Şablon klonlanamadı (düzenlenmiş)", { templateId: template.id, error: err?.message });
+      setCloneState("idle");
+      setCloneError("Plan kopyalanamadı, tekrar dener misin?");
+    }
+  };
+
+  // Nexus Link Paylaşımı — `/t/:slugOrId` HERKESE açık, oturumsuz/anonim
+  // ziyaretçiler bile önizleyip "Aktif Rutinlerime Ekle" yapabilir (bkz.
+  // SharedTemplateView.jsx + app.jsx'teki deep-link ayrıştırması). Panoya
+  // yalın URL yerine hazır, güven vurgulu bir mesaj kopyalanır (bkz.
+  // shareLink.js) — arkadaşa doğrudan yapıştırılabilir.
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(buildTemplateShareMessage(template));
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      /* pano izni yoksa sessizce yut — kritik olmayan bir kolaylık */
     }
   };
 
@@ -217,77 +292,131 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
             </div>
           )}
 
-          <div className="flex items-center gap-3">
+          {!editMode && (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleLike}
+                className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-bold border transition-colors duration-200 ${
+                  liked ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"
+                }`}
+              >
+                <Heart className="w-3.5 h-3.5" fill={liked ? "currentColor" : "none"} /> {likeCount}
+              </button>
+              <button
+                onClick={handleCopyLink}
+                aria-label="Linki Kopyala"
+                className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-bold border border-white/10 text-slate-300 hover:border-cyan-500/40 transition-colors duration-200"
+              >
+                {linkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+                {linkCopied ? "Kopyalandı" : "Paylaş"}
+              </button>
+              <button
+                onClick={handleClone}
+                disabled={cloneState !== "idle"}
+                className="flex-1 flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[12.5px] font-bold text-black transition-all active:scale-95 disabled:active:scale-100 disabled:opacity-70"
+                style={{ background: "linear-gradient(90deg, #22D3EE, #B26BFF)" }}
+              >
+                {cloneState === "success" ? (
+                  <>
+                    <Check className="w-4 h-4 motion-safe:animate-[checkPop_0.4s_ease]" /> Planlarına Eklendi
+                  </>
+                ) : cloneState === "loading" ? (
+                  "Kopyalanıyor..."
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" /> Planlarıma Ekle
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {!editMode && myProfile && cloneState === "idle" && (
             <button
-              onClick={handleLike}
-              className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-bold border transition-colors duration-200 ${
-                liked ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"
-              }`}
+              onClick={handleEnterEditMode}
+              className="flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-bold text-white border border-white/15 hover:border-cyan-500/40 transition-colors duration-200"
             >
-              <Heart className="w-3.5 h-3.5" fill={liked ? "currentColor" : "none"} /> {likeCount}
+              <Pencil className="w-3.5 h-3.5" /> Planı Düzenle & Öyle Ekle
             </button>
-            <button
-              onClick={handleClone}
-              disabled={cloneState !== "idle"}
-              className="flex-1 flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[12.5px] font-bold text-black transition-all active:scale-95 disabled:active:scale-100 disabled:opacity-70"
-              style={{ background: "linear-gradient(90deg, #22D3EE, #B26BFF)" }}
-            >
-              {cloneState === "success" ? (
-                <>
-                  <Check className="w-4 h-4 motion-safe:animate-[checkPop_0.4s_ease]" /> Planlarına Eklendi
-                </>
-              ) : cloneState === "loading" ? (
-                "Kopyalanıyor..."
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" /> Planlarıma Ekle
-                </>
-              )}
-            </button>
-          </div>
+          )}
+
           {cloneError && <p className="text-[11.5px] font-medium text-red-400 -mt-3">{cloneError}</p>}
 
-          {/* Hikaye — formatTemplateStory.js çıktısının minimal render'ı */}
-          <div className="flex flex-col gap-4">
-            {sections.map((s) => (
-              <div key={s.title}>
-                <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-slate-500 mb-1">{s.title}</p>
-                <p className="text-[13px] leading-relaxed text-slate-300 whitespace-pre-line">{s.body}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Yorumlar */}
-          <div className="pt-4 border-t border-white/10 flex flex-col gap-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-slate-500">Yorumlar ({comments.length})</p>
-            {loadingComments ? (
-              <p className="text-[12px] text-slate-500">Yükleniyor...</p>
-            ) : comments.length === 0 ? (
-              <p className="text-[12px] text-slate-500">Henüz yorum yok — ilk yorumu sen yaz.</p>
-            ) : (
-              comments.map((c) => <CommentRow key={c.id} comment={c} isTemplateAuthor={isTemplateAuthor} onReply={handleReply} />)
-            )}
-
-            {myProfile && (
+          {editMode ? (
+            <>
+              <TemplateTaskEditor
+                title={editTitle}
+                onTitleChange={setEditTitle}
+                totalDays={editTotalDays}
+                onTotalDaysChange={setEditTotalDays}
+                routines={editRoutines}
+                onRoutinesChange={setEditRoutines}
+                tasks={editTasks}
+                onTasksChange={setEditTasks}
+              />
               <div className="flex items-center gap-2">
-                <input
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handlePostComment()}
-                  placeholder="Deneyimini paylaş..."
-                  className="flex-1 rounded-xl border border-white/10 bg-[#0c1322]/95 px-3.5 py-2.5 text-[12.5px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
-                />
                 <button
-                  onClick={handlePostComment}
-                  disabled={posting || !draft.trim()}
-                  className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-black disabled:opacity-40"
+                  onClick={handleCloneEdited}
+                  disabled={cloneState !== "idle"}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[12.5px] font-bold text-black transition-all active:scale-95 disabled:opacity-70"
                   style={{ background: "linear-gradient(90deg, #22D3EE, #B26BFF)" }}
                 >
-                  <Send className="w-4 h-4" />
+                  {cloneState === "loading" ? "Ekleniyor..." : cloneState === "success" ? "Eklendi ✓" : "💾 Değişikliklerle Ekle"}
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  disabled={cloneState !== "idle"}
+                  className="text-[12px] font-semibold text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-60"
+                >
+                  Vazgeç
                 </button>
               </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <>
+              {/* Hikaye — formatTemplateStory.js çıktısının minimal render'ı */}
+              <div className="flex flex-col gap-4">
+                {sections.map((s) => (
+                  <div key={s.title}>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-slate-500 mb-1">{s.title}</p>
+                    <p className="text-[13px] leading-relaxed text-slate-300 whitespace-pre-line">{s.body}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Yorumlar */}
+              <div className="pt-4 border-t border-white/10 flex flex-col gap-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-slate-500">Yorumlar ({comments.length})</p>
+                {loadingComments ? (
+                  <p className="text-[12px] text-slate-500">Yükleniyor...</p>
+                ) : comments.length === 0 ? (
+                  <p className="text-[12px] text-slate-500">Henüz yorum yok — ilk yorumu sen yaz.</p>
+                ) : (
+                  comments.map((c) => <CommentRow key={c.id} comment={c} isTemplateAuthor={isTemplateAuthor} onReply={handleReply} />)
+                )}
+
+                {myProfile && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handlePostComment()}
+                      placeholder="Deneyimini paylaş..."
+                      className="flex-1 rounded-xl border border-white/10 bg-[#0c1322]/95 px-3.5 py-2.5 text-[12.5px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
+                    />
+                    <button
+                      onClick={handlePostComment}
+                      disabled={posting || !draft.trim()}
+                      className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-black disabled:opacity-40"
+                      style={{ background: "linear-gradient(90deg, #22D3EE, #B26BFF)" }}
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

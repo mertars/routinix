@@ -1,5 +1,6 @@
 import { getSupabaseAdmin, getUserFromRequest } from "./_lib/supabaseAdmin.js";
 import { getRemaining, consumeOne, DAILY_LIMIT } from "./_lib/quota.js";
+import { isAdminUser } from "./_lib/adminAccess.js";
 import { runCoachIntent } from "./_lib/coachPrompt.js";
 import { lightenTasks, intensifyTasks, postponeDayTasks, findTodayDay, analyzeProgress } from "../src/services/aiCoachService.js";
 
@@ -22,25 +23,40 @@ export default async function handler(req, res) {
   if (!user) {
     return res.status(401).json({ ok: false, consumed: false, message: "Oturum doğrulanamadı, tekrar giriş yapar mısın?" });
   }
+  // AI Koç anonim (misafir) oturumlara TAMAMEN KAPALI — client tarafındaki
+  // gate (AiCoachWidget.jsx) yalnızca UX'tir, GERÇEK sınır burasıdır: `is_anonymous`
+  // JWT'den doğrulanır, client'ın gönderdiği hiçbir alana güvenilmez. "status"
+  // dahil TÜM action'lar için geçerli — yarı-erişim yok.
+  if (user.is_anonymous) {
+    return res.status(403).json({ ok: false, consumed: false, message: "403 Forbidden - Login Required: AI Koç'u kullanmak için ücretsiz hesabını tamamlaman gerekiyor." });
+  }
 
   const { action, message, targetPlanId } = req.body || {};
   if (!action) {
     return res.status(400).json({ ok: false, consumed: false, message: "'action' alanı zorunlu." });
   }
 
+  // Admin durumu YALNIZCA JWT'den doğrulanmış `user.email`e göre, sunucu
+  // tarafında hesaplanır (bkz. adminAccess.js dosya başı yorumu) — client
+  // isteğinden gelen hiçbir alan bu kararı ETKİLEMEZ.
+  const isAdmin = isAdminUser(user);
+
   try {
     if (action === "status") {
+      if (isAdmin) return res.status(200).json({ ok: true, consumed: false, unlimited: true, remaining: null, dailyLimit: null });
       const remaining = await getRemaining(user.id);
-      return res.status(200).json({ ok: true, consumed: false, remaining, dailyLimit: DAILY_LIMIT });
+      return res.status(200).json({ ok: true, consumed: false, unlimited: false, remaining, dailyLimit: DAILY_LIMIT });
     }
 
     // Hak kontrolü — AI çağrısı/mutasyon yapılmadan ÖNCE (gereksiz maliyeti
-    // önler); localStorage değil, tek gerçek kaynak burasıdır.
-    const remainingBefore = await getRemaining(user.id);
-    if (remainingBefore <= 0) {
+    // önler); localStorage değil, tek gerçek kaynak burasıdır. Admin ise bu
+    // kontrol tamamen atlanır.
+    const remainingBefore = isAdmin ? Infinity : await getRemaining(user.id);
+    if (!isAdmin && remainingBefore <= 0) {
       return res.status(403).json({
         ok: false,
         consumed: false,
+        unlimited: false,
         remaining: 0,
         dailyLimit: DAILY_LIMIT,
         message: `Bugünkü ${DAILY_LIMIT} ücretsiz hakkın doldu. Yarın sıfırlanır, ya da Premium'a geç.`,
@@ -67,8 +83,18 @@ export default async function handler(req, res) {
 
     const result = await dispatch(action, { message, targetPlanId, allPlans, userId: user.id, admin });
 
-    result.remaining = result.consumed ? await consumeOne(user.id) : remainingBefore;
-    result.dailyLimit = DAILY_LIMIT;
+    // NOT: `Infinity` JSON.stringify'da sessizce `null`a döner — bu yüzden
+    // admin/sınırsız durumu ayrı bir `unlimited` bayrağıyla taşınır, asla
+    // ham Infinity/remaining sayısı olarak DEĞİL.
+    if (isAdmin) {
+      result.unlimited = true;
+      result.remaining = null;
+      result.dailyLimit = null;
+    } else {
+      result.unlimited = false;
+      result.remaining = result.consumed ? await consumeOne(user.id) : remainingBefore;
+      result.dailyLimit = DAILY_LIMIT;
+    }
     return res.status(result.ok === false ? 400 : 200).json(result);
   } catch (err) {
     // eslint-disable-next-line no-console

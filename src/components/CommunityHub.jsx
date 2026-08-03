@@ -1,5 +1,5 @@
-import { useState, useEffect, memo } from "react";
-import { X, Search, Plus, Users } from "lucide-react";
+import { useState, useEffect, memo, lazy, Suspense } from "react";
+import { X, Search, Plus, Users, Sparkles } from "lucide-react";
 import useDebounce from "../hooks/useDebounce";
 import { CATEGORIES, CATEGORY_KEYS } from "../constants";
 import { ALL_PRESET_TAGS } from "../data/communityTags";
@@ -10,6 +10,11 @@ import GuidedTemplateForm from "./community/GuidedTemplateForm";
 import TemplateDetailModal from "./community/TemplateDetailModal";
 import PublicProfileCard from "./community/PublicProfileCard";
 import logger from "../utils/logger";
+
+// WeeklyFlowModal ayrı bir chunk'ta (bkz. lazy) — `html-to-image` bağımlılığı
+// (PNG dışa aktarım) yalnızca kullanıcı gerçekten "Haftalık Özeti Gör"e
+// tıklarsa indirilir, Nexus'un kendi bundle'ını şişirmez.
+const WeeklyFlowModal = lazy(() => import("./WeeklyFlowModal"));
 
 // Ambient nöon zemin — TAMAMEN STATİK: hiçbir `animation`, hiçbir
 // `filter: blur()` yok. Önceki sürüm 3 adet sürekli `animation: ... infinite`
@@ -64,6 +69,21 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
   const [detailTemplate, setDetailTemplate] = useState(null);
   const [profileCardTarget, setProfileCardTarget] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [weeklyFlowOpen, setWeeklyFlowOpen] = useState(false);
+  // Mobil arama/etiket şeridi scroll'a duyarlı (yalnızca lg altında GÖRÜNÜR
+  // zaten — bkz. aşağıdaki "lg:hidden" sarmalayıcı; masaüstünde bu state hiç
+  // görsel etkiye sahip değil, ayrı bir "responsive guard" gerekmez). 5-50px
+  // arası bilerek bir "histerezis" bölgesidir — tam eşikte ileri geri
+  // titremeyi (flicker) önler.
+  const [mobileBarCollapsed, setMobileBarCollapsed] = useState(false);
+  const handleContentScroll = (e) => {
+    const top = e.currentTarget.scrollTop;
+    setMobileBarCollapsed((prev) => {
+      if (top > 50) return prev ? prev : true;
+      if (top <= 4) return prev ? false : prev;
+      return prev;
+    });
+  };
 
   useEffect(() => {
     if (!open || !user) {
@@ -221,6 +241,18 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
           </div>
         </div>
 
+        {user && (
+          <button
+            onClick={() => setWeeklyFlowOpen(true)}
+            className="shrink-0 mx-4 sm:mx-6 lg:mx-8 mt-3 flex items-center justify-between gap-3 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-violet-500/10 px-4 py-2.5 text-left transition-colors hover:border-cyan-500/50"
+          >
+            <span className="flex items-center gap-1.5 text-[12.5px] font-bold text-cyan-200">
+              <Sparkles className="w-3.5 h-3.5" /> Haftalık Özeti Gör
+            </span>
+            <span className="text-[10.5px] text-slate-400 hidden sm:inline">Bu haftaki verimlilik karnen hazır →</span>
+          </button>
+        )}
+
         {!profileLoading && user && !myProfile && (
           <div className="shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-b border-white/10 flex items-center gap-2 flex-wrap">
             <span className="text-[12px] text-slate-400">Nexus'a katılmak için bir kullanıcı adı seç:</span>
@@ -243,48 +275,77 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
           </div>
         )}
 
-        {/* Mobil: üstte arama + kategori/etiket çipleri (tek yatay şerit) */}
-        <div className="lg:hidden shrink-0 px-4 sm:px-6 pt-3 pb-2 border-b border-white/10 flex flex-col gap-2.5">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Şablon ara..."
-              className="w-full rounded-xl border border-white/10 bg-[#0c1322]/90 pl-9 pr-3 py-2.5 text-[13px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
-            />
+        {/* Mobil: üstte arama + kategori/etiket çipleri — aşağı kaydırınca
+            (scrollTop > 50) yumuşakça yukarı katlanır, yerine sağda küçük bir
+            arama ikonu belirir; en üste dönünce (scrollTop <= 4) otomatik
+            geri açılır. Masaüstünde bu bloğun TAMAMI `lg:hidden` — collapse
+            state'inin orada hiçbir görsel karşılığı yok, ayrı bir "desktop'ta
+            çalışmasın" kontrolüne gerek kalmaz. `max-height` + `opacity` +
+            `translate-y` geçişi: her iki taraf da SABİT bir max-height'a
+            (içeriğin gerçek boyundan cömertçe büyük) katlanıp açılıyor —
+            JS ile yükseklik ölçmeye gerek yok, tamamen CSS transition. */}
+        <div className="lg:hidden shrink-0 border-b border-white/10">
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-out ${
+              mobileBarCollapsed ? "max-h-0 opacity-0 -translate-y-2" : "max-h-[240px] opacity-100 translate-y-0"
+            }`}
+          >
+            <div className="px-4 sm:px-6 pt-3 pb-2 flex flex-col gap-2.5">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Şablon ara..."
+                  className="w-full rounded-xl border border-white/10 bg-[#0c1322]/90 pl-9 pr-3 py-2.5 text-[13px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
+                />
+              </div>
+              <div className="edge-fade-x flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                {myProfile && (
+                  <button
+                    onClick={() => setFollowingOnly((v) => !v)}
+                    className={`shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold border transition-colors duration-200 ${
+                      followingOnly ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"
+                    }`}
+                  >
+                    <Users className="w-3 h-3" /> Takip Edilenler
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold border transition-colors duration-200 ${!selectedCategory ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"}`}
+                >
+                  Tümü
+                </button>
+                {CATEGORY_KEYS.map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => setSelectedCategory(k)}
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold border transition-colors duration-200 ${selectedCategory === k ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"}`}
+                  >
+                    {CATEGORIES[k].emoji} {CATEGORIES[k].label}
+                  </button>
+                ))}
+              </div>
+              {TagChipsRow}
+            </div>
           </div>
-          <div className="edge-fade-x flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-            {myProfile && (
+
+          {/* Katlanınca beliren küçük arama tetikleyicisi */}
+          <div className={`overflow-hidden transition-all duration-300 ease-out ${mobileBarCollapsed ? "max-h-14 opacity-100" : "max-h-0 opacity-0"}`}>
+            <div className="flex items-center justify-end px-4 sm:px-6 py-2">
               <button
-                onClick={() => setFollowingOnly((v) => !v)}
-                className={`shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold border transition-colors duration-200 ${
-                  followingOnly ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"
-                }`}
+                onClick={() => setMobileBarCollapsed(false)}
+                aria-label="Aramayı ve etiketleri aç"
+                className="w-9 h-9 rounded-full flex items-center justify-center border border-white/10 bg-[#0c1322]/90 text-slate-300 hover:border-cyan-500/40 transition-colors"
               >
-                <Users className="w-3 h-3" /> Takip Edilenler
+                <Search className="w-4 h-4" />
               </button>
-            )}
-            <button
-              onClick={() => setSelectedCategory(null)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold border transition-colors duration-200 ${!selectedCategory ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"}`}
-            >
-              Tümü
-            </button>
-            {CATEGORY_KEYS.map((k) => (
-              <button
-                key={k}
-                onClick={() => setSelectedCategory(k)}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold border transition-colors duration-200 ${selectedCategory === k ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"}`}
-              >
-                {CATEGORIES[k].emoji} {CATEGORIES[k].label}
-              </button>
-            ))}
+            </div>
           </div>
-          {TagChipsRow}
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden" onScroll={handleContentScroll}>
           <div className="lg:flex lg:h-full">
             {/* Masaüstü: sol sabit filtre paneli — YALNIZCA ana kategoriler
                 (spesifik etiketler artık sağdaki yatay çip şeridinde). */}
@@ -384,6 +445,12 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
               setDetailTemplate(t);
             }}
           />
+        )}
+
+        {weeklyFlowOpen && (
+          <Suspense fallback={null}>
+            <WeeklyFlowModal open={weeklyFlowOpen} user={user} profile={myProfile} onClose={() => setWeeklyFlowOpen(false)} />
+          </Suspense>
         )}
       </div>
     </div>

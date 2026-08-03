@@ -9,6 +9,7 @@ import {
   MIN_GOAL_LENGTH,
   FALLBACK_QUESTIONS,
   isLikelyGibberish,
+  AI_GATE_MESSAGE,
 } from "./constants";
 import { generateOnboardingQuestions, createEnrichedPlan, fetchNextWeekTasks } from "./services/aiPipelineService";
 import {
@@ -151,9 +152,10 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   // ---- ADIM 1: Intro "Devam Et" → auth gate → dinamik soruları üret → wizard ----
   const startOnboarding = useCallback(async () => {
     if (!canStart) return;
-    // Giriş yoksa AI çağrısı harcamadan önce auth modalını aç.
-    if (!user) {
-      onRequireAuth?.();
+    // Giriş yoksa VEYA anonim (misafir) bir oturumsa AI çağrısı harcamadan
+    // önce auth modalını aç — AI özellikleri yalnızca kalıcı hesaplara açık.
+    if (!user || user.is_anonymous) {
+      onRequireAuth?.(AI_GATE_MESSAGE);
       return;
     }
     if (isLikelyGibberish(goal)) {
@@ -168,8 +170,8 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   // ---- Şablon Keşfet: "Şablonu Kullan" → hedef+kategori+gün sayısını aktarıp planı anında başlat ----
   const startFromTemplate = useCallback(
     async (template) => {
-      if (!user) {
-        onRequireAuth?.();
+      if (!user || user.is_anonymous) {
+        onRequireAuth?.(AI_GATE_MESSAGE);
         return;
       }
       // State güncellemeleri asenkron olduğundan (kapanış closure'ı state'i geç
@@ -196,8 +198,8 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
 
   // Wizard cevaplarını + hedefi AI'a bağlam olarak verip planı üretir/kaydeder.
   const finalizeAndGenerate = useCallback(async () => {
-    if (!user) {
-      onRequireAuth?.();
+    if (!user || user.is_anonymous) {
+      onRequireAuth?.(AI_GATE_MESSAGE);
       return;
     }
     setErrorMsg("");

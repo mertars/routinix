@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabaseClient";
+import { slugify } from "../utils/slugify";
 import logger from "../utils/logger";
 
 // "Topluluk Şablon Hub'ı" — şablon CRUD/arama/beğeni/klonlama. Tüm sorgular
@@ -61,24 +62,59 @@ export async function fetchTemplates({ search = "", tags = [], category = null, 
   return templates.map((t) => ({ ...t, stats: statsById.get(t.id) || { like_count: 0, clone_count: 0, comment_count: 0 } }));
 }
 
-export async function fetchTemplateById(templateId) {
-  const { data, error } = await supabase
-    .from("templates")
-    // "!author_id" DEĞİŞTİRİLEMEZ bir ip ucu: PostgREST'in şema önbelleğinde
-    // templates ↔ community_profiles arasında BİRDEN FAZLA foreign key
-    // ilişkisi bulununca ("Could not embed because more than one
-    // relationship was found for 'templates' and 'community_profiles'")
-    // hangi FK'yi kullanacağını otomatik seçemiyor — bu ip ucu, embed'in
-    // kesin olarak templates.author_id sütunu üzerinden kurulmasını zorlar.
-    .select("*, author:community_profiles!author_id(id, username, display_name, avatar_url, is_bot, usage_days_count)")
-    .eq("id", templateId)
-    .single();
-  if (error) {
-    logger.error("COMMUNITY", "Şablon detayı getirilemedi", { templateId, error: error?.message });
-    throw error;
+const TEMPLATE_SELECT =
+  // "!author_id" DEĞİŞTİRİLEMEZ bir ip ucu: PostgREST'in şema önbelleğinde
+  // templates ↔ community_profiles arasında BİRDEN FAZLA foreign key
+  // ilişkisi bulununca ("Could not embed because more than one
+  // relationship was found for 'templates' and 'community_profiles'")
+  // hangi FK'yi kullanacağını otomatik seçemiyor — bu ip ucu, embed'in
+  // kesin olarak templates.author_id sütunu üzerinden kurulmasını zorlar.
+  "*, author:community_profiles!author_id(id, username, display_name, avatar_url, is_bot, usage_days_count)";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Nexus link paylaşımı — okunabilir bir slug ("/t/python-baslangic-haritasi")
+// VEYA eski/ham bir UUID ("/t/c0893419-...") ile gelen ziyaretçiyi karşılar.
+// ÖNCE slug'da aranır (metin sütunu, HERHANGİ bir string güvenle sorgulanabilir)
+// — bulunamazsa VE değer gerçekten bir UUID GİBİ görünüyorsa `id` ile ikinci
+// bir deneme yapılır. Bilerek TERSİ yapılmaz: rastgele bir slug string'ini
+// doğrudan `id` (uuid tipi) sütununa karşı sorgulamak Postgres'te "invalid
+// input syntax for type uuid" hatasına yol açar — bu yüzden UUID şekli
+// doğrulanmadan asla `id` sorgusu denenmez.
+export async function fetchTemplateByIdOrSlug(idOrSlug) {
+  const { data: bySlug, error: slugErr } = await supabase.from("templates").select(TEMPLATE_SELECT).eq("slug", idOrSlug).maybeSingle();
+  if (slugErr) {
+    logger.error("COMMUNITY", "Şablon slug ile getirilemedi", { idOrSlug, error: slugErr?.message });
+    throw slugErr;
   }
-  const { data: stats } = await supabase.from("template_stats").select("*").eq("template_id", templateId).maybeSingle();
-  return { ...data, stats: stats || { like_count: 0, clone_count: 0, comment_count: 0 } };
+
+  let row = bySlug;
+  if (!row && UUID_RE.test(idOrSlug)) {
+    const { data: byId, error: idErr } = await supabase.from("templates").select(TEMPLATE_SELECT).eq("id", idOrSlug).maybeSingle();
+    if (idErr) {
+      logger.error("COMMUNITY", "Şablon id ile getirilemedi", { idOrSlug, error: idErr?.message });
+      throw idErr;
+    }
+    row = byId;
+  }
+
+  if (!row) throw new Error("Şablon bulunamadı.");
+
+  const { data: stats } = await supabase.from("template_stats").select("*").eq("template_id", row.id).maybeSingle();
+  return { ...row, stats: stats || { like_count: 0, clone_count: 0, comment_count: 0 } };
+}
+
+// Verilen başlıktan okunabilir bir slug türetir; `templates.slug` üzerindeki
+// KISMİ unique index'e (bkz. supabase/nexus_readable_slugs.sql) çarparsa
+// kısa, rastgele bir sonek ekleyip tekrar dener. Boş bir slug'ı (`slugify`
+// tamamen ASCII-dışı bir başlıktan hiçbir şey üretemezse) sessizce `null`
+// bırakır — `fetchTemplateByIdOrSlug` zaten NULL slug'ları atlayıp id'ye düşer.
+async function generateUniqueSlug(title) {
+  const base = slugify(title);
+  if (!base) return null;
+  const { data } = await supabase.from("templates").select("id").eq("slug", base).maybeSingle();
+  if (!data) return base;
+  return `${base}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
 // authorProfileId: profiles.id (auth.users.id DEĞİL — bkz. profileService.js).
@@ -87,11 +123,14 @@ export async function fetchTemplateById(templateId) {
 // (fetchPlanDetail) türetiyor (bkz. o dosyanın "Aktif/Tamamlanan Plan Seç"
 // adımı). Burada yalnızca kaydediliyor.
 export async function createTemplate({ authorProfileId, title, category, coverUrl, goal, totalDays, tags, story, previewRoutines, templateTasks }) {
+  const trimmedTitle = title.trim();
+  const slug = await generateUniqueSlug(trimmedTitle);
   const { data, error } = await supabase
     .from("templates")
     .insert({
       author_id: authorProfileId,
-      title: title.trim(),
+      title: trimmedTitle,
+      slug,
       category,
       cover_url: coverUrl,
       goal: goal.trim(),
@@ -179,6 +218,26 @@ export async function hasLikedTemplate(templateId, profileId) {
     .maybeSingle();
   if (error) return false;
   return !!data;
+}
+
+// Nexus link paylaşımı — /t/:templateId'ye gelen HER ziyarette (oturumsuz/
+// anonim ziyaretçiler DAHİL) çağrılır. `increment_template_view` RPC'si
+// (bkz. supabase/nexus_link_sharing.sql) SECURITY DEFINER'dır ve yüzeyi
+// bilinçli olarak yalnızca `view_count`'u 1 artırmakla sınırlıdır — anon rolü
+// başka hiçbir şeyi okuyup/değiştiremez. Sessizce yutulur: bir görüntülenme
+// sayacının başarısız yazımı ziyaretçinin önizleme akışını KESMEMELİ.
+export async function incrementTemplateView(templateId) {
+  // try/catch EK GÜVENCE: `.rpc(...)` normalde bir hatayı `{error}` alanında
+  // döner (üstteki gibi ele alınır), ama gerçek bir ağ/bağlantı kopmasında
+  // promise'in kendisi REDDEDEBİLİR — bu görüntülenme sayacı gibi kritik
+  // olmayan bir yan etkinin, ne olursa olsun, çağıranın akışını (kart açma/
+  // Nexus önizlemesi) KESMEMESİ gerekir.
+  try {
+    const { error } = await supabase.rpc("increment_template_view", { p_template_id: templateId });
+    if (error) logger.error("COMMUNITY", "Görüntülenme sayılamadı", { templateId, error: error?.message });
+  } catch (err) {
+    logger.error("COMMUNITY", "Görüntülenme RPC'si çöktü", { templateId, error: err?.message });
+  }
 }
 
 export async function toggleLike(templateId, profileId, currentlyLiked) {

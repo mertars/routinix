@@ -11,7 +11,12 @@ function todayDate() {
 }
 
 // Bugünün satırını getirir; yoksa DAILY_LIMIT ile oluşturur. Döner: kalan hak.
-export async function getRemaining(userId) {
+// `isAdmin` true ise (bkz. adminAccess.js — YALNIZCA JWT'den doğrulanmış
+// user.email'e göre sunucu tarafında hesaplanır) veritabanına hiç gitmeden
+// Infinity döner — admin hesapları için günlük sayaç hiç oluşturulmaz/tüketilmez.
+export async function getRemaining(userId, isAdmin = false) {
+  if (isAdmin) return Infinity;
+
   const admin = getSupabaseAdmin();
   const date = todayDate();
 
@@ -37,7 +42,9 @@ export async function getRemaining(userId) {
 // (aynı anda iki istek) karşı DB seviyesinde koşullu update kullanır: yalnızca
 // remaining_usage > 0 iken düşer, aksi halde satırı olduğu gibi bırakır.
 // Döner: düşümden sonraki kalan hak.
-export async function consumeOne(userId) {
+export async function consumeOne(userId, isAdmin = false) {
+  if (isAdmin) return Infinity;
+
   const admin = getSupabaseAdmin();
   const date = todayDate();
 

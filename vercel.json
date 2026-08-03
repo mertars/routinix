@@ -1,0 +1,15 @@
+{
+  "rewrites": [
+    {
+      "source": "/t/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|WhatsApp|TelegramBot|Slackbot|LinkedInBot|Discordbot|Pinterest|SkypeUriPreview|redditbot|Applebot|vkShare|W3C_Validator).*"
+        }
+      ],
+      "destination": "/api/og-template?slug=:slug"
+    }
+  ]
+}

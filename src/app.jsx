@@ -12,6 +12,11 @@ import CategoryIntro from "./components/CategoryIntro";
 import PlanBoard from "./components/PlanBoard";
 import BackgroundScene from "./components/BackgroundScene";
 import GlobalStyles from "./components/GlobalStyles";
+// Nexus link paylaşımı ("/t/:templateId") — anonim ziyaretçiler için ilk
+// boyamada gerekebilir (yavaş bir "lazy" gecikmesi PLG akışında istenmez),
+// bu yüzden diğer panellerin aksine BİLEREK statik import edilir.
+import SharedTemplateView from "./components/SharedTemplateView";
+import GuestBanner from "./components/GuestBanner";
 import { InlineFallback, FabFallback, OverlayFallback } from "./components/LazyFallback";
 
 // İlk boyamada (intro ekranı) KESİNLİKLE gerekmeyen, yalnızca kullanıcı
@@ -50,7 +55,19 @@ const CommunityHub = lazy(() => import("./components/CommunityHub"));
 
 export default function App() {
   const auth = useAuth();
+  // Nexus link paylaşımı ("/t/:templateId") — mount anında TEK SEFERLİK
+  // okunur (sonraki navigasyonlar zaten `handleSharedTemplateDone` ile
+  // `window.history.replaceState` üzerinden "/"e döner, bu state'i tekrar
+  // hesaplamaya gerek yok).
+  const [sharedTemplateId, setSharedTemplateId] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const m = window.location.pathname.match(/^\/t\/([^/?#]+)/);
+    return m ? m[1] : null;
+  });
   const [authOpen, setAuthOpen] = useState(false);
+  // AuthModal'ın "neden açıldığını" anlatan opsiyonel bağlam mesajı (ör. AI
+  // Koç/AI Plan Oluşturucu kilidine takılınca) — bkz. requireAuth aşağıda.
+  const [authContext, setAuthContext] = useState(null);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
@@ -63,8 +80,34 @@ export default function App() {
   const [communityOpen, setCommunityOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [printRange, setPrintRange] = useState(Infinity);
-  const ps = usePlanStudio({ user: auth.user, onRequireAuth: () => setAuthOpen(true) });
+  // Tek, paylaşılan "auth iste" tetikleyicisi — hem düz "Giriş Yap" tıklamaları
+  // (mesajsız, `requireAuth()`) hem de AI kilidi (mesajlı, `requireAuth(AI_GATE_MESSAGE)`)
+  // BUNU kullanır; usePlanStudio'nun `onRequireAuth` prop'una GEÇİLEBİLMESİ için
+  // hook çağrısından ÖNCE tanımlanmış olması gerekir.
+  const requireAuth = useCallback((message) => {
+    setAuthContext(message || null);
+    setAuthOpen(true);
+  }, []);
+
+  const ps = usePlanStudio({ user: auth.user, onRequireAuth: requireAuth });
   const { stage, mode } = ps;
+
+  // Mesajsız/düz "Giriş Yap" için STABİL bir referans — Header memo() olduğu
+  // için burada her render'da YENİ bir inline ok fonksiyonu vermek memo'yu
+  // etkisiz kılardı (bkz. dosya başı "View Isolation" yorumu).
+  const openAuth = useCallback(() => requireAuth(), [requireAuth]);
+
+  // SharedTemplateView'da "Aktif Rutinlerime Ekle" başarıyla tamamlanınca:
+  // URL'i temizle ("/"), özel görünümden çık (normal uygulama kabuğu
+  // render olsun) ve yeni oluşan planı doğrudan aç.
+  const handleSharedTemplateDone = useCallback(
+    (plan) => {
+      window.history.replaceState({}, "", "/");
+      setSharedTemplateId(null);
+      if (plan?.id) ps.openSavedPlan(plan.id);
+    },
+    [ps.openSavedPlan]
+  );
 
   // BackgroundScene KÖKTE sabit mount edilir ve hiçbir panel açılınca
   // unmount OLMAZ — panel onu yalnızca görsel olarak ÖRTER, kendisi
@@ -169,7 +212,6 @@ export default function App() {
 
   // Header/DrawerMenu'ye geçen geri kalan tekil handler'lar — memo'nun etkili
   // olması için bunlar da stabil referanslı olmalı (bkz. yukarıdaki toggle*).
-  const openAuth = useCallback(() => setAuthOpen(true), []);
   const requestSignOut = useCallback(() => setLogoutConfirmOpen(true), []);
   const toggleHamburger = useCallback(() => ps.setMenuOpen((v) => !v), [ps.setMenuOpen]);
   const closeHamburger = useCallback(() => ps.setMenuOpen(false), [ps.setMenuOpen]);
@@ -189,6 +231,48 @@ export default function App() {
     setLogoutConfirmOpen(true);
   }, [ps.setMenuOpen]);
 
+  // Giriş/Kayıt modalı JSX'i TEK yerde tanımlanır — hem normal uygulama
+  // kabuğunda hem de SharedTemplateView'ın erken-return dalında (aşağıda)
+  // kullanılır, çünkü "hesabını kaydet" o ekrandan da tetiklenebilir.
+  const authModalNode = authOpen && (
+    <Suspense fallback={<OverlayFallback z={80} />}>
+      <AuthModal
+        open={authOpen}
+        accent={mode.accent}
+        onClose={() => {
+          setAuthOpen(false);
+          setAuthContext(null); // bir sonraki düz "Giriş Yap" açılışına AI mesajı SIZMASIN
+        }}
+        onSignIn={auth.signIn}
+        onSignUp={auth.isAnonymous ? auth.upgradeAnonymousAccount : auth.signUp}
+        onGoogle={auth.isAnonymous ? auth.linkGoogleIdentity : auth.signInWithGoogle}
+        onSuccess={() => {
+          setAuthOpen(false);
+          setAuthContext(null);
+        }}
+        isAnonymousUpgrade={auth.isAnonymous}
+        contextMessage={authContext}
+      />
+    </Suspense>
+  );
+
+  // Nexus link paylaşımı (`/t/:templateId`) — bu SPA'da react-router gibi bir
+  // kütüphane yok; tek bir statik deep-link giriş noktası için tüm `stage`
+  // durum makinesini bir router'a taşımak orantısız olurdu. Bunun yerine
+  // `window.location.pathname` TEK SEFERLİK (mount anında) ayrıştırılır —
+  // eşleşirse normal uygulama kabuğu YERİNE SharedTemplateView render edilir.
+  // ÖNEMLİ: bu erken `return`, TÜM hook'lardan (yukarıdaki useState/useEffect/
+  // useCallback) SONRA gelir — React'in "hook'lar her render'da aynı sırada
+  // çağrılmalı" kuralına uyulur, yalnızca JSX çıktısı koşullu değişir.
+  if (sharedTemplateId) {
+    return (
+      <>
+        <SharedTemplateView idOrSlug={sharedTemplateId} auth={auth} onOpenAuth={openAuth} onDone={handleSharedTemplateDone} />
+        {authModalNode}
+      </>
+    );
+  }
+
   return (
     <div className="w-full" style={{ background: "var(--bg-app)" }}>
       {/* Atmosferik animasyonlu dağ/topoğrafya + neon şerit arka planı (içeriğin
@@ -204,6 +288,12 @@ export default function App() {
             : "min-h-[100dvh]"
         }`}
       >
+        {/* Misafir şeridi — Header'ın (sticky top-0 z-20) hemen ÜSTÜNDE DOM
+            sırasıyla, kendisi de sticky top-0 z-30: art arda gelen sticky
+            elemanlar tarayıcıda üst üste istiflenir, Header'ın piksel
+            yüksekliğini bilmeye gerek kalmaz (bkz. GuestBanner.jsx yorumu). */}
+        {auth.isAnonymous && <GuestBanner onUpgrade={openAuth} />}
+
         <Header
           modeAccent={mode.accent}
           modeAccentSoft={mode.accentSoft}
@@ -337,19 +427,7 @@ export default function App() {
       )}
 
       {/* Giriş/Kayıt modalı — koşullu mount. */}
-      {authOpen && (
-        <Suspense fallback={<OverlayFallback z={80} />}>
-          <AuthModal
-            open={authOpen}
-            accent={mode.accent}
-            onClose={() => setAuthOpen(false)}
-            onSignIn={auth.signIn}
-            onSignUp={auth.signUp}
-            onGoogle={auth.signInWithGoogle}
-            onSuccess={() => setAuthOpen(false)}
-          />
-        </Suspense>
-      )}
+      {authModalNode}
 
       <ConfirmModal
         open={logoutConfirmOpen}
@@ -435,6 +513,8 @@ export default function App() {
           <AiCoachWidget
             plan={ps.dbPlan}
             userId={auth.user?.id}
+            isAnonymous={auth.isAnonymous}
+            onRequireAuth={requireAuth}
             onApplyAction={ps.applyCoachAction}
             onSendMessage={ps.sendCoachMessage}
             onJumpToPlan={ps.openSavedPlan}

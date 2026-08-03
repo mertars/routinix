@@ -3,8 +3,11 @@ import { useState } from "react";
 // Email + şifre ile giriş/kayıt modalı. signIn/signUp fonksiyonları prop olarak
 // gelir (useAuth'tan); modal sadece formu ve durumu (mod, hata, yükleniyor)
 // yönetir. Başarılı girişte onSuccess çağrılır (üst katman modalı kapatır).
-export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, onGoogle, onSuccess }) {
-  const [tab, setTab] = useState("signin"); // "signin" | "signup"
+export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, onGoogle, onSuccess, isAnonymousUpgrade = false, contextMessage = null }) {
+  // Anonim yükseltme akışında "Giriş Yap" sekmesinin hiç anlamı yok — henüz
+  // gerçek bir email/şifreye bağlı olmayan (anonim) bir oturumla zaten
+  // GİRİŞLİ durumdayız, tek gereken bu oturumu kalıcı hale getirmek.
+  const [tab, setTab] = useState(() => (isAnonymousUpgrade ? "signup" : "signin")); // "signin" | "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -46,8 +49,14 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
           setError(err.message || "Kayıt başarısız. Lütfen tekrar dene.");
           return;
         }
-        // E-posta onayı açıksa session hemen gelmez; kullanıcıyı bilgilendir.
-        if (data?.session) {
+        // Anonim hesap yükseltme (bkz. useAuth.upgradeAnonymousAccount): bu
+        // `supabase.auth.updateUser(...)` çağırır, YENİ bir oturum DÖNMEZ
+        // (zaten anonim oturum olarak GİRİŞLİYDİ) — `data.session` kontrolü
+        // burada anlamsız, başarılı dönüş = anında tamamlanmış demektir.
+        if (isAnonymousUpgrade) {
+          onSuccess?.();
+        } else if (data?.session) {
+          // E-posta onayı açıksa session hemen gelmez; kullanıcıyı bilgilendir.
           onSuccess?.();
         } else {
           setInfo("Kayıt oluşturuldu! E-posta adresine gönderilen onay bağlantısına tıkladıktan sonra giriş yapabilirsin.");
@@ -97,9 +106,11 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
         <div className="flex items-start justify-between mb-5">
           <div>
             <h2 className="text-[18px] font-bold text-[var(--text-primary)]">
-              {tab === "signin" ? "Giriş Yap" : "Kayıt Ol"}
+              {isAnonymousUpgrade ? "Hesabını Kaydet" : tab === "signin" ? "Giriş Yap" : "Kayıt Ol"}
             </h2>
-            <p className="text-[12px] text-[var(--text-muted)] mt-1">Planlarını kaydetmek için hesabına bağlan.</p>
+            <p className="text-[12px] text-[var(--text-muted)] mt-1">
+              {contextMessage || (isAnonymousUpgrade ? "Şu ana kadar oluşturduğun her şey kalır — sadece bir email/şifre ekle." : "Planlarını kaydetmek için hesabına bağlan.")}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -111,7 +122,8 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
           </button>
         </div>
 
-        {/* Sekme kontrolü */}
+        {/* Sekme kontrolü — anonim yükseltmede gösterilmez (bkz. yukarıdaki not) */}
+        {!isAnonymousUpgrade && (
         <div
           className="flex rounded-xl p-1 gap-1 mb-4"
           style={{ background: "rgba(var(--overlay-rgb),0.045)", border: "1px solid rgba(var(--overlay-rgb),0.08)" }}
@@ -140,6 +152,7 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
             );
           })}
         </div>
+        )}
 
         {/* Google ile giriş */}
         <button

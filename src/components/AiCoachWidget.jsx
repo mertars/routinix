@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Bot } from "lucide-react";
-import { categoryOf } from "../constants";
+import { categoryOf, AI_GATE_MESSAGE } from "../constants";
 import { fetchDashboardData } from "../services/planService";
 import { callCoachAction } from "../services/coachActionService";
 import logger from "../utils/logger";
@@ -64,13 +64,18 @@ function TypingBubble() {
 // ikisi de usePlanStudio üzerinden gerçek Supabase mutasyonları tetikler.
 // Kullanıcının TÜM planları arasında bir "hedef plan" seçilebilir (dropdown);
 // AI da serbest metinden hangi planı kastettiğini kendi tespit edebilir.
-export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessage, onJumpToPlan }) {
+export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth, onApplyAction, onSendMessage, onJumpToPlan }) {
   const [open, setOpen] = useState(false);
   // Hak sayısı artık YALNIZCA sunucudan (api/coach-action.js -> user_quotas)
   // gelir — localStorage tabanlı sayaç kaldırıldı (DevTools'tan silinerek
   // sıfırlanabiliyordu). null = henüz bilinmiyor (drawer açılana kadar).
   const [remaining, setRemaining] = useState(null);
   const [dailyLimit, setDailyLimit] = useState(3);
+  // Admin/sınırsız hesaplar için sunucu `unlimited: true, remaining: null`
+  // döner (Infinity JSON'da sessizce null'a döndüğü için ayrı bir bayrak
+  // kullanılır, bkz. api/coach-action.js) — sayısal bir "kalan hak" göstermek
+  // yerine net bir "Sınırsız" rozeti gösterilir.
+  const [unlimited, setUnlimited] = useState(false);
   const [messages, setMessages] = useState([]);
   const [typing, setTyping] = useState(false);
   const [draft, setDraft] = useState("");
@@ -93,6 +98,7 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
     callCoachAction({ action: "status" })
       .then((res) => {
         if (cancelled || !res) return;
+        if (res.unlimited) setUnlimited(true);
         if (typeof res.remaining === "number") setRemaining(res.remaining);
         if (typeof res.dailyLimit === "number") setDailyLimit(res.dailyLimit);
       })
@@ -136,7 +142,17 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, typing]);
 
-  const locked = remaining !== null && remaining <= 0;
+  const locked = !unlimited && remaining !== null && remaining <= 0;
+
+  // Anonim (misafir) oturumlar AI Koç'a erişemez — sohbet çekmecesini açmak
+  // yerine doğrudan AuthModal'ı (AI'a özel bağlam mesajıyla) tetikler.
+  const handleToggleOpen = () => {
+    if (isAnonymous) {
+      onRequireAuth?.(AI_GATE_MESSAGE);
+      return;
+    }
+    setOpen((v) => !v);
+  };
   const displayRemaining = remaining ?? dailyLimit;
   const pushMessage = (msg) => setMessages((prev) => [...prev, msg]);
   const planOptions = allPlans.length ? allPlans : plan ? [plan] : [];
@@ -158,6 +174,7 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
     const result = await onApplyAction(action.key);
     if (!mountedRef.current) return;
     setTyping(false);
+    if (result?.unlimited) setUnlimited(true);
     if (typeof result?.remaining === "number") setRemaining(result.remaining);
     if (typeof result?.dailyLimit === "number") setDailyLimit(result.dailyLimit);
     pushMessage({ role: "bot", text: result?.message || "Bir şeyler ters gitti, tekrar dener misin?", error: result?.ok === false });
@@ -177,6 +194,7 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
     const result = await onSendMessage(text, { targetPlanId: selectedPlanId });
     if (!mountedRef.current) return;
     setTyping(false);
+    if (result?.unlimited) setUnlimited(true);
     if (typeof result?.remaining === "number") setRemaining(result.remaining);
     if (typeof result?.dailyLimit === "number") setDailyLimit(result.dailyLimit);
 
@@ -212,12 +230,12 @@ export default function AiCoachWidget({ plan, userId, onApplyAction, onSendMessa
           >
             ✨ AI Koç'a Danış{" "}
             <span style={{ color: locked ? "#FF6E92" : "#7DE9C3" }}>
-              ({displayRemaining}/{dailyLimit} Kalan Hak)
+              {unlimited ? "(✨ Sınırsız — Admin)" : `(${displayRemaining}/${dailyLimit} Kalan Hak)`}
             </span>
           </div>
 
           <button
-            onClick={() => setOpen((v) => !v)}
+            onClick={handleToggleOpen}
             aria-label="AI Koç'u aç"
             className="relative w-14 h-14 rounded-full flex items-center justify-center bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-500 ring-2 ring-violet-500/50 motion-safe:animate-pulse transition-transform duration-200 hover:scale-105 active:scale-95"
             style={{ boxShadow: "0 10px 34px -10px rgba(124,58,237,0.75), 0 0 24px -6px rgba(124,58,237,0.55)" }}

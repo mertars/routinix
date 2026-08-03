@@ -19,6 +19,12 @@ export default async function handler(req, res) {
   if (!user) {
     return res.status(401).json({ ok: false, message: "Oturum doğrulanamadı, tekrar giriş yapar mısın?" });
   }
+  // AI plan üretimi anonim (misafir) oturumlara KAPALI — client tarafındaki
+  // gate (usePlanStudio.js) yalnızca UX'tir, GERÇEK sınır burasıdır: `is_anonymous`
+  // JWT'den doğrulanır, client'ın gönderdiği hiçbir alana güvenilmez.
+  if (user.is_anonymous) {
+    return res.status(403).json({ ok: false, message: "403 Forbidden - Login Required: AI ile plan oluşturmak için ücretsiz hesabını tamamlaman gerekiyor." });
+  }
 
   const { action, payload } = req.body || {};
   if (!action) {

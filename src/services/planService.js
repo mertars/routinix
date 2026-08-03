@@ -209,6 +209,22 @@ export async function fetchDashboardData(userId) {
   }));
 }
 
+// Belirli id'lere sahip görevlerin YALNIZCA başlıklarını getirir — WeeklyFlowModal
+// "Şampiyon Rutin" slaytında focus_sessions.task_id'den gelen id'leri okunabilir
+// başlıklara çevirmek için. Embed (`tasks(title)`) yerine bilerek AYRI bir sorgu:
+// communityService.js'teki template_stats deseniyle aynı sebep — PostgREST
+// embed'i tetiklemeden, küçük/hedefli bir `in (...)` sorgusu.
+export async function fetchTasksByIds(userId, taskIds) {
+  const ids = [...new Set(taskIds)].filter(Boolean);
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase.from("tasks").select("id, title").eq("user_id", userId).in("id", ids);
+  if (error) {
+    logger.error("SUPABASE", "Görev başlıkları getirilemedi", { table: "tasks", action: "select", userId, error });
+    return [];
+  }
+  return data || [];
+}
+
 // Kullanıcının kayıtlı planlarını (özet) getirir — "Planlarım" listesi için.
 export async function fetchUserPlans(userId) {
   const { data, error } = await supabase
