@@ -60,10 +60,9 @@ export function InlineFallback() {
   );
 }
 
-// MobileActionDeck için — `stage === STAGE_PLAN` olunca ağaca girer
-// (framer-motion, bu tek bileşen için gelen tek bağımlılık — masaüstünü/diğer
-// ekranları hiç etkilememesi için lazy). Gerçek bileşenle AYNI rezerve
-// alanı (`md:hidden`, minHeight 168) kullanır, CLS = 0.
+// MobileActionDeck için — `stage === STAGE_PLAN` olunca ağaca girer.
+// Gerçek bileşenle AYNI rezerve alanı (`md:hidden`, minHeight 168) kullanır,
+// CLS = 0.
 export function DeckFallback() {
   return (
     <div className="md:hidden w-full mb-5 rounded-3xl animate-pulse" style={{ minHeight: 168, background: "rgba(var(--overlay-rgb),0.04)" }} aria-hidden="true" />

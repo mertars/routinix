@@ -7,13 +7,18 @@ import { useTheme } from "../context/ThemeContext";
 // + mor/siyan neon `drop-shadow` ışıltısı. Panel açıkken oklar "X"e döner.
 // Framer Motion BİLEREK kullanılmadı (bkz. GlobalStyles.jsx yorumu) — Header
 // koşulsuz kök bileşen, saf CSS aynı hissi sıfır bundle maliyetiyle verir.
+// YALNIZCA masaüstü (md:flex, mobilde hidden) — mobil artık BottomTabBar.jsx
+// (sabit alt gezinme + FAB) kullanıyor, "gizli menü" yaklaşımı mobilde
+// bilinçli olarak tamamen kaldırıldı (bkz. app.jsx). Masaüstünde DrawerMenu
+// hâlâ Ritim/Planlarım/Plan Ekle gibi Header'ın kendi inline nav'ında
+// yer almayan hedefler için gerekli, o yüzden BURADA duruyor.
 function MenuTrigger({ open, onToggle }) {
   return (
     <button
       onClick={onToggle}
       aria-label={open ? "Menüyü kapat" : "Menüyü aç"}
       aria-expanded={open}
-      className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 px-2 py-1"
+      className="hidden md:flex absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex-col items-center gap-0.5 px-2 py-1"
     >
       <span className="text-[10.5px] font-bold uppercase tracking-[0.05em]" style={{ color: "var(--text-secondary)" }}>
         Menü

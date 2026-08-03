@@ -7,6 +7,7 @@ import { setLogUser } from "./utils/logger";
 import Header from "./components/Header";
 import ConfirmModal from "./components/ConfirmModal";
 import DrawerMenu from "./components/DrawerMenu";
+import BottomTabBar from "./components/BottomTabBar";
 import DeletePlanModal from "./components/DeletePlanModal";
 import CategoryIntro from "./components/CategoryIntro";
 import PlanBoard from "./components/PlanBoard";
@@ -343,13 +344,18 @@ export default function App() {
           onOpenProfile={openNexusProfile}
         />
 
+        {/* Sabit alt gezinme barı — mobilde HER ZAMAN görünür (bkz.
+            BottomTabBar.jsx dosya başı yorumu), Header'ın gizli-menü
+            tetikleyicisinin mobildeki yerini alır. */}
+        <BottomTabBar onOpenCommunity={toggleCommunity} onOpenRoutines={toggleRoutines} onOpenProfile={openNexusProfile} onNewPlan={ps.startNewPlan} />
+
         <main
           className={`flex-1 min-h-0 w-full mx-auto ${
             onIntroLike
-              ? "max-w-7xl px-4 md:px-6 pt-4 md:pt-8 pb-4 md:pb-10 flex flex-col"
+              ? "max-w-7xl px-4 md:px-6 pt-4 md:pt-8 pb-24 md:pb-10 flex flex-col"
               : stage === STAGE_PLAN
-                ? "max-w-7xl px-4 md:px-8 pt-6 pb-16"
-                : "max-w-xl px-5 pt-6 pb-16"
+                ? "max-w-7xl px-4 md:px-8 pt-6 pb-24 md:pb-16"
+                : "max-w-xl px-5 pt-6 pb-24 md:pb-16"
           }`}
         >
           {onIntroLike && (
@@ -390,11 +396,10 @@ export default function App() {
               <MobileActionDeck
                 user={auth.user}
                 planGoal={ps.dbPlan?.summary}
-                onOpenRoutines={toggleRoutines}
-                onOpenPomodoro={togglePomodoro}
-                onOpenProfile={openNexusProfile}
+                onOpenCommunity={toggleCommunity}
                 onNewPlan={ps.startNewPlan}
                 onDeletePlan={onDeletePlan}
+                savedPlansCount={ps.savedPlans.length}
               />
             </Suspense>
           )}

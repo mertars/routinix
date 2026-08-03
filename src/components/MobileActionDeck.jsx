@@ -1,17 +1,16 @@
 import { useState, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Repeat2, Timer, User, X, Plus, Trash2 } from "lucide-react";
+import { Share2, Plus, Trash2 } from "lucide-react";
 import { MONO_FONT } from "../constants";
 import { fetchDashboardData } from "../services/planService";
 import { isRoutineChecked } from "../utils/routineCheckin";
 
-const CARD_BG = "rgba(var(--overlay-rgb), 0.05)";
-const CARD_BORDER = "1px solid rgba(var(--overlay-rgb), 0.12)";
-
-// Bugünün GERÇEK rutin tamamlama yüzdesi — DrawerMenu.jsx'teki AYNI mantık
-// (bkz. orada ki uzun yorum): rutin check-in'leri sunucuda tarih-bazlı
-// SAKLANMIYOR, yalnızca localStorage'da bugünün tarihiyle. Bu yüzden burada
-// da sahte bir "seri" sayısı YOK, yalnızca gerçek, o an hesaplanabilir %.
+// Bugünün GERÇEK rutin tamamlama yüzdesi. Rutin check-in'leri sunucuda
+// tarih-bazlı SAKLANMIYOR (bkz. utils/routineCheckin.js — bilinçli olarak
+// yalnızca localStorage, günün tarihine göre anahtarlı). Bu yüzden çok
+// günlü bir "seri/streak" GÜN SAYISI gerçek bir veriye dayanamaz — kart
+// bunun yerine bugünün gerçek % ilerlemesini gösterir, %100 olunca "seri"
+// hissini gerçek bir kutlama rozetiyle (🔥) verir; uydurma bir gün sayısı
+// GÖSTERİLMEZ.
 function useTodayProgress(user) {
   const [routines, setRoutines] = useState(null);
 
@@ -36,186 +35,88 @@ function useTodayProgress(user) {
   }, [routines]);
 }
 
-function FrontCard({ icon, label, value, gradient, glow, onClick, side, revealed }) {
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      animate={{ x: revealed ? (side === "left" ? -18 : 18) : 0, opacity: revealed ? 0 : 1 }}
-      transition={{ type: "spring", stiffness: 320, damping: 28 }}
-      style={{ pointerEvents: revealed ? "none" : "auto", background: CARD_BG, border: CARD_BORDER }}
-      className="bento-card card-glow relative flex items-center gap-3 rounded-3xl p-3.5 text-left"
-    >
-      <span className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-gradient-to-br ${gradient} shadow-lg ${glow} shrink-0`}>
-        {icon}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-[10.5px] font-semibold uppercase tracking-[0.04em]" style={{ color: "var(--text-muted)" }}>
-          {label}
-        </span>
-        <span className="block text-[15px] font-black truncate" style={{ color: "var(--text-primary)", fontFamily: MONO_FONT }}>
-          {value}
-        </span>
-      </span>
-    </motion.button>
-  );
-}
-
-// "Center Split Reveal" — Routinix ana ekranındaki 2x2 Bento kart bloğu.
-// Kullanıcı yatay kaydırdığında (ya da ortadaki indikatöre dokunduğunda)
-// sol sütun sola, sağ sütun sağa akıcı bir spring'le ayrılır ve arkasındaki
-// aksiyon panelini (Eylem Deck'i) açığa çıkarır. DrawerMenu.jsx'in (☰ menü)
-// YERİNE geçmez — o hâlâ tüm gezinme hedeflerini taşıyor; bu, ana ekrandaki
-// en sık kullanılan 4 kısayol için AYRI, kasıtlı olarak dar kapsamlı bir
-// hızlı-erişim bileşenidir.
-//
-// TEMA: DrawerMenu ile birebir aynı token seti (`--overlay-rgb`/`--text-*`/
-// `--glass-rgb`/`--modal-border`) — hiçbir hardcoded siyah/beyaz yok, tek
-// kaynaktan (index.css) hem koyu hem açık temada doğru çalışır. Kartlarda
-// TEK bir `border` katmanı var (çift kenarlık hatası burada da bilerek
-// tekrarlanmadı).
-export default function MobileActionDeck({ user, planGoal, onOpenRoutines, onOpenPomodoro, onOpenProfile, onNewPlan, onDeletePlan }) {
-  const [revealed, setRevealed] = useState(false);
+// "Feature-First Mobile Layout" — ana ekranda HER ZAMAN görünür bento kart
+// akışı (eski "Center Split Reveal" swipe-jesti bilinçli olarak kaldırıldı:
+// bu turun isteği "hiçbir özellik derin menülere/jestlere saklanmasın" —
+// bir kaydırma jesti arkasına gizlemek de bu ilkeyle çelişirdi). framer-motion
+// bu yüzden artık kullanılmıyor; paketten de kaldırıldı (bkz. package.json).
+export default function MobileActionDeck({ user, planGoal, onOpenCommunity, onNewPlan, onDeletePlan, savedPlansCount }) {
   const { totalCount, todayPct } = useTodayProgress(user);
 
-  const cards = [
-    {
-      key: "progress",
-      side: "left",
-      icon: <Sparkles className="w-[18px] h-[18px]" strokeWidth={2.25} />,
-      label: "İlerleme",
-      value: totalCount > 0 ? `%${todayPct}` : "—",
-      gradient: "from-cyan-400 to-purple-600",
-      glow: "shadow-purple-500/30",
-      onClick: () => setRevealed((v) => !v),
-    },
-    {
-      key: "routines",
-      side: "right",
-      icon: <Repeat2 className="w-[18px] h-[18px]" strokeWidth={2.25} />,
-      label: "Rutinler",
-      value: "Bugün",
-      gradient: "from-emerald-400 to-teal-600",
-      glow: "shadow-emerald-500/30",
-      onClick: onOpenRoutines,
-    },
-    {
-      key: "pomodoro",
-      side: "left",
-      icon: <Timer className="w-[18px] h-[18px]" strokeWidth={2.25} />,
-      label: "Pomodoro",
-      value: "Odaklan",
-      gradient: "from-pink-500 to-rose-600",
-      glow: "shadow-pink-500/30",
-      onClick: onOpenPomodoro,
-    },
-    {
-      key: "profile",
-      side: "right",
-      icon: <User className="w-[18px] h-[18px]" strokeWidth={2.25} />,
-      label: "Profil",
-      value: "Nexus",
-      gradient: "from-sky-400 to-indigo-600",
-      glow: "shadow-indigo-500/30",
-      onClick: onOpenProfile,
-    },
-  ];
-
-  const handlePanEnd = (_e, info) => {
-    if (Math.abs(info.offset.x) > 44 || Math.abs(info.velocity.x) > 350) setRevealed((v) => !v);
-  };
-
   return (
-    <div className="md:hidden relative w-full mb-5" style={{ minHeight: 168 }}>
-      {/* Arka katman — açılan eylem paneli */}
-      <AnimatePresence>
-        {revealed && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 340, damping: 30 }}
-            className="absolute inset-0 z-0 flex flex-col gap-3 rounded-3xl p-4"
-            style={{ background: "rgba(var(--glass-rgb), var(--alpha-modal))", border: "1px solid var(--modal-border)", backdropFilter: "blur(20px) saturate(160%)", WebkitBackdropFilter: "blur(20px) saturate(160%)" }}
-          >
-            <button
-              onClick={() => setRevealed(false)}
-              aria-label="Kapat"
-              className="absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
-              style={{ background: "rgba(var(--overlay-rgb),0.06)", color: "var(--text-muted)" }}
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-
-            <div
-              className="rounded-2xl p-3.5 pr-9"
-              style={{
-                background: "rgba(var(--overlay-rgb),0.045)",
-                boxShadow: "-6px 0 18px -6px rgba(178,107,255,0.4), 6px 0 18px -6px rgba(34,211,238,0.35), 0 0 0 1px rgba(178,107,255,0.3)",
-              }}
-            >
-              <p className="text-[10px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--text-faint)" }}>
-                🎯 Bugünkü Odak Noktan
-              </p>
-              <p className="mt-1 text-[13px] font-semibold leading-relaxed line-clamp-2" style={{ color: "var(--text-primary)" }}>
-                {planGoal || "Henüz bir hedef belirlenmedi — yeni bir plan başlat."}
-              </p>
+    <div className="md:hidden w-full mb-5 flex flex-col gap-2.5">
+      {/* 1) Günün İlerlemesi & Seri Kartı */}
+      <div
+        className="rounded-3xl p-4 text-white relative overflow-hidden"
+        style={{ background: "linear-gradient(135deg, #7C3AED 0%, #6366F1 100%)", border: "1px solid rgba(255,255,255,0.18)" }}
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] px-2 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.18)", color: "#F3E8FF" }}>
+            ☀️ Günün İlerlemesi
+          </span>
+          {totalCount > 0 && (
+            <span className="flex items-center gap-1 text-[11px] font-bold" style={{ color: todayPct === 100 ? "#B9F8CF" : "#F3E8FF", fontFamily: MONO_FONT }}>
+              {todayPct === 100 ? "🔥 Seri Devam Ediyor!" : `${todayPct}% tamam`}
+            </span>
+          )}
+        </div>
+        {totalCount > 0 ? (
+          <>
+            <div className="mt-2.5 text-[24px] font-black leading-none" style={{ fontFamily: MONO_FONT }}>
+              %{todayPct} <span className="text-[12px] font-bold text-purple-100/80">Tamamlandı</span>
             </div>
-
-            <div className="grid grid-cols-2 gap-2 mt-auto">
-              <button
-                onClick={() => {
-                  onNewPlan?.();
-                  setRevealed(false);
-                }}
-                className="card-glow flex items-center justify-center gap-1.5 rounded-2xl py-3.5 text-[13px] font-black text-white transition-transform active:scale-[0.97]"
-                style={{ background: "linear-gradient(135deg, #22D3EE, #7C3AED)" }}
-              >
-                <Plus className="w-4 h-4" strokeWidth={2.75} /> Plan Ekle
-              </button>
-              <button
-                onClick={() => {
-                  onDeletePlan?.();
-                  setRevealed(false);
-                }}
-                className="card-glow flex items-center justify-center gap-1.5 rounded-2xl py-3.5 text-[13px] font-bold transition-colors active:scale-[0.97]"
-                style={{ background: "rgba(var(--overlay-rgb),0.06)", color: "var(--text-secondary)", border: "1px solid rgba(var(--overlay-rgb),0.14)" }}
-              >
-                <Trash2 className="w-4 h-4" /> Planları Yönet
-              </button>
+            <div className="mt-2.5 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.16)" }}>
+              <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${todayPct}%`, background: "#ffffff" }} />
             </div>
-          </motion.div>
+          </>
+        ) : (
+          <p className="mt-2.5 text-[13px] font-bold">{user ? "Henüz rutin eklenmedi" : "Giriş yapılmadı"}</p>
         )}
-      </AnimatePresence>
+        {planGoal && <p className="mt-2.5 text-[11.5px] font-semibold text-purple-100/75 line-clamp-1">🎯 {planGoal}</p>}
+      </div>
 
-      {/* Ön katman — 2x2 Bento grid, yatay pan jestiyle ikiye ayrılır */}
-      <motion.div className="relative z-10 grid grid-cols-2 gap-2.5" onPanEnd={handlePanEnd}>
-        {cards.map((c) => (
-          <FrontCard
-            key={c.key}
-            icon={c.icon}
-            label={c.label}
-            value={c.value}
-            gradient={c.gradient}
-            glow={c.glow}
-            side={c.side}
-            revealed={revealed}
-            onClick={c.onClick}
-          />
-        ))}
+      {/* 2) Sosyal & Paylaşım Showcase Kartı */}
+      <button
+        type="button"
+        onClick={onOpenCommunity}
+        className="card-glow rounded-3xl p-4 text-left text-white relative overflow-hidden"
+        style={{ background: "linear-gradient(135deg, #EC4899 0%, #7C3AED 100%)", border: "1px solid rgba(255,255,255,0.2)" }}
+      >
+        <span className="w-9 h-9 rounded-2xl flex items-center justify-center bg-white/20">
+          <Share2 className="w-4.5 h-4.5" strokeWidth={2.5} />
+        </span>
+        <p className="mt-2.5 text-[14.5px] font-black leading-tight">Planını Toplulukla Paylaş</p>
+        <p className="mt-0.5 text-[11.5px] font-semibold text-white/80">Routinix Nexus'ta binlerce kişiye ilham ver</p>
+      </button>
 
-        {/* Ortadaki yön indikatörü — dokununca da paneli açar/kapatır */}
-        <motion.button
-          type="button"
-          onClick={() => setRevealed((v) => !v)}
-          animate={{ opacity: revealed ? 0 : 1, x: [0, 3, -3, 0] }}
-          transition={{ opacity: { duration: 0.2 }, x: { duration: 2.2, repeat: Infinity, ease: "easeInOut" } }}
-          style={{ pointerEvents: revealed ? "none" : "auto", background: "rgba(var(--glass-rgb), var(--alpha-modal))", border: "1px solid var(--modal-border)", color: "var(--text-secondary)" }}
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 rounded-full px-3 py-1.5 text-[10.5px] font-bold whitespace-nowrap backdrop-blur-md"
+      {/* 3) Hızlı Erişim — Plan Ekle / Planları Yönet */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <button
+          onClick={onNewPlan}
+          className="card-glow flex flex-col items-start justify-between gap-3 rounded-3xl p-4 text-left"
+          style={{ background: "rgba(var(--overlay-rgb),0.05)", border: "1px solid rgba(var(--overlay-rgb),0.12)" }}
         >
-          ↔ Eylemler için kaydır
-        </motion.button>
-      </motion.div>
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white bg-gradient-to-br from-cyan-400 to-purple-600 shadow-lg shadow-purple-500/30">
+            <Plus className="w-4.5 h-4.5" strokeWidth={2.75} />
+          </span>
+          <span className="text-[13px] font-black leading-tight" style={{ color: "var(--text-primary)" }}>
+            Yeni Plan Hazırla
+          </span>
+        </button>
+        <button
+          onClick={onDeletePlan}
+          disabled={!savedPlansCount}
+          className="card-glow flex flex-col items-start justify-between gap-3 rounded-3xl p-4 text-left disabled:opacity-40 disabled:pointer-events-none"
+          style={{ background: "rgba(var(--overlay-rgb),0.05)", border: "1px solid rgba(var(--overlay-rgb),0.12)" }}
+        >
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white bg-gradient-to-br from-rose-500 to-red-700 shadow-lg shadow-rose-500/30">
+            <Trash2 className="w-4.5 h-4.5" strokeWidth={2.5} />
+          </span>
+          <span className="text-[13px] font-black leading-tight" style={{ color: "var(--text-primary)" }}>
+            Planları Yönet
+          </span>
+        </button>
+      </div>
     </div>
   );
 }
