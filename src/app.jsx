@@ -17,7 +17,7 @@ import GlobalStyles from "./components/GlobalStyles";
 // bu yüzden diğer panellerin aksine BİLEREK statik import edilir.
 import SharedTemplateView from "./components/SharedTemplateView";
 import GuestBanner from "./components/GuestBanner";
-import { InlineFallback, FabFallback, OverlayFallback } from "./components/LazyFallback";
+import { InlineFallback, FabFallback, OverlayFallback, DeckFallback } from "./components/LazyFallback";
 
 // İlk boyamada (intro ekranı) KESİNLİKLE gerekmeyen, yalnızca kullanıcı
 // etkileşimiyle açılan panel/modal bileşenleri — ayrı chunk'lara bölünür
@@ -52,6 +52,7 @@ const PomodoroStudio = lazy(() => import("./components/PomodoroStudio"));
 const OnboardingWizard = lazy(() => import("./components/OnboardingWizard"));
 const RhythmStudio = lazy(() => import("./components/RhythmStudio"));
 const CommunityHub = lazy(() => import("./components/CommunityHub"));
+const MobileActionDeck = lazy(() => import("./components/MobileActionDeck"));
 const NexusProfileOverlay = lazy(() => import("./components/community/NexusProfileOverlay"));
 
 export default function App() {
@@ -403,6 +404,20 @@ export default function App() {
                 onPrev={ps.goPrevQuestion}
                 onNext={ps.goNextQuestion}
                 onFinish={ps.finalizeAndGenerate}
+              />
+            </Suspense>
+          )}
+
+          {stage === STAGE_PLAN && (
+            <Suspense fallback={<DeckFallback />}>
+              <MobileActionDeck
+                user={auth.user}
+                planGoal={ps.dbPlan?.summary}
+                onOpenRoutines={toggleRoutines}
+                onOpenPomodoro={togglePomodoro}
+                onOpenProfile={openNexusProfile}
+                onNewPlan={ps.startNewPlan}
+                onDeletePlan={onDeletePlan}
               />
             </Suspense>
           )}
