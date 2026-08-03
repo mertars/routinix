@@ -7,7 +7,6 @@ import { setLogUser } from "./utils/logger";
 import Header from "./components/Header";
 import ConfirmModal from "./components/ConfirmModal";
 import DrawerMenu from "./components/DrawerMenu";
-import BottomTabBar from "./components/BottomTabBar";
 import DeletePlanModal from "./components/DeletePlanModal";
 import CategoryIntro from "./components/CategoryIntro";
 import PlanBoard from "./components/PlanBoard";
@@ -18,7 +17,7 @@ import GlobalStyles from "./components/GlobalStyles";
 // bu yüzden diğer panellerin aksine BİLEREK statik import edilir.
 import SharedTemplateView from "./components/SharedTemplateView";
 import GuestBanner from "./components/GuestBanner";
-import { InlineFallback, FabFallback, OverlayFallback, DeckFallback } from "./components/LazyFallback";
+import { InlineFallback, FabFallback, OverlayFallback } from "./components/LazyFallback";
 
 // İlk boyamada (intro ekranı) KESİNLİKLE gerekmeyen, yalnızca kullanıcı
 // etkileşimiyle açılan panel/modal bileşenleri — ayrı chunk'lara bölünür
@@ -53,7 +52,6 @@ const PomodoroStudio = lazy(() => import("./components/PomodoroStudio"));
 const OnboardingWizard = lazy(() => import("./components/OnboardingWizard"));
 const RhythmStudio = lazy(() => import("./components/RhythmStudio"));
 const CommunityHub = lazy(() => import("./components/CommunityHub"));
-const MobileActionDeck = lazy(() => import("./components/MobileActionDeck"));
 const NexusProfileOverlay = lazy(() => import("./components/community/NexusProfileOverlay"));
 
 export default function App() {
@@ -236,6 +234,8 @@ export default function App() {
     ps.setMenuOpen(false);
     setDeleteOpen(true);
   }, [ps.setMenuOpen]);
+  const onToggleReminders = useCallback(() => ps.setRemindersOn((v) => !v), [ps.setRemindersOn]);
+  const onToggleHaptics = useCallback(() => ps.setHapticsOn((v) => !v), [ps.setHapticsOn]);
 
   // Giriş/Kayıt modalı JSX'i TEK yerde tanımlanır — hem normal uygulama
   // kabuğunda hem de SharedTemplateView'ın erken-return dalında (aşağıda)
@@ -342,20 +342,19 @@ export default function App() {
           onOpenCommunity={toggleCommunity}
           onOpenPomodoro={togglePomodoro}
           onOpenProfile={openNexusProfile}
+          remindersOn={ps.remindersOn}
+          onToggleReminders={onToggleReminders}
+          hapticsOn={ps.hapticsOn}
+          onToggleHaptics={onToggleHaptics}
         />
-
-        {/* Sabit alt gezinme barı — mobilde HER ZAMAN görünür (bkz.
-            BottomTabBar.jsx dosya başı yorumu), Header'ın gizli-menü
-            tetikleyicisinin mobildeki yerini alır. */}
-        <BottomTabBar onOpenCommunity={toggleCommunity} onOpenRoutines={toggleRoutines} onOpenProfile={openNexusProfile} onNewPlan={ps.startNewPlan} />
 
         <main
           className={`flex-1 min-h-0 w-full mx-auto ${
             onIntroLike
-              ? "max-w-7xl px-4 md:px-6 pt-4 md:pt-8 pb-24 md:pb-10 flex flex-col"
+              ? "max-w-7xl px-4 md:px-6 pt-4 md:pt-8 pb-4 md:pb-10 flex flex-col"
               : stage === STAGE_PLAN
-                ? "max-w-7xl px-4 md:px-8 pt-6 pb-24 md:pb-16"
-                : "max-w-xl px-5 pt-6 pb-24 md:pb-16"
+                ? "max-w-7xl px-4 md:px-8 pt-6 pb-16"
+                : "max-w-xl px-5 pt-6 pb-16"
           }`}
         >
           {onIntroLike && (
@@ -387,19 +386,6 @@ export default function App() {
                 onPrev={ps.goPrevQuestion}
                 onNext={ps.goNextQuestion}
                 onFinish={ps.finalizeAndGenerate}
-              />
-            </Suspense>
-          )}
-
-          {stage === STAGE_PLAN && (
-            <Suspense fallback={<DeckFallback />}>
-              <MobileActionDeck
-                user={auth.user}
-                planGoal={ps.dbPlan?.summary}
-                onOpenCommunity={toggleCommunity}
-                onNewPlan={ps.startNewPlan}
-                onDeletePlan={onDeletePlan}
-                savedPlansCount={ps.savedPlans.length}
               />
             </Suspense>
           )}

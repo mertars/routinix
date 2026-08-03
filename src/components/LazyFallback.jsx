@@ -60,15 +60,6 @@ export function InlineFallback() {
   );
 }
 
-// MobileActionDeck için — `stage === STAGE_PLAN` olunca ağaca girer.
-// Gerçek bileşenle AYNI rezerve alanı (`md:hidden`, minHeight 168) kullanır,
-// CLS = 0.
-export function DeckFallback() {
-  return (
-    <div className="md:hidden w-full mb-5 rounded-3xl animate-pulse" style={{ minHeight: 168, background: "rgba(var(--overlay-rgb),0.04)" }} aria-hidden="true" />
-  );
-}
-
 // AiCoachWidget için — yalnızca `stage === STAGE_PLAN && dbPlan` olunca
 // ağaca girer. Widget'ın sağ-alt sabit tetikleyici baloncuğuyla BİREBİR aynı
 // konum/boyutta (w-14 h-14, aynı fixed ofset, aynı z-40) — chunk gelip
