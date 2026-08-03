@@ -324,6 +324,7 @@ export default function App() {
           accent={mode.accent}
           accentSoft={mode.accentSoft}
           user={auth.user}
+          savedPlans={ps.savedPlans}
           savedPlansCount={ps.savedPlans.length}
           remindersOn={ps.remindersOn}
           onToggleReminders={onToggleReminders}

@@ -5,7 +5,8 @@ import CoverPattern from "./community/CoverPattern";
 import Avatar from "./community/Avatar";
 import TemplateTaskEditor from "./community/TemplateTaskEditor";
 import { parseStorySections } from "../utils/formatTemplateStory";
-import { fetchTemplateByIdOrSlug, incrementTemplateView, cloneTemplateToMyPlans } from "../services/communityService";
+import { fetchTemplateByIdOrSlug, incrementTemplateView, cloneTemplateToMyPlans, recordTemplateClone } from "../services/communityService";
+import { fetchProfileByAuthUserId } from "../services/profileService";
 import { buildTemplateShareMessage } from "../utils/shareLink";
 import logger from "../utils/logger";
 
@@ -37,6 +38,7 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
+  const ctaRef = useRef(null);
   // Eklenen plan — dolunca kısa bir başarı ekranı gösterilir, ardından
   // gerçek uygulama kabuğuna (yeni planı doğrudan açarak) geçilir.
   const [successPlan, setSuccessPlan] = useState(null);
@@ -116,8 +118,6 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
     }
   };
 
-  const handlePrint = () => window.print();
-
   // Başarı ekranını kısa bir süre GÖSTER, sonra app.jsx'e devret (o da
   // URL'i temizleyip normal uygulamayı yeni planı doğrudan açık şekilde
   // render eder — bkz. app.jsx handleSharedTemplateDone). Kullanıcı
@@ -128,16 +128,23 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
     return () => clearTimeout(id);
   }, [successPlan, onDone]);
 
-  // "🚀 Kendi Planlarıma Ekle" — HİÇ düzenlemeden, orijinal şablon verisiyle
-  // anında klonlar (edit state'inden TAMAMEN bağımsız — kullanıcı daha önce
-  // düzenleme moduna girip geri dönmüş olsa bile bu buton her zaman
-  // ORİJİNAL/pristine `template`'i kullanır).
+  // "🚀 Planı Ekle ve Çıktısını Çıkar" — HİÇ düzenlemeden, orijinal şablon
+  // verisiyle anında klonlar (edit state'inden TAMAMEN bağımsız — kullanıcı
+  // daha önce düzenleme moduna girip geri dönmüş olsa bile bu buton her
+  // zaman ORİJİNAL/pristine `template`'i kullanır). Ardından sosyal-kanıt
+  // olayını (template_clones — bkz. TemplateDetailModal.jsx'teki aynı desen)
+  // best-effort kaydeder ve `window.print()`'i HENÜZ önizleme (preview)
+  // içeriği ekrandayken tetikler — `successPlan` ekranına geçmeden ÖNCE,
+  // aksi halde yazdırma diyaloğu boş bir "✅ eklendi" ekranını yakalardı.
   const handleQuickAdd = async () => {
     if (adding || !auth.user) return;
     setAdding(true);
     setAddError("");
     try {
       const plan = await cloneTemplateToMyPlans(template, auth.user.id);
+      const myProfile = await fetchProfileByAuthUserId(auth.user.id);
+      if (myProfile) recordTemplateClone(template.id, myProfile.id);
+      window.print();
       setSuccessPlan(plan);
     } catch (err) {
       logger.error("SHARED_TEMPLATE", "Plan eklenemedi (hızlı ekle)", { idOrSlug, templateDbId: template?.id, error: err?.message });
@@ -234,18 +241,26 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
   return (
     <div className="shared-template-print-root fixed inset-0 z-[200] overflow-y-auto bg-[#080d1a] text-white">
       {/* Yazdırma/PDF desteği — `.no-print` işaretli her şey (üst şerit,
-          güvenlik/CTA butonları, kapak fotoğrafı) yazdırırken tamamen
-          kaldırılır; koyu tema `filter: invert()` ile okunabilir bir
-          siyah-üzerine-beyaza çevrilir (kağıda koyu bir zemin basmak yerine).
-          "PDF Çıktısı Alınabilir" etiketi bu yüzden GERÇEK bir işlevdir. */}
+          güvenlik/CTA butonları, kapak fotoğrafı) VE her `<button>` yazdırırken
+          tamamen kaldırılır; geriye yalnızca başlık, hikaye bölümleri ve
+          rutin listesinden oluşan temiz bir metin taslağı kalır. Zemin/metin
+          rengi TÜM alt elemanlarda (Tailwind'in koyu tema sınıflarını ezerek)
+          açıkça beyaza/siyaha zorlanır — koyu temanın ekrandaki hali kağıda
+          hiç yansımaz. "PDF Çıktısı Alınabilir" etiketi bu yüzden GERÇEK bir
+          işlevdir (bkz. handleQuickAdd — plan eklendikten hemen sonra
+          `window.print()` tetiklenir). */}
       <style>{`
         @media print {
-          .no-print { display: none !important; }
+          button, .no-print { display: none !important; }
           .shared-template-print-root {
             position: static !important;
             overflow: visible !important;
-            background: #fff !important;
-            filter: invert(1) hue-rotate(180deg);
+          }
+          .shared-template-print-root, .shared-template-print-root * {
+            background: #ffffff !important;
+            color: #000000 !important;
+            border-color: #d4d4d8 !important;
+            box-shadow: none !important;
           }
         }
       `}</style>
@@ -288,7 +303,7 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
           </p>
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
-              onClick={handlePrint}
+              onClick={() => ctaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
               className="flex items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-[10.5px] font-semibold text-slate-300 hover:border-cyan-500/40 transition-colors"
             >
               <FileDown className="w-3 h-3" /> PDF Çıktısı Alınabilir
@@ -361,14 +376,14 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
             + "vazgeç" gösterilir — iki farklı "ekle" butonunun AYNI ANDA
             görünüp kafa karıştırmasını önler. */}
         {mode === "preview" ? (
-          <div className="no-print sticky bottom-4 flex flex-col gap-2">
+          <div ref={ctaRef} className="no-print sticky bottom-4 flex flex-col gap-2">
             <button
               onClick={handleQuickAdd}
               disabled={adding || !auth.user}
               className="w-full flex items-center justify-center gap-2 rounded-full px-5 py-3.5 text-[13.5px] font-bold text-black disabled:opacity-60 transition-transform active:scale-[0.98]"
               style={{ background: "linear-gradient(90deg, #22D3EE, #B26BFF)", boxShadow: "0 12px 30px -10px rgba(178,107,255,0.5)" }}
             >
-              🚀 {adding ? "Ekleniyor..." : "Kendi Planlarıma Ekle"}
+              🚀 {adding ? "Ekleniyor..." : "Planı Ekle ve Çıktısını Çıkar"}
             </button>
             <button
               onClick={() => setMode("edit")}
@@ -379,7 +394,7 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
             </button>
           </div>
         ) : (
-          <div className="no-print sticky bottom-4 flex flex-col gap-2">
+          <div ref={ctaRef} className="no-print sticky bottom-4 flex flex-col gap-2">
             <button
               onClick={handleAddEditedToMyPlans}
               disabled={adding || !auth.user}

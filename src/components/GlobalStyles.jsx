@@ -23,6 +23,14 @@ export default function GlobalStyles() {
         from { transform: translateY(100%); }
         to { transform: translateY(0); }
       }
+      /* DrawerMenu.jsx (Bento Bottom Sheet) açılış — hafif "geri tepen" (spring)
+         hissi için taşmalı (overshoot) bir bezier eğrisi kullanılır, düz
+         ease-out DEĞİL. cubic-bezier(0.34,1.56,0.64,1) klasik bir "back-out"
+         yaklaşıklamasıdır: eğri 1.0'ı geçici olarak aşıp geri döner. */
+      @keyframes bentoSheetIn {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+      }
       @keyframes slideDownSheet {
         from { transform: translateY(0); opacity: 1; }
         to { transform: translateY(100%); opacity: 0.4; }
@@ -55,6 +63,35 @@ export default function GlobalStyles() {
       .drawer-panel-left { animation: slideInDrawerLeft 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
       .focus-sheet { animation: slideUpSheet 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
       .day-reveal { animation: dayReveal 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+
+      /* --- DrawerMenu.jsx: mobilde alttan yukarı yaylı (spring) açılan Bento
+         Bottom Sheet, md'den itibaren sağdan kayan ince bir yan panele
+         dönüşür (FocusSidePanel/TaskDrawer ile AYNI duyarlı desen) — masaüstü
+         kullanımı (hesap/ayarlar erişimi, ☰ her ekran boyutunda görünür)
+         bozulmaz, yalnızca mobildeki eski "demode hamburger" hissi değişir. */
+      .bento-sheet {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-height: 86vh;
+        border-radius: 2.25rem 2.25rem 0 0;
+        animation: bentoSheetIn 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      @media (min-width: 768px) {
+        .bento-sheet {
+          left: auto;
+          top: 0;
+          bottom: 0;
+          right: 0;
+          height: 100%;
+          max-height: none;
+          width: 360px;
+          border-radius: 0;
+          animation: slideInDrawer 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        .bento-sheet .bento-drag-handle { display: none; }
+      }
 
       .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
       .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -436,7 +473,7 @@ export default function GlobalStyles() {
 
       @media (prefers-reduced-motion: reduce) {
         .motion-safe\\:animate-spin { animation: none !important; }
-        .drawer-panel, .drawer-panel-left, .focus-sheet, .focus-panel, .task-sheet, .pomo-tabbar, .day-reveal, .neon-strip, .pop-in, .chip-fill-pulse, .check-glow { animation: none !important; }
+        .drawer-panel, .drawer-panel-left, .focus-sheet, .focus-panel, .task-sheet, .bento-sheet, .pomo-tabbar, .day-reveal, .neon-strip, .pop-in, .chip-fill-pulse, .check-glow { animation: none !important; }
         .bg-blob--violet, .bg-blob--orange { animation: none !important; }
         .accordion-body { transition: none !important; }
       }
