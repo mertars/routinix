@@ -43,6 +43,13 @@ export default function GlobalStyles() {
         from { opacity: 0; transform: translateY(10px) scale(0.99); }
         to { opacity: 1; transform: translateY(0) scale(1); }
       }
+      /* Topluluk Hub'ı "Planlarıma Ekle" başarı ikonu — monokrom estetiğe
+         uygun sade bir "pop" (renkli konfeti YOK, bkz. TemplateDetailModal.jsx). */
+      @keyframes checkPop {
+        0% { transform: scale(0.5); opacity: 0; }
+        60% { transform: scale(1.15); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+      }
 
       .drawer-panel { animation: slideInDrawer 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
       .drawer-panel-left { animation: slideInDrawerLeft 0.28s cubic-bezier(0.32, 0.72, 0, 1); }

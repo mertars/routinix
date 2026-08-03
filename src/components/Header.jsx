@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Timer, BarChart3 } from "lucide-react";
+import { Timer, BarChart3, Users2 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 // ☀️/🌙 Animasyonlu tema değiştirici — güneş/ay ikonu kayarak/dönerek geçiş yapar.
@@ -49,6 +49,8 @@ function Header({
   onPlansClick,
   rhythmActive,
   onRhythmClick,
+  communityActive,
+  onCommunityClick,
   pomodoroActive,
   onPomodoroClick,
   onAuthClick,
@@ -173,6 +175,24 @@ function Header({
                 </button>
               </>
             )}
+
+            {/* Routinix Nexus — Şablon Keşfet gibi herkese açık (göz atmak oturum
+                gerektirmez, paylaşım/beğeni/takip modül içinde kendi hafif
+                kullanıcı-adı akışıyla istenir). Cyan aksan — modülün kendi
+                mor/cyan neon-glass kimliğiyle eşleşir. */}
+            <button
+              onClick={onCommunityClick}
+              className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
+              style={{
+                background: communityActive ? "rgba(34,211,238,0.22)" : "rgba(34,211,238,0.12)",
+                color: "#67E8F9",
+                border: "1px solid rgba(34,211,238,0.40)",
+                boxShadow: communityActive ? "0 0 16px -4px rgba(34,211,238,0.6)" : "0 0 10px -5px rgba(34,211,238,0.5)",
+              }}
+            >
+              <Users2 className="w-[13px] h-[13px]" strokeWidth={2.25} />
+              Nexus
+            </button>
 
             {/* Pomodoro & Focus Studio — herkese açık (Şablon Keşfet gibi, oturum gerektirmez) */}
             <button

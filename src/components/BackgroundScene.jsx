@@ -30,17 +30,21 @@ const DEFAULT_GLOW = GLOW_BY_CATEGORY.software;
 // Tek prop'u `category` (primitif string) — memo, App'in kök state'inde
 // alakasız her değişiklikte (ör. yazı yazma) bu ağır SVG'nin yeniden
 // hesaplanmasını engeller; yalnızca kategori GERÇEKTEN değişince re-render olur.
-function BackgroundScene({ category }) {
+function BackgroundScene({ category, suspended = false }) {
   const glow = GLOW_BY_CATEGORY[category] || DEFAULT_GLOW;
 
   // Sürekli koşan CSS animasyonlarını (ridge-sweep + bg-blob, GlobalStyles.jsx)
-  // iki durumda DURDUR: (1) mobil genişlikte (<768px — küçük/orta segment
-  // cihazlarda GPU/pil bütçesi daha kısıtlı, tamamen dekoratif bir arka plan
-  // için harcanacak pay değil), (2) sekme arka plana alındığında
-  // (`visibilitychange`) — kullanıcı görmediği bir animasyonun compositor'ı
-  // meşgul etmeye devam etmesinin hiçbir faydası yok. `matchMedia` (yalnızca
-  // breakpoint GEÇİŞİNDE tetiklenir) kullanılır — ham `resize` dinleyicisi
-  // gibi her pikselde ateşlenen bir olay DEĞİL.
+  // ÜÇ durumda DURDUR: (1) mobil genişlikte (<768px — küçük/orta segment
+  // cihazlarda GPU/pil bütçesi daha kısıtlı), (2) sekme arka plana alındığında
+  // (`visibilitychange`), (3) `suspended` prop'u true olduğunda — app.jsx
+  // bunu, ÜZERİNDE tam ekran bir panel (Nexus/Pomodoro/Rhythm/TaskDrawer/...)
+  // açık olduğunda true yapar. BU ÜÇÜNCÜ KOŞUL KRİTİK: BackgroundScene
+  // `z-0`'da SABİT mount edilir ve panel açılınca UNMOUNT OLMAZ — panel onu
+  // sadece görsel olarak ÖRTER, animasyonları (feGaussianBlur'lu SVG dash
+  // kayması + blur(70px)'lu blob'lar) durdurmaz. Kullanıcı hiçbir zaman
+  // GÖRMEDİĞİ bu animasyon, `suspended` eklenmeden önce panel açıkken bile
+  // sonsuza dek GPU'yu meşgul etmeye devam ediyordu — ısınmanın asıl kaynağı
+  // panelin KENDİ CSS'i değil, ARKADA hâlâ koşan bu katmandı.
   const [animPaused, setAnimPaused] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(max-width: 767px)").matches || document.hidden;
@@ -58,8 +62,10 @@ function BackgroundScene({ category }) {
     };
   }, []);
 
+  const paused = animPaused || suspended;
+
   return (
-    <div className={`fixed inset-0 z-0 pointer-events-none overflow-hidden ${animPaused ? "bg-anim-paused" : ""}`} aria-hidden="true">
+    <div className={`fixed inset-0 z-0 pointer-events-none overflow-hidden ${paused ? "bg-anim-paused" : ""}`} aria-hidden="true">
       {/* --- Süzülen glow blob'lar — her iki temada, kategoriye duyarlı renk --- */}
       <div
         className="bg-blob bg-blob--violet"

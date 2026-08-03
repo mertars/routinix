@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Timer, BarChart3 } from "lucide-react";
+import { Timer, BarChart3, Users2 } from "lucide-react";
 import { MONO_FONT } from "../constants";
 
 // Sadece bu menüde kullanılan küçük toggle atomu.
@@ -44,6 +44,7 @@ function DrawerMenu({
   onOpenRoutines,
   onOpenPlans,
   onOpenRhythm,
+  onOpenCommunity,
   onOpenPomodoro,
 }) {
   if (!open) return null;
@@ -56,6 +57,7 @@ function DrawerMenu({
     { key: "routines", emoji: "🔁", label: "Rutinler", color: "#7DE9C3", onClick: onOpenRoutines, always: false },
     { key: "plans", emoji: "📂", label: "Planlarım", color: "#8FA0FF", onClick: onOpenPlans, always: false },
     { key: "rhythm", icon: <BarChart3 className="w-4 h-4" strokeWidth={2.25} />, label: "Ritim & Gün Sonu", color: "#A78BFA", onClick: onOpenRhythm, always: false },
+    { key: "community", icon: <Users2 className="w-4 h-4" strokeWidth={2.25} />, label: "Routinix Nexus", color: "#22D3EE", onClick: onOpenCommunity, always: true },
     { key: "pomodoro", icon: <Timer className="w-4 h-4" strokeWidth={2.25} />, label: "Pomodoro & Focus", color: "#FB7185", onClick: onOpenPomodoro, always: true },
   ].filter((b) => b.always || user);
 

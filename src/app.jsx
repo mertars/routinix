@@ -46,6 +46,7 @@ const AiCoachWidget = lazy(() => import("./components/AiCoachWidget"));
 const PomodoroStudio = lazy(() => import("./components/PomodoroStudio"));
 const OnboardingWizard = lazy(() => import("./components/OnboardingWizard"));
 const RhythmStudio = lazy(() => import("./components/RhythmStudio"));
+const CommunityHub = lazy(() => import("./components/CommunityHub"));
 
 export default function App() {
   const auth = useAuth();
@@ -59,10 +60,21 @@ export default function App() {
   const [pomodoroOpen, setPomodoroOpen] = useState(false);
   const [pomodoroInitialTask, setPomodoroInitialTask] = useState(null);
   const [rhythmOpen, setRhythmOpen] = useState(false);
+  const [communityOpen, setCommunityOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [printRange, setPrintRange] = useState(Infinity);
   const ps = usePlanStudio({ user: auth.user, onRequireAuth: () => setAuthOpen(true) });
   const { stage, mode } = ps;
+
+  // BackgroundScene KÖKTE sabit mount edilir ve hiçbir panel açılınca
+  // unmount OLMAZ — panel onu yalnızca görsel olarak ÖRTER, kendisi
+  // (feGaussianBlur'lu SVG dash animasyonu + blur(70px)'lu blob'lar)
+  // arkada sonsuza dek animasyona devam eder. Bu bayrak, üstte tam ekran
+  // bir panel/modal açıkken BackgroundScene'e "dur" sinyali verir — aksi
+  // halde kullanıcı hiç GÖRMEDİĞİ bu animasyon GPU'yu meşgul etmeyi sürdürür
+  // (ısınmanın asıl kaynağı genelde panelin kendi CSS'i değil, budur).
+  const anyOverlayOpen =
+    authOpen || logoutConfirmOpen || deleteOpen || taskDrawerOpen || routinesOpen || hubOpen || plansOpen || pomodoroOpen || rhythmOpen || communityOpen || printOpen;
 
   // Bugün / Rutinler / Şablon Keşfet / Planlarım / Pomodoro panellerinden aynı
   // anda yalnızca biri açık olur; tetiklendiklerinde hamburger menüsü de kapanır
@@ -78,6 +90,7 @@ export default function App() {
     setPlansOpen(false);
     setPomodoroOpen(false);
     setRhythmOpen(false);
+    setCommunityOpen(false);
   }, []);
   const toggleTaskDrawer = useCallback(() => {
     const next = !taskDrawerOpen;
@@ -115,6 +128,12 @@ export default function App() {
     ps.setMenuOpen(false);
     setRhythmOpen(next);
   }, [rhythmOpen, closeAllPanels, ps.setMenuOpen]);
+  const toggleCommunity = useCallback(() => {
+    const next = !communityOpen;
+    closeAllPanels();
+    ps.setMenuOpen(false);
+    setCommunityOpen(next);
+  }, [communityOpen, closeAllPanels, ps.setMenuOpen]);
   // Görev kartındaki "Başlat" — Pomodoro Studio'yu bu görev seçiliyken açar
   // (bkz. PomodoroStudio.jsx `initialTask` prop'u). Tam görev objesi TaskCard'dan
   // geldiği için PomodoroStudio kendi başına ayrı bir plan/görev fetch'i
@@ -175,7 +194,7 @@ export default function App() {
       {/* Atmosferik animasyonlu dağ/topoğrafya + neon şerit arka planı (içeriğin
           arkasında) — ambient glow rengi aktif kategoriye göre (intro'da seçili
           sekme, plan içindeyken planın kendi kategorisi) yumuşakça değişir. */}
-      <BackgroundScene category={ps.category} />
+      <BackgroundScene category={ps.category} suspended={anyOverlayOpen} />
 
       {/* Mobilde intro tek ekrana kilitli (h-100dvh, scroll yok); md'den itibaren serbest. */}
       <div
@@ -199,6 +218,8 @@ export default function App() {
           onPlansClick={togglePlans}
           rhythmActive={rhythmOpen}
           onRhythmClick={toggleRhythm}
+          communityActive={communityOpen}
+          onCommunityClick={toggleCommunity}
           pomodoroActive={pomodoroOpen}
           onPomodoroClick={togglePomodoro}
           onAuthClick={openAuth}
@@ -225,6 +246,7 @@ export default function App() {
           onOpenRoutines={toggleRoutines}
           onOpenPlans={togglePlans}
           onOpenRhythm={toggleRhythm}
+          onOpenCommunity={toggleCommunity}
           onOpenPomodoro={togglePomodoro}
           onSignOut={onDrawerSignOut}
         />
@@ -390,6 +412,17 @@ export default function App() {
       {rhythmOpen && (
         <Suspense fallback={<OverlayFallback z={90} />}>
           <RhythmStudio open={rhythmOpen} userId={auth.user?.id} onClose={() => setRhythmOpen(false)} />
+        </Suspense>
+      )}
+
+      {/* Routinix Nexus — tam performans izolasyonu: koşullu mount, kapalıyken
+          tek bir bayt bile ana pakete dahil değil (React.lazy) ve DOM'da/
+          bellekte hiçbir iz kalmaz. "Planlarıma Ekle" artık AI'ı YENİDEN
+          TETİKLEMEZ — communityService.cloneTemplateToMyPlans ile ANINDA
+          kopyalanan planı doğrudan usePlanStudio.openSavedPlan ile açar. */}
+      {communityOpen && (
+        <Suspense fallback={<OverlayFallback z={100} />}>
+          <CommunityHub open={communityOpen} user={auth.user} onClose={() => setCommunityOpen(false)} onPlanCloned={ps.openSavedPlan} />
         </Suspense>
       )}
 
