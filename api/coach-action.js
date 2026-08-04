@@ -20,29 +20,40 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, message: "Yalnızca POST desteklenir." });
   }
 
-  const user = await getUserFromRequest(req);
-  if (!user) {
-    return res.status(401).json({ ok: false, consumed: false, message: "Oturum doğrulanamadı, tekrar giriş yapar mısın?" });
-  }
-  // AI Koç anonim (misafir) oturumlara TAMAMEN KAPALI — client tarafındaki
-  // gate (AiCoachWidget.jsx) yalnızca UX'tir, GERÇEK sınır burasıdır: `is_anonymous`
-  // JWT'den doğrulanır, client'ın gönderdiği hiçbir alana güvenilmez. "status"
-  // dahil TÜM action'lar için geçerli — yarı-erişim yok.
-  if (user.is_anonymous) {
-    return res.status(403).json({ ok: false, consumed: false, message: "403 Forbidden - Login Required: AI Koç'u kullanmak için ücretsiz hesabını tamamlaman gerekiyor." });
+  if (!process.env.GEMINI_API_KEY) {
+    // eslint-disable-next-line no-console
+    console.error("GEMINI_API_KEY missing");
+    return res.status(500).json({ ok: false, consumed: false, message: "Sunucu yapılandırma hatası: yapay zeka servisi kullanılamıyor." });
   }
 
-  const { action, message, targetPlanId } = req.body || {};
-  if (!action) {
-    return res.status(400).json({ ok: false, consumed: false, message: "'action' alanı zorunlu." });
-  }
-
-  // Admin durumu YALNIZCA JWT'den doğrulanmış `user.email`e göre, sunucu
-  // tarafında hesaplanır (bkz. adminAccess.js dosya başı yorumu) — client
-  // isteğinden gelen hiçbir alan bu kararı ETKİLEMEZ.
-  const isAdmin = isAdminUser(user);
-
+  // FUNCTION_INVOCATION_FAILED SERTLEŞTİRMESİ: getUserFromRequest ve
+  // isAdminUser ÖNCEDEN try/catch DIŞINDAYDI — biri (ör. eksik Supabase env
+  // değişkeni) fırlatırsa, Vercel fonksiyonu JSON DEĞİL ham bir hata
+  // sayfasıyla öldürüyordu (istemci "Beklenmedik bir sunucu yanıtı alındı."
+  // görüyordu). Artık TÜM handler gövdesi TEK bir try/catch içinde.
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return res.status(401).json({ ok: false, consumed: false, message: "Oturum doğrulanamadı, tekrar giriş yapar mısın?" });
+    }
+    // AI Koç anonim (misafir) oturumlara TAMAMEN KAPALI — client tarafındaki
+    // gate (AiCoachWidget.jsx) yalnızca UX'tir, GERÇEK sınır burasıdır:
+    // `is_anonymous` JWT'den doğrulanır, client'ın gönderdiği hiçbir alana
+    // güvenilmez. "status" dahil TÜM action'lar için geçerli — yarı-erişim yok.
+    if (user.is_anonymous) {
+      return res.status(403).json({ ok: false, consumed: false, message: "403 Forbidden - Login Required: AI Koç'u kullanmak için ücretsiz hesabını tamamlaman gerekiyor." });
+    }
+
+    const { action, message, targetPlanId } = req.body || {};
+    if (!action) {
+      return res.status(400).json({ ok: false, consumed: false, message: "'action' alanı zorunlu." });
+    }
+
+    // Admin durumu YALNIZCA JWT'den doğrulanmış `user.email`e göre, sunucu
+    // tarafında hesaplanır (bkz. adminAccess.js dosya başı yorumu) — client
+    // isteğinden gelen hiçbir alan bu kararı ETKİLEMEZ.
+    const isAdmin = isAdminUser(user);
+
     if (action === "status") {
       if (isAdmin) return res.status(200).json({ ok: true, consumed: false, unlimited: true, remaining: null, trialLimit: null });
       const remaining = await getRemaining(user.id);
@@ -99,7 +110,7 @@ export default async function handler(req, res) {
     return res.status(result.ok === false ? 400 : 200).json(result);
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error("[coach-action] hata:", "status:", err?.status, err?.message, err?.stack);
+    console.error("Gemini Error Details:", { source: "coach-action", status: err?.status, message: err?.message, stack: err?.stack });
     // "Beklenmedik bir sunucu yanıtı alındı." (frontend'in JSON-parse-edilemedi
     // fallback'i) ile KARIŞTIRILMASIN — bu, sunucunun GERÇEKTEN döndürdüğü,
     // geçerli bir JSON hata yanıtı. Gemini tarafında kota/bütçe tükenmişse

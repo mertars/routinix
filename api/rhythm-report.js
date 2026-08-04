@@ -56,29 +56,39 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, message: "Yalnızca POST desteklenir." });
   }
 
-  const user = await getUserFromRequest(req);
-  if (!user) {
-    return res.status(401).json({ ok: false, message: "Oturum doğrulanamadı, tekrar giriş yapar mısın?" });
-  }
-  // GÜVENLİK: coach-action.js/generate-plan.js ile AYNI sınır, burada
-  // eksikti — anonim (misafir) oturumlar da GERÇEK bir auth.uid()'ye sahip
-  // olduğu için getUserFromRequest bunları da geçerli `user` olarak
-  // döndürüyordu. Bu kontrol olmadan, bir paylaşım linkine gelen HERKES
-  // (hesap açmadan, signInAnonymously çağırarak) bu endpoint'i (ve altındaki
-  // gerçek Gemini çağrısını) sınırsızca tetikleyebilirdi.
-  if (user.is_anonymous) {
-    return res.status(403).json({ ok: false, message: "403 Forbidden - Login Required: Ritim raporu için ücretsiz hesabını tamamlaman gerekiyor." });
+  if (!process.env.GEMINI_API_KEY) {
+    // eslint-disable-next-line no-console
+    console.error("GEMINI_API_KEY missing");
+    return res.status(500).json({ ok: false, message: "Sunucu yapılandırma hatası: yapay zeka servisi kullanılamıyor." });
   }
 
-  const { action, lapsedRoutineTitles } = req.body || {};
-  if (!action) {
-    return res.status(400).json({ ok: false, message: "'action' alanı zorunlu." });
-  }
-
-  const admin = getSupabaseAdmin();
-  const dateStr = todayDate();
-
+  // FUNCTION_INVOCATION_FAILED SERTLEŞTİRMESİ: getUserFromRequest/
+  // getSupabaseAdmin ÖNCEDEN try/catch DIŞINDAYDI — coach-action.js/
+  // generate-plan.js'teki AYNI düzeltme burada da: TÜM handler gövdesi
+  // TEK bir try/catch içinde, hiçbir alt-adım uncaught fırlayamaz.
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return res.status(401).json({ ok: false, message: "Oturum doğrulanamadı, tekrar giriş yapar mısın?" });
+    }
+    // GÜVENLİK: coach-action.js/generate-plan.js ile AYNI sınır — anonim
+    // (misafir) oturumlar da GERÇEK bir auth.uid()'ye sahip olduğu için
+    // getUserFromRequest bunları da geçerli `user` olarak döndürür. Bu
+    // kontrol olmadan, bir paylaşım linkine gelen HERKES (hesap açmadan,
+    // signInAnonymously çağırarak) bu endpoint'i (ve altındaki gerçek
+    // Gemini çağrısını) sınırsızca tetikleyebilirdi.
+    if (user.is_anonymous) {
+      return res.status(403).json({ ok: false, message: "403 Forbidden - Login Required: Ritim raporu için ücretsiz hesabını tamamlaman gerekiyor." });
+    }
+
+    const { action, lapsedRoutineTitles } = req.body || {};
+    if (!action) {
+      return res.status(400).json({ ok: false, message: "'action' alanı zorunlu." });
+    }
+
+    const admin = getSupabaseAdmin();
+    const dateStr = todayDate();
+
     if (action === "generate") {
       // GÜVENLİK/MALİYET: bu action GERÇEK bir Gemini çağrısı yapar ve
       // öncesinde HİÇBİR hak/hız sınırı yoktu (AI Koç'un user_ai_trial'ının
@@ -190,7 +200,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, message: `Bilinmeyen aksiyon: ${action}` });
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error("[rhythm-report] hata:", "status:", err?.status, err?.message, err?.stack);
+    console.error("Gemini Error Details:", { source: "rhythm-report", status: err?.status, message: err?.message, stack: err?.stack });
     const { httpStatus, message } = classifyGeminiError(err);
     return res.status(httpStatus).json({ ok: false, message });
   }

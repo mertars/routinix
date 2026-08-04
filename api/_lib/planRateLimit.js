@@ -32,43 +32,66 @@ async function countSince(admin, isoSince, userId) {
 // GÜVENLİK NOTU: en PAHALI/en geniş kapsamlı kontrol (Global Tavan) İLK
 // kontrol edilir — sistem geneli bütçe zaten tükenmişse, tek bir kullanıcının
 // kendi (belki hâlâ boş) RPM/RPH/RPD hakkını sorgulamaya bile gerek yok.
+//
+// FAIL-OPEN, ÇÖKMEZ: bu fonksiyonun KENDİSİ (ör. supabase/plan_rate_limit.sql
+// henüz çalıştırılmadıysa "api_request_log tablosu yok" hatası, ya da geçici
+// bir DB bağlantı sorunu) bir istisna fırlatırsa, generate-plan.js'i
+// FUNCTION_INVOCATION_FAILED ile çökertmek YERİNE isteğe İZİN VERİLİR (hata
+// sunucu logunda kalır). Bir alt-sistem arızası, meşru bir kullanıcıyı
+// planlamaktan alıkoymamalı — bu, kullanıcının kendi hakkını AŞMASINDAN
+// (o durumda bilerek `allowed: false` dönülür) TAMAMEN farklı bir senaryu.
 export async function checkPlanRateLimit(userId) {
-  const admin = getSupabaseAdmin();
-  const now = Date.now();
-  const minuteAgo = new Date(now - 60_000).toISOString();
-  const hourAgo = new Date(now - 60 * 60_000).toISOString();
-  const dayStart = utcDayStartIso();
+  try {
+    const admin = getSupabaseAdmin();
+    const now = Date.now();
+    const minuteAgo = new Date(now - 60_000).toISOString();
+    const hourAgo = new Date(now - 60 * 60_000).toISOString();
+    const dayStart = utcDayStartIso();
 
-  const globalDayCount = await countSince(admin, dayStart, null);
-  if (globalDayCount >= GLOBAL_DAILY_CAP) {
-    return { allowed: false, message: "Sistem şu anda yoğun talep altında, lütfen daha sonra tekrar deneyin.", retryAfterSec: 3600 };
-  }
+    const globalDayCount = await countSince(admin, dayStart, null);
+    if (globalDayCount >= GLOBAL_DAILY_CAP) {
+      return { allowed: false, message: "Sistem şu anda yoğun talep altında, lütfen daha sonra tekrar deneyin.", retryAfterSec: 3600 };
+    }
 
-  const [minuteCount, hourCount, dayCount] = await Promise.all([
-    countSince(admin, minuteAgo, userId),
-    countSince(admin, hourAgo, userId),
-    countSince(admin, dayStart, userId),
-  ]);
+    const [minuteCount, hourCount, dayCount] = await Promise.all([
+      countSince(admin, minuteAgo, userId),
+      countSince(admin, hourAgo, userId),
+      countSince(admin, dayStart, userId),
+    ]);
 
-  if (dayCount >= RPD_LIMIT) {
-    return { allowed: false, message: "Günlük planlama limitinize ulaştınız.", retryAfterSec: 86400 };
-  }
-  if (hourCount >= RPH_LIMIT) {
-    return { allowed: false, message: "Saatlik planlama limitinize ulaştınız.", retryAfterSec: 3600 };
-  }
-  if (minuteCount >= RPM_LIMIT) {
-    return { allowed: false, message: "Çok hızlı istek gönderdiniz, lütfen 1 dakika bekleyin.", retryAfterSec: 60 };
-  }
+    if (dayCount >= RPD_LIMIT) {
+      return { allowed: false, message: "Günlük planlama limitinize ulaştınız.", retryAfterSec: 86400 };
+    }
+    if (hourCount >= RPH_LIMIT) {
+      return { allowed: false, message: "Saatlik planlama limitinize ulaştınız.", retryAfterSec: 3600 };
+    }
+    if (minuteCount >= RPM_LIMIT) {
+      return { allowed: false, message: "Çok hızlı istek gönderdiniz, lütfen 1 dakika bekleyin.", retryAfterSec: 60 };
+    }
 
-  return { allowed: true };
+    return { allowed: true };
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[planRateLimit] checkPlanRateLimit başarısız (fail-open, istek engellenmedi):", err?.message);
+    return { allowed: true };
+  }
 }
 
 // Rate-limit kontrolü GEÇTİKTEN, ama gerçek Gemini çağrısından ÖNCE çağrılır
 // (bkz. api/generate-plan.js) — "önce rezervasyon, sonra pahalı iş" sırası,
 // eşzamanlı iki isteğin ikisinin de aynı anda kontrolü geçip limiti aşmasını
 // (küçük bir yarış penceresi dışında) pratik olarak engeller.
+//
+// BİLEREK sessizce yutar (throw ETMEZ): bir sayaç satırının yazılamaması
+// (ör. tablo henüz yok) ikincil bir bookkeeping sorunu — asıl plan üretim
+// isteğini ASLA kesmemeli/çökertmemeli.
 export async function logApiRequest(userId, endpoint = "generate-plan") {
-  const admin = getSupabaseAdmin();
-  const { error } = await admin.from("api_request_log").insert({ user_id: userId, endpoint });
-  if (error) throw error;
+  try {
+    const admin = getSupabaseAdmin();
+    const { error } = await admin.from("api_request_log").insert({ user_id: userId, endpoint });
+    if (error) throw error;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[planRateLimit] logApiRequest başarısız (yok sayıldı):", err?.message);
+  }
 }
