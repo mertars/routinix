@@ -70,7 +70,7 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
   // gelir — localStorage tabanlı sayaç kaldırıldı (DevTools'tan silinerek
   // sıfırlanabiliyordu). null = henüz bilinmiyor (drawer açılana kadar).
   const [remaining, setRemaining] = useState(null);
-  const [dailyLimit, setDailyLimit] = useState(3);
+  const [trialLimit, setTrialLimit] = useState(20);
   // Admin/sınırsız hesaplar için sunucu `unlimited: true, remaining: null`
   // döner (Infinity JSON'da sessizce null'a döndüğü için ayrı bir bayrak
   // kullanılır, bkz. api/coach-action.js) — sayısal bir "kalan hak" göstermek
@@ -91,6 +91,20 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
     mountedRef.current = false;
   }, []);
 
+  // Debounce (2sn) — üst üste hızlı tıklamalarla aynı anda birden fazla
+  // AI çağrısı tetiklenmesini (ve gereksiz yere hak tüketilmesini) önler.
+  // `typing` zaten YANIT BEKLERKEN tekrar göndermeyi engelliyor; bu ayrıca
+  // hızlı bir yanıt gelse bile (<2sn) bir SONRAKİ gönderimi kısa süre
+  // geciktirir — cooldownRef senkron kontrol için, `cooling` state'i
+  // yalnızca buton görünümünü (disabled) güncellemek için.
+  const cooldownRef = useRef(0);
+  const [cooling, setCooling] = useState(false);
+  const beginCooldown = () => {
+    cooldownRef.current = Date.now() + 2000;
+    setCooling(true);
+    setTimeout(() => mountedRef.current && setCooling(false), 2000);
+  };
+
   // Drawer her açıldığında güncel hak durumunu sunucudan çek.
   useEffect(() => {
     if (!open || !userId) return;
@@ -100,7 +114,7 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
         if (cancelled || !res) return;
         if (res.unlimited) setUnlimited(true);
         if (typeof res.remaining === "number") setRemaining(res.remaining);
-        if (typeof res.dailyLimit === "number") setDailyLimit(res.dailyLimit);
+        if (typeof res.trialLimit === "number") setTrialLimit(res.trialLimit);
       })
       .catch((err) => logger.error("AI_COACH", "Hak durumu alınamadı", { error: err?.message }));
     return () => {
@@ -153,7 +167,7 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
     }
     setOpen((v) => !v);
   };
-  const displayRemaining = remaining ?? dailyLimit;
+  const displayRemaining = remaining ?? trialLimit;
   const pushMessage = (msg) => setMessages((prev) => [...prev, msg]);
   const planOptions = allPlans.length ? allPlans : plan ? [plan] : [];
   const selectedPlan = planOptions.find((p) => p.id === selectedPlanId) || plan;
@@ -165,9 +179,10 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
 
   // Hazır aksiyon çipleri — her zaman ekranda açık olan planı hedefler.
   // Hak kontrolü/düşümü artık sunucuda (api/coach-action.js); dönen
-  // result.remaining/dailyLimit'i olduğu gibi yansıtıyoruz.
+  // result.remaining/trialLimit'i olduğu gibi yansıtıyoruz.
   const runAction = async (action) => {
-    if (locked || typing) return;
+    if (locked || typing || cooldownRef.current > Date.now()) return;
+    beginCooldown();
     pushMessage({ role: "user", text: `${action.emoji} ${action.label}` });
     setTyping(true);
     await new Promise((r) => setTimeout(r, 550)); // premium "düşünüyor" hissi
@@ -176,7 +191,7 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
     setTyping(false);
     if (result?.unlimited) setUnlimited(true);
     if (typeof result?.remaining === "number") setRemaining(result.remaining);
-    if (typeof result?.dailyLimit === "number") setDailyLimit(result.dailyLimit);
+    if (typeof result?.trialLimit === "number") setTrialLimit(result.trialLimit);
     pushMessage({ role: "bot", text: result?.message || "Bir şeyler ters gitti, tekrar dener misin?", error: result?.ok === false });
   };
 
@@ -186,7 +201,8 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
   const submitDraft = async (e) => {
     e.preventDefault();
     const text = draft.trim();
-    if (locked || typing || !text) return;
+    if (locked || typing || !text || cooldownRef.current > Date.now()) return;
+    beginCooldown();
     pushMessage({ role: "user", text });
     setDraft("");
     setTyping(true);
@@ -196,7 +212,7 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
     setTyping(false);
     if (result?.unlimited) setUnlimited(true);
     if (typeof result?.remaining === "number") setRemaining(result.remaining);
-    if (typeof result?.dailyLimit === "number") setDailyLimit(result.dailyLimit);
+    if (typeof result?.trialLimit === "number") setTrialLimit(result.trialLimit);
 
     const targetedOther = result?.targetPlanId && result.targetPlanId !== plan?.id;
     const jumpPlan = targetedOther ? planOptions.find((p) => p.id === result.targetPlanId) : null;
@@ -230,7 +246,7 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
           >
             ✨ AI Koç'a Danış{" "}
             <span style={{ color: locked ? "#FF6E92" : "#7DE9C3" }}>
-              {unlimited ? "(✨ Sınırsız — Admin)" : `(${displayRemaining}/${dailyLimit} Kalan Hak)`}
+              {unlimited ? "(✨ Sınırsız — Admin)" : `(${displayRemaining}/${trialLimit} Kalan Hak)`}
             </span>
           </div>
 
@@ -328,7 +344,7 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
                   <button
                     key={a.key}
                     onClick={() => runAction(a)}
-                    disabled={locked || typing}
+                    disabled={locked || typing || cooling}
                     className="flex flex-col items-start gap-1 rounded-xl p-2.5 text-left transition-colors card-glow disabled:opacity-35 disabled:pointer-events-none"
                     style={{ background: "rgba(124,58,237,0.10)", border: "1px solid rgba(124,58,237,0.30)" }}
                   >
@@ -363,7 +379,7 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
                 >
                   <p className="text-[13px] font-bold text-slate-900 dark:text-slate-100 mb-1">⭐ Premium ile Sınırsız Koçluk Al</p>
                   <p className="text-[11.5px] text-slate-500 dark:text-slate-400 leading-relaxed mb-3">
-                    Bugünkü {dailyLimit} ücretsiz hakkın doldu. Yarın sıfırlanır, ya da hemen sınırsız erişime geç.
+                    AI Koç deneme limitin doldu. {trialLimit} ücretsiz mesaj hakkını kullandın — sınırsız erişim için Premium'a geç.
                   </p>
                   <button
                     className="w-full rounded-xl py-2.5 text-[12.5px] font-semibold"
@@ -384,7 +400,7 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
                   />
                   <button
                     type="submit"
-                    disabled={typing || !draft.trim()}
+                    disabled={typing || cooling || !draft.trim()}
                     className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center disabled:opacity-40"
                     style={{ background: "linear-gradient(90deg, #7C3AED, #06B6D4)", color: "#0b0c10" }}
                   >

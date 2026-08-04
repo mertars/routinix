@@ -148,7 +148,7 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
       setSuccessPlan(plan);
     } catch (err) {
       logger.error("SHARED_TEMPLATE", "Plan eklenemedi (hızlı ekle)", { idOrSlug, templateDbId: template?.id, error: err?.message });
-      setAddError("Plan eklenemedi, tekrar dener misin?");
+      setAddError(err?.code === "PLAN_LIMIT_REACHED" ? err.message : "Plan eklenemedi, tekrar dener misin?");
     } finally {
       setAdding(false);
     }
@@ -174,7 +174,7 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
       setSuccessPlan(plan);
     } catch (err) {
       logger.error("SHARED_TEMPLATE", "Plan eklenemedi (düzenlenmiş)", { idOrSlug, templateDbId: template?.id, error: err?.message });
-      setAddError("Plan eklenemedi, tekrar dener misin?");
+      setAddError(err?.code === "PLAN_LIMIT_REACHED" ? err.message : "Plan eklenemedi, tekrar dener misin?");
     } finally {
       setAdding(false);
     }

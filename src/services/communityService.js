@@ -176,6 +176,16 @@ export async function cloneTemplateToMyPlans(template, userId) {
     .single();
   if (planErr) {
     logger.error("COMMUNITY", "Klonlanan plan oluşturulamadı", { templateId: template.id, error: planErr?.message });
+    // 10 aktif plan limiti — sunucu tarafı trigger'ı (bkz. supabase/plan_limit.sql)
+    // bu şablon klonlama yolundan gelen 11. denemeyi de yakalar (usePlanStudio.js
+    // yalnızca wizard yolunu kontrol eder). Çağıranların ("Plan eklenemedi, tekrar
+    // dener misin?" gibi yanıltıcı bir genel hata YERİNE) gerçek sebebi ayırt
+    // edebilmesi için tanınabilir bir `code` eklenir.
+    if (planErr.message?.includes("PLAN_LIMIT_REACHED")) {
+      const limitErr = new Error("Maksimum 10 aktif plan limitine ulaştın. Yeni bir plan açmak için mevcut planlarını düzenleyebilir veya silebilirsin.");
+      limitErr.code = "PLAN_LIMIT_REACHED";
+      throw limitErr;
+    }
     throw planErr;
   }
 

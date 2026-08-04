@@ -10,6 +10,7 @@ import {
   FALLBACK_QUESTIONS,
   isLikelyGibberish,
   AI_GATE_MESSAGE,
+  MAX_ACTIVE_PLANS,
 } from "./constants";
 import { generateOnboardingQuestions, createEnrichedPlan, fetchNextWeekTasks } from "./services/aiPipelineService";
 import {
@@ -77,6 +78,9 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
 
   // "Planlarım" — oturum açıksa DB'den çekilen kayıtlı planların özeti.
   const [savedPlans, setSavedPlans] = useState([]);
+  // 10 plan limitine takılan "+ Plan Ekle" denemesinde açılır (bkz.
+  // startNewPlan) — app.jsx bunu ConfirmModal ile gösterir.
+  const [planLimitOpen, setPlanLimitOpen] = useState(false);
 
   // Şablon Keşfet'ten "Şablonu Kullan" ile gelen kesin gün sayısı — AI'ın
   // total_days tahminini ezmek için finalizeAndGenerate'de kullanılır.
@@ -117,6 +121,14 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   }, [refreshSavedPlans]);
 
   const startNewPlan = useCallback(() => {
+    setMenuOpen(false);
+    // Gerçek sınır sunucuda (bkz. supabase/plan_limit.sql trigger'ı, Nexus
+    // şablon klonlamayı da kapsar) — bu, kullanıcının 11. planı denemeden
+    // ÖNCE, wizard'a hiç girmeden şık bir modalla durdurulduğu UX katmanı.
+    if (savedPlans.length >= MAX_ACTIVE_PLANS) {
+      setPlanLimitOpen(true);
+      return;
+    }
     setGoal("");
     setExtraNote("");
     setErrorMsg("");
@@ -126,10 +138,9 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     setQuestions([]);
     setAnswers({});
     setWizardStep(0);
-    setMenuOpen(false);
     setTemplateDaysOverride(null);
     setStage(STAGE_INTRO);
-  }, []);
+  }, [savedPlans.length]);
 
   // Ortak: verilen kategori/hedef için dinamik onboarding sorularını üretip
   // wizard'a geçer. startOnboarding (manuel "Başla") ve startFromTemplate
@@ -416,6 +427,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   return {
     // durum
     category, mode, goal, extraNote, stage, errorMsg, menuOpen, savedPlans,
+    planLimitOpen, closePlanLimit: () => setPlanLimitOpen(false),
     remindersOn, hapticsOn,
     goalTrimmed, goalTooShort, canStart,
     // onboarding wizard

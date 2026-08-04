@@ -1,5 +1,5 @@
 import { getSupabaseAdmin, getUserFromRequest } from "./_lib/supabaseAdmin.js";
-import { getRemaining, consumeOne, DAILY_LIMIT } from "./_lib/quota.js";
+import { getRemaining, consumeOne, TRIAL_LIMIT } from "./_lib/quota.js";
 import { isAdminUser } from "./_lib/adminAccess.js";
 import { runCoachIntent } from "./_lib/coachPrompt.js";
 import { lightenTasks, intensifyTasks, postponeDayTasks, findTodayDay, analyzeProgress } from "../src/services/aiCoachService.js";
@@ -43,9 +43,9 @@ export default async function handler(req, res) {
 
   try {
     if (action === "status") {
-      if (isAdmin) return res.status(200).json({ ok: true, consumed: false, unlimited: true, remaining: null, dailyLimit: null });
+      if (isAdmin) return res.status(200).json({ ok: true, consumed: false, unlimited: true, remaining: null, trialLimit: null });
       const remaining = await getRemaining(user.id);
-      return res.status(200).json({ ok: true, consumed: false, unlimited: false, remaining, dailyLimit: DAILY_LIMIT });
+      return res.status(200).json({ ok: true, consumed: false, unlimited: false, remaining, trialLimit: TRIAL_LIMIT });
     }
 
     // Hak kontrolü — AI çağrısı/mutasyon yapılmadan ÖNCE (gereksiz maliyeti
@@ -58,8 +58,8 @@ export default async function handler(req, res) {
         consumed: false,
         unlimited: false,
         remaining: 0,
-        dailyLimit: DAILY_LIMIT,
-        message: `Bugünkü ${DAILY_LIMIT} ücretsiz hakkın doldu. Yarın sıfırlanır, ya da Premium'a geç.`,
+        trialLimit: TRIAL_LIMIT,
+        message: `AI Koç deneme limitin doldu. Sınırsız kullanım için Premium'a geç.`,
       });
     }
 
@@ -89,11 +89,11 @@ export default async function handler(req, res) {
     if (isAdmin) {
       result.unlimited = true;
       result.remaining = null;
-      result.dailyLimit = null;
+      result.trialLimit = null;
     } else {
       result.unlimited = false;
       result.remaining = result.consumed ? await consumeOne(user.id) : remainingBefore;
-      result.dailyLimit = DAILY_LIMIT;
+      result.trialLimit = TRIAL_LIMIT;
     }
     return res.status(result.ok === false ? 400 : 200).json(result);
   } catch (err) {

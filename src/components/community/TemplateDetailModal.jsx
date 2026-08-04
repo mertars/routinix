@@ -185,7 +185,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
     } catch (err) {
       logger.error("COMMUNITY_DETAIL", "Şablon klonlanamadı", { templateId: template.id, error: err?.message });
       setCloneState("idle");
-      setCloneError("Plan kopyalanamadı, tekrar dener misin?");
+      setCloneError(err?.code === "PLAN_LIMIT_REACHED" ? err.message : "Plan kopyalanamadı, tekrar dener misin?");
     }
   };
 
@@ -234,7 +234,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
     } catch (err) {
       logger.error("COMMUNITY_DETAIL", "Şablon klonlanamadı (düzenlenmiş)", { templateId: template.id, error: err?.message });
       setCloneState("idle");
-      setCloneError("Plan kopyalanamadı, tekrar dener misin?");
+      setCloneError(err?.code === "PLAN_LIMIT_REACHED" ? err.message : "Plan kopyalanamadı, tekrar dener misin?");
     }
   };
 

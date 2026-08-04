@@ -1,85 +1,64 @@
 import { getSupabaseAdmin } from "./supabaseAdmin.js";
 
-// AI Koç günlük hak motoru — SUNUCU TARAFI. Eskiden localStorage'da tutulan
-// sayaç, kullanıcı DevTools'tan localStorage.clear()/manuel silme ile
-// sıfırlanabildiği için güvensizdi. Artık tek kaynak public.user_quotas
-// tablosu; yalnızca bu dosya (service_role ile) yazabilir.
-//
-// 3 → 100: test/tanıtım aşamasında farklı hesapların günlük hakkı hızla
-// tükenip "kota doldu" ekranına düşmesini engellemek için yükseltildi.
-// Sistem BİLEREK tamamen kaldırılmadı — "Premium'a Geç" teşviki ve
-// maliyet koruması (bir hesabın günde sonsuz Gemini çağrısı yapamaması)
-// olarak yapı aynen duruyor, yalnızca eşik gevşetildi.
-export const DAILY_LIMIT = 100;
+// AI Koç ÖMÜR BOYU deneme hakkı — SUNUCU TARAFI, service_role ile.
+// Eski sistem (user_quotas) GÜNLÜK sıfırlanıyordu (100/gün) — bu, iç
+// test/tanıtım döneminde "herkes kota'ya takılmasın" diye bilinçli bir
+// gevşetmeydi. Proje artık dışa açılıyor: gerçek bir freemium modeli
+// gerekiyor — kullanıcı başına TOPLAM TRIAL_LIMIT mesaj, hiç sıfırlanmaz.
+// Bkz. supabase/ai_trial_limit.sql (yeni public.user_ai_trial tablosu +
+// increment_user_trial_usage RPC'si — bu SQL'in Supabase'de çalıştırılmış
+// olması GEREKİR, aksi halde aşağıdaki fallback yola düşülür).
+export const TRIAL_LIMIT = 20;
 
-function todayDate() {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
-}
-
-// Bugünün satırını getirir; yoksa DAILY_LIMIT ile oluşturur. Döner: kalan hak.
+// Kullanıcının satırını getirir; yoksa 0 kullanımla oluşturur. Döner: kalan hak.
 // `isAdmin` true ise (bkz. adminAccess.js — YALNIZCA JWT'den doğrulanmış
 // user.email'e göre sunucu tarafında hesaplanır) veritabanına hiç gitmeden
-// Infinity döner — admin hesapları için günlük sayaç hiç oluşturulmaz/tüketilmez.
+// Infinity döner — admin hesapları için sayaç hiç oluşturulmaz/tüketilmez.
 export async function getRemaining(userId, isAdmin = false) {
   if (isAdmin) return Infinity;
 
   const admin = getSupabaseAdmin();
-  const date = todayDate();
 
   const { data: existing, error: selErr } = await admin
-    .from("user_quotas")
-    .select("remaining_usage")
+    .from("user_ai_trial")
+    .select("messages_used")
     .eq("user_id", userId)
-    .eq("date", date)
     .maybeSingle();
   if (selErr) throw selErr;
-  if (existing) return existing.remaining_usage;
+  if (existing) return Math.max(0, TRIAL_LIMIT - existing.messages_used);
 
-  const { data: created, error: insErr } = await admin
-    .from("user_quotas")
-    .insert({ user_id: userId, date, remaining_usage: DAILY_LIMIT })
-    .select("remaining_usage")
-    .single();
+  const { error: insErr } = await admin.from("user_ai_trial").insert({ user_id: userId, messages_used: 0 });
   if (insErr) throw insErr;
-  return created.remaining_usage;
+  return TRIAL_LIMIT;
 }
 
-// Başarılı bir aksiyondan SONRA çağrılır — hakkı 1 azaltır. Yarış durumuna
-// (aynı anda iki istek) karşı DB seviyesinde koşullu update kullanır: yalnızca
-// remaining_usage > 0 iken düşer, aksi halde satırı olduğu gibi bırakır.
-// Döner: düşümden sonraki kalan hak.
+// Başarılı bir aksiyondan SONRA çağrılır — kullanımı 1 artırır (ömür boyu
+// toplam). Yarış durumuna karşı DB seviyesinde koşullu update kullanır.
+// Döner: artıştan sonraki kalan hak.
 export async function consumeOne(userId, isAdmin = false) {
   if (isAdmin) return Infinity;
 
   const admin = getSupabaseAdmin();
-  const date = todayDate();
 
-  // Satır yoksa önce oluştur (limit ile).
+  // Satır yoksa önce oluştur.
   await getRemaining(userId);
 
-  const { data, error } = await admin.rpc("decrement_user_quota", {
+  const { data, error } = await admin.rpc("increment_user_trial_usage", {
     p_user_id: userId,
-    p_date: date,
-    p_default_limit: DAILY_LIMIT,
+    p_trial_limit: TRIAL_LIMIT,
   });
-  if (!error && typeof data === "number") return data;
+  if (!error && typeof data === "number") return Math.max(0, TRIAL_LIMIT - data);
 
-  // rpc fonksiyonu henüz kurulmadıysa (bkz. migration.sql) güvenli bir
-  // fallback: satırı oku, 0'ın altına düşürmeden manuel azalt.
-  const { data: row, error: readErr } = await admin
-    .from("user_quotas")
-    .select("remaining_usage")
-    .eq("user_id", userId)
-    .eq("date", date)
-    .single();
+  // rpc fonksiyonu henüz kurulmadıysa (bkz. ai_trial_limit.sql) güvenli bir
+  // fallback: satırı oku, limitin üstüne çıkarmadan manuel artır.
+  const { data: row, error: readErr } = await admin.from("user_ai_trial").select("messages_used").eq("user_id", userId).single();
   if (readErr) throw readErr;
 
-  const next = Math.max(0, row.remaining_usage - 1);
+  const nextUsed = Math.min(TRIAL_LIMIT, row.messages_used + 1);
   const { error: updErr } = await admin
-    .from("user_quotas")
-    .update({ remaining_usage: next, updated_at: new Date().toISOString() })
-    .eq("user_id", userId)
-    .eq("date", date);
+    .from("user_ai_trial")
+    .update({ messages_used: nextUsed, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
   if (updErr) throw updErr;
-  return next;
+  return Math.max(0, TRIAL_LIMIT - nextUsed);
 }
