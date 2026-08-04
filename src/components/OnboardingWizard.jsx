@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { MONO_FONT } from "../constants";
 
 // Dinamik onboarding sihirbazı: aiPipelineService.generateOnboardingQuestions'ın
@@ -15,6 +16,20 @@ export default function OnboardingWizard({
   onNext,
   onFinish,
 }) {
+  // "Planı Oluştur" ÇİFT TIKLAMA koruması — bu tek tık, arkada GERÇEK/ücretli
+  // bir Gemini isteği tetikler (bkz. usePlanStudio.finalizeAndGenerate ->
+  // api/generate-plan.js). `stage` STAGE_LOADING'e geçince bu bileşen zaten
+  // unmount olur (app.jsx koşullu render), ama tıklama ile o re-render
+  // ARASINDAKİ kısa pencerede (ör. hızlı çift tık/mash) ikinci bir isteğin
+  // gitmesini engellemek için senkron, yerel bir kilit — sunucudaki asıl
+  // hız sınırının (api/_lib/planRateLimit.js) İLK savunma hattı.
+  const [submitting, setSubmitting] = useState(false);
+  const handleFinish = () => {
+    if (submitting) return;
+    setSubmitting(true);
+    onFinish?.();
+  };
+
   const total = questions.length;
   const q = questions[wizardStep];
   if (!q) return null;
@@ -108,12 +123,21 @@ export default function OnboardingWizard({
           Geri
         </button>
         <button
-          onClick={isLast ? onFinish : onNext}
-          disabled={!canProceed}
-          className="flex-1 rounded-2xl py-3.5 text-[14.5px] font-semibold transition-all disabled:opacity-40"
+          onClick={isLast ? handleFinish : onNext}
+          disabled={isLast ? !canProceed || submitting : !canProceed}
+          className="flex-1 flex items-center justify-center gap-2 rounded-2xl py-3.5 text-[14.5px] font-semibold transition-all disabled:opacity-40"
           style={{ background: canProceed ? accent : "var(--disabled-bg)", color: canProceed ? "#0A0E13" : "var(--text-faint)" }}
         >
-          {isLast ? "Planı Oluştur" : "İleri"}
+          {isLast && submitting ? (
+            <>
+              <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent motion-safe:animate-spin" />
+              Oluşturuluyor...
+            </>
+          ) : isLast ? (
+            "Planı Oluştur"
+          ) : (
+            "İleri"
+          )}
         </button>
       </div>
     </div>

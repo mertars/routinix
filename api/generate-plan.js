@@ -1,6 +1,6 @@
 import { getUserFromRequest } from "./_lib/supabaseAdmin.js";
 import { generateOnboardingQuestions, createEnrichedPlan, fetchNextWeekTasks } from "./_lib/planPrompt.js";
-import { checkCooldown } from "./_lib/rateLimit.js";
+import { checkPlanRateLimit, logApiRequest } from "./_lib/planRateLimit.js";
 
 // Plan üretim pipeline'ının TEK sunucu tarafı giriş noktası. Eskiden client
 // (anon key) VITE_GEMINI_API_KEY ile Gemini'yi doğrudan çağırıyordu — anahtar
@@ -32,20 +32,25 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, message: "'action' alanı zorunlu." });
   }
 
-  // GÜVENLİK: bu üç action da GERÇEK, ücretli Gemini çağrısı yapar ve
-  // öncesinde hiçbir hak/hız sınırı yoktu — bir istemci bu uç noktayı
-  // script ile döngüde çağırıp sınırsız Gemini isteği tetikleyebilirdi
-  // (10 plan limiti burada işe yaramaz: create_plan'ın SONUCU client
+  // GÜVENLİK/BÜTÇE: bu üç action da GERÇEK, ücretli Gemini çağrısı yapar.
+  // Çok katmanlı hız sınırı (kullanıcı bazlı RPM/RPH/RPD + sistem geneli
+  // Global Günlük Tavan) — bkz. api/_lib/planRateLimit.js dosya başı yorumu.
+  // 10 aktif plan limiti burada işe yaramaz (create_plan'ın SONUCU client
   // tarafında hiç kaydedilmeden atılabilir, plans tablosuna hiç yazılmadan
-  // AI çağrısı zaten yapılmış/ücretlendirilmiş olur). 3sn'lik bir soğuma
-  // süresi meşru kullanımda görünmez (bir yanıt beklemek zaten bundan uzun
-  // sürer) ama bir spam döngüsünü ilk denemede durdurur.
-  const allowed = await checkCooldown(user.id, 3000);
-  if (!allowed) {
-    return res.status(429).json({ ok: false, message: "Çok hızlı istek gönderiyorsun, birkaç saniye bekleyip tekrar dener misin?" });
+  // AI çağrısı zaten yapılmış/ücretlendirilmiş olur) — bu yüzden ayrı,
+  // istek-seviyesinde bir koruma gerekiyordu.
+  const limitCheck = await checkPlanRateLimit(user.id);
+  if (!limitCheck.allowed) {
+    if (limitCheck.retryAfterSec) res.setHeader("Retry-After", String(limitCheck.retryAfterSec));
+    return res.status(429).json({ ok: false, message: limitCheck.message });
   }
 
   try {
+    // "Rezervasyon önce, pahalı iş sonra": kontrolü geçer geçmez (Gemini'ye
+    // gitmeden ÖNCE) loglanır — eşzamanlı isteklerin ikisinin de aynı anda
+    // kontrolü geçip limiti aşması riskini pratik olarak azaltır.
+    await logApiRequest(user.id, "generate-plan");
+
     let data;
     if (action === "onboarding_questions") {
       data = await generateOnboardingQuestions(payload);
