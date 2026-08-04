@@ -203,15 +203,15 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#030304] text-slate-400 text-[13px]">Yükleniyor...</div>
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--bg-app)] text-[var(--text-muted)] text-[13px]">Yükleniyor...</div>
     );
   }
 
   if (error || !template) {
     return (
-      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-3 bg-[#030304] text-center px-6">
+      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-3 bg-[var(--bg-app)] text-center px-6">
         <span className="text-[40px]">🔗</span>
-        <p className="text-[14px] font-bold text-white">{error || "Şablon bulunamadı"}</p>
+        <p className="text-[14px] font-bold text-[var(--text-primary)]">{error || "Şablon bulunamadı"}</p>
         <button onClick={() => onDone?.(null)} className="mt-2 text-[12.5px] font-bold text-cyan-300">
           Routinix'e Git →
         </button>
@@ -221,15 +221,15 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
 
   if (successPlan) {
     return (
-      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-3 bg-[#030304] text-center px-6 animate-[fadeIn_0.2s_ease]">
+      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-3 bg-[var(--bg-app)] text-center px-6 animate-[fadeIn_0.2s_ease]">
         <span
           className="w-16 h-16 rounded-full flex items-center justify-center text-[28px]"
           style={{ background: "rgba(46,217,163,0.15)", border: "1px solid rgba(46,217,163,0.4)" }}
         >
           ✅
         </span>
-        <p className="text-[15px] font-bold text-white">Plan başarıyla kütüphanene eklendi!</p>
-        <p className="text-[12px] text-slate-400">Planına yönlendiriliyorsun...</p>
+        <p className="text-[15px] font-bold text-[var(--text-primary)]">Plan başarıyla kütüphanene eklendi!</p>
+        <p className="text-[12px] text-[var(--text-muted)]">Planına yönlendiriliyorsun...</p>
       </div>
     );
   }
@@ -239,7 +239,7 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
   const author = template.author;
 
   return (
-    <div className="shared-template-print-root fixed inset-0 z-[200] overflow-y-auto bg-[#030304] text-white">
+    <div className="shared-template-print-root fixed inset-0 z-[200] overflow-y-auto bg-[var(--bg-app)] text-[var(--text-primary)]">
       {/* Yazdırma/PDF desteği — `.no-print` işaretli her şey (üst şerit,
           güvenlik/CTA butonları, kapak fotoğrafı) VE her `<button>` yazdırırken
           tamamen kaldırılır; geriye yalnızca başlık, hikaye bölümleri ve
@@ -271,7 +271,7 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
           background: [
             "radial-gradient(circle at 8% -6%, rgba(178,107,255,0.28) 0%, transparent 45%)",
             "radial-gradient(circle at 96% 108%, rgba(34,211,238,0.24) 0%, transparent 45%)",
-            "#030304",
+            "var(--bg-app)",
           ].join(", "),
         }}
       />
@@ -283,7 +283,7 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
           </span>
           <button
             onClick={handleCopyLink}
-            className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-[11px] font-semibold text-slate-300 hover:border-cyan-500/40 transition-colors"
+            className="flex items-center gap-1.5 rounded-full border border-[var(--border-default)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:border-cyan-500/40 transition-colors"
           >
             {linkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
             {linkCopied ? "Kopyalandı" : "Linki Kopyala"}
@@ -294,19 +294,19 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
             kırmak için) hesap açmadan/ödeme yapmadan güvenle gelinebileceğini
             AÇIKÇA belirtir. Asıl PDF/yazdırma aksiyonu artık aşağıdaki 2 ana
             butondan biri (bkz. handlePrint) — burada yalnızca bilgi verilir. */}
-        <div className="no-print rounded-xl border border-white/10 bg-zinc-900/60 px-3.5 py-2.5 flex flex-col gap-2">
-          <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-300">
+        <div className="no-print rounded-xl border border-[var(--border-default)] bg-[rgba(var(--overlay-rgb),0.05)] px-3.5 py-2.5 flex flex-col gap-2">
+          <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)]">
             <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             Güvenli Ön İzleme: Bu bir Routinix Nexus şablonudur. Hesap açma veya ödeme gerektirmez.
           </p>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="flex items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-[10.5px] font-semibold text-slate-300">
+            <span className="flex items-center gap-1 rounded-full border border-[var(--border-default)] px-2.5 py-1 text-[10.5px] font-semibold text-[var(--text-secondary)]">
               <PencilLine className="w-3 h-3" /> Serbestçe Düzenle
             </span>
           </div>
         </div>
 
-        <CoverPattern coverId={template.cover_url} className="no-print w-full h-44 rounded-2xl border border-white/10">
+        <CoverPattern coverId={template.cover_url} className="no-print w-full h-44 rounded-2xl border border-[var(--border-default)]">
           <span
             className="absolute top-3 left-3 text-[10px] font-bold uppercase tracking-[0.06em] px-2.5 py-1 rounded-full border"
             style={{ background: "rgba(8,13,26,0.75)", borderColor: `${cat.accent}55`, color: cat.accent }}
@@ -316,10 +316,10 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
         </CoverPattern>
 
         <div>
-          <h1 className="text-[20px] font-black text-white leading-tight">{template.title}</h1>
+          <h1 className="text-[20px] font-black text-[var(--text-primary)] leading-tight">{template.title}</h1>
           <button className="flex items-center gap-1.5 mt-2 hover:opacity-70 transition-opacity">
             <Avatar src={author?.avatar_url} name={author?.display_name || author?.username} />
-            <span className="text-[12.5px] font-semibold text-slate-300">{author?.display_name || author?.username}</span>
+            <span className="text-[12.5px] font-semibold text-[var(--text-secondary)]">{author?.display_name || author?.username}</span>
           </button>
         </div>
 
@@ -333,16 +333,16 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
           <div className="flex flex-col gap-4">
             {sections.map((s) => (
               <div key={s.title}>
-                <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-slate-500 mb-1">{s.title}</p>
-                <p className="text-[13px] leading-relaxed text-slate-300 whitespace-pre-line">{s.body}</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--text-faint)] mb-1">{s.title}</p>
+                <p className="text-[13px] leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{s.body}</p>
               </div>
             ))}
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-slate-500 mb-2">Rutinler</p>
+            <div className="rounded-xl border border-[var(--border-default)] bg-[rgba(var(--overlay-rgb),0.04)] p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--text-faint)] mb-2">Rutinler</p>
               <ul className="flex flex-col gap-1.5">
                 {(template.preview_routines || []).map((r, i) => (
-                  <li key={i} className="text-[12.5px] text-slate-300">
-                    • {r.content} <span className="text-slate-500">({r.frequency === "daily" ? "her gün" : "haftada 1"})</span>
+                  <li key={i} className="text-[12.5px] text-[var(--text-secondary)]">
+                    • {r.content} <span className="text-[var(--text-faint)]">({r.frequency === "daily" ? "her gün" : "haftada 1"})</span>
                   </li>
                 ))}
               </ul>
@@ -368,11 +368,11 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
             bağlantı olarak altta kalır — iki ana butonla görsel rekabete
             girmesin. */}
         {mode === "preview" ? (
-          <div ref={ctaRef} className="no-print sticky bottom-4 flex flex-col gap-2">
+          <div ref={ctaRef} className="no-print sticky flex flex-col gap-2" style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={handlePrint}
-                className="w-full flex items-center justify-center gap-2 rounded-full px-4 py-3.5 text-[13px] font-bold text-white border border-white/15 bg-zinc-900/85 backdrop-blur-md transition-transform active:scale-[0.98] hover:border-cyan-500/40"
+                className="w-full flex items-center justify-center gap-2 rounded-full px-4 py-3.5 text-[13px] font-bold text-[var(--text-primary)] border border-[var(--border-strong)] bg-[rgba(var(--glass-rgb),0.9)] backdrop-blur-md transition-transform active:scale-[0.98] hover:border-cyan-500/40"
               >
                 <FileDown className="w-4 h-4" /> PDF Çıktı Al
               </button>
@@ -388,13 +388,13 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
             <button
               onClick={() => setMode("edit")}
               disabled={adding}
-              className="w-full text-[11.5px] font-semibold text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-60"
+              className="w-full text-[11.5px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-60"
             >
               <Pencil className="w-3 h-3 inline -mt-0.5 mr-1" /> Planı Düzenle & Öyle Ekle
             </button>
           </div>
         ) : (
-          <div ref={ctaRef} className="no-print sticky bottom-4 flex flex-col gap-2">
+          <div ref={ctaRef} className="no-print sticky flex flex-col gap-2" style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}>
             <button
               onClick={handleAddEditedToMyPlans}
               disabled={adding || !auth.user}
@@ -403,19 +403,19 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
             >
               💾 {adding ? "Ekleniyor..." : "Değişikliklerle Planlarıma Ekle"}
             </button>
-            <button onClick={handleCancelEdit} disabled={adding} className="w-full text-[11.5px] font-semibold text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-60">
+            <button onClick={handleCancelEdit} disabled={adding} className="w-full text-[11.5px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-60">
               Vazgeç, önizlemeye dön
             </button>
           </div>
         )}
 
         {auth.isAnonymous && (
-          <button onClick={onOpenAuth} className="no-print text-[11.5px] font-semibold text-slate-400 hover:text-cyan-300 transition-colors text-center">
+          <button onClick={onOpenAuth} className="no-print text-[11.5px] font-semibold text-[var(--text-muted)] hover:text-cyan-300 transition-colors text-center">
             İlerlemeni kaybetmemek için hesabını kaydet →
           </button>
         )}
 
-        <button onClick={() => onDone?.(null)} className="no-print flex items-center justify-center gap-1.5 text-[11px] font-semibold text-slate-500 hover:text-slate-300 transition-colors">
+        <button onClick={() => onDone?.(null)} className="no-print flex items-center justify-center gap-1.5 text-[11px] font-semibold text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors">
           <X className="w-3.5 h-3.5" /> Routinix'e devam et
         </button>
       </div>

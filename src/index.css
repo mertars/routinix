@@ -172,6 +172,10 @@ body {
   margin: 0;
   min-height: 100dvh;
   -webkit-tap-highlight-color: transparent;
+  /* Güvenlik ağı: herhangi bir bileşendeki taşan bir genişlik/negatif margin
+     mobilde yatay kaydırma barına yol açmasın diye kök seviyede kesilir.
+     İçeriği kırpmaz — yalnızca YATAY taşmayı gizler, dikey scroll serbest. */
+  overflow-x: hidden;
 }
 
 /* Özel Neon Scrollbar — "Bugünün Görevleri" (TodayPopover) ve Pomodoro

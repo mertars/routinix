@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./lib/supabaseClient";
+import logger from "./utils/logger";
 
 // Uygulama genelinde oturum durumunu yöneten hook. supabase.auth.onAuthStateChange
 // ile giriş/çıkış/token-yenileme olaylarını dinler; başlangıçta mevcut oturumu
@@ -11,11 +12,24 @@ export default function useAuth() {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      setAuthReady(true);
-    });
+    // .catch() KRİTİK: internet kesikken/Supabase'e ulaşılamazken bu promise
+    // REJECT olabilir — yakalanmazsa `authReady` asla true olmaz ve uygulama
+    // sonsuza kadar "oturum kontrol ediliyor" durumunda takılı kalırdı.
+    // Ağ hatasında en güvenli geri dönüş: oturumsuz kabul edip devam etmek
+    // (kullanıcı misafir/anonim akışa düşer, sayfa asla donmaz).
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!mounted) return;
+        setSession(data.session);
+        setAuthReady(true);
+      })
+      .catch((err) => {
+        if (!mounted) return;
+        logger.error("AUTH", "Oturum getirilemedi (ağ hatası olabilir)", { error: err?.message });
+        setSession(null);
+        setAuthReady(true);
+      });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
