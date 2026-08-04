@@ -18,7 +18,7 @@ export default function CoverPattern({ coverId, className = "", style, children 
   const fallback = coverById(coverId);
 
   return (
-    <div className={`relative overflow-hidden ${className}`} style={{ background: errored ? fallback.style : "#0c1322", ...style }}>
+    <div className={`relative overflow-hidden ${className}`} style={{ background: errored ? fallback.style : "var(--bg-card)", ...style }}>
       {!errored && (
         <img
           src={photoUrl}

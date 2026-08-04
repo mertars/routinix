@@ -82,7 +82,7 @@ export default function PublicProfileCard({ profile, myProfile, onClose, onFollo
     <FocusSidePanel open={!!profile} onClose={onClose} side="right" icon={null} title="">
       {/* FocusSidePanel'in kendi gövdesi zaten `p-4` taşıyor — burada ekstra
           dolgu EKLEMİYORUZ, yalnızca monokrom zemin/metin rengini bindiriyoruz. */}
-      <div className="-m-4 p-5 flex flex-col gap-5 bg-[#030304] min-h-[calc(100%+2rem)] text-white">
+      <div className="-m-4 p-5 flex flex-col gap-5 bg-[var(--bg-app)] min-h-[calc(100%+2rem)] text-[var(--text-primary)]">
         <div className="flex items-center gap-3">
           <Avatar src={profile.avatar_url} name={profile.display_name || profile.username} size="w-14 h-14" textSize="text-[18px]" />
           <div className="min-w-0">
@@ -90,7 +90,7 @@ export default function PublicProfileCard({ profile, myProfile, onClose, onFollo
               <h3 className="text-[15px] font-bold truncate">{profile.display_name || profile.username}</h3>
               {profile.is_bot && <BadgeCheck className="w-3.5 h-3.5 shrink-0 text-cyan-400" />}
             </div>
-            <p className="text-[11.5px] text-slate-400">@{profile.username}</p>
+            <p className="text-[11.5px] text-[var(--text-muted)]">@{profile.username}</p>
           </div>
         </div>
 
@@ -103,9 +103,9 @@ export default function PublicProfileCard({ profile, myProfile, onClose, onFollo
           </span>
         )}
 
-        {profile.bio && <p className="text-[12.5px] text-slate-300 leading-relaxed">{profile.bio}</p>}
+        {profile.bio && <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">{profile.bio}</p>}
 
-        <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-400">
+        <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text-muted)]">
           <span>⚡ {usageDays} Gündür Routinix Üyesi</span>
         </div>
 
@@ -114,7 +114,7 @@ export default function PublicProfileCard({ profile, myProfile, onClose, onFollo
             onClick={handleFollowToggle}
             disabled={busy}
             className={`w-full flex items-center justify-center gap-2 rounded-full py-2.5 text-[12.5px] font-bold transition-all active:scale-95 disabled:opacity-50 ${
-              following ? "border border-white/15 text-slate-300" : "text-black"
+              following ? "border border-[var(--border-strong)] text-[var(--text-secondary)]" : "text-black"
             }`}
             style={following ? undefined : { background: "linear-gradient(90deg, #22D3EE, #B26BFF)" }}
           >
@@ -130,27 +130,27 @@ export default function PublicProfileCard({ profile, myProfile, onClose, onFollo
           </button>
         )}
 
-        <div className="grid grid-cols-3 gap-2 py-3 border-y border-white/10">
+        <div className="grid grid-cols-3 gap-2 py-3 border-y border-[var(--border-default)]">
           <div className="text-center">
             <p className="text-[16px] font-bold tabular-nums">{stats?.template_count ?? "—"}</p>
-            <p className="text-[9.5px] font-semibold uppercase tracking-[0.04em] text-slate-500">Şablon</p>
+            <p className="text-[9.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-faint)]">Şablon</p>
           </div>
           <div className="text-center">
             <p className="text-[16px] font-bold tabular-nums">🏆 {stats?.total_clones ?? "—"}</p>
-            <p className="text-[9.5px] font-semibold uppercase tracking-[0.04em] text-slate-500">Hayata Dokundu</p>
+            <p className="text-[9.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-faint)]">Hayata Dokundu</p>
           </div>
           <div className="text-center">
             <p className="text-[16px] font-bold tabular-nums">{stats?.follower_count ?? "—"}</p>
-            <p className="text-[9.5px] font-semibold uppercase tracking-[0.04em] text-slate-500">Takipçi</p>
+            <p className="text-[9.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-faint)]">Takipçi</p>
           </div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-2.5">
-          <p className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-slate-500">Paylaştığı Şablonlar</p>
+          <p className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-[var(--text-faint)]">Paylaştığı Şablonlar</p>
           {loading ? (
-            <p className="text-[12px] text-slate-500">Yükleniyor...</p>
+            <p className="text-[12px] text-[var(--text-faint)]">Yükleniyor...</p>
           ) : templates.length === 0 ? (
-            <p className="text-[12px] text-slate-500">Henüz bir şablon paylaşmamış.</p>
+            <p className="text-[12px] text-[var(--text-faint)]">Henüz bir şablon paylaşmamış.</p>
           ) : (
             templates.map((t) => {
               const cat = categoryOf(t.category);
@@ -158,12 +158,12 @@ export default function PublicProfileCard({ profile, myProfile, onClose, onFollo
                 <button
                   key={t.id}
                   onClick={() => onOpenTemplate?.(t)}
-                  className="flex items-center gap-2.5 rounded-xl p-2 border border-white/10 text-left hover:border-cyan-500/40 transition-colors"
+                  className="flex items-center gap-2.5 rounded-xl p-2 border border-[var(--border-default)] text-left hover:border-cyan-500/40 transition-colors"
                 >
                   <CoverPattern coverId={t.cover_url} className="w-10 h-10 rounded-lg shrink-0" />
                   <span className="min-w-0">
                     <span className="block text-[12px] font-semibold truncate">{t.title}</span>
-                    <span className="block text-[10.5px] text-slate-500">
+                    <span className="block text-[10.5px] text-[var(--text-faint)]">
                       {cat.emoji} {cat.label}
                     </span>
                   </span>

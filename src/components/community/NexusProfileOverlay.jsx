@@ -22,16 +22,16 @@ function StatTile({ icon, value, label }) {
     <div
       className="flex flex-col items-center justify-center gap-1 rounded-2xl py-4 px-2 text-center"
       style={{
-        background: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))",
-        border: "1px solid rgba(255,255,255,0.1)",
-        boxShadow: "inset 0 1px 1px rgba(255,255,255,0.12)",
+        background: "rgba(var(--overlay-rgb),0.045)",
+        border: "1px solid rgba(var(--overlay-rgb),0.1)",
+        boxShadow: "inset 0 1px 1px rgba(255,255,255,0.08)",
       }}
     >
-      <span className="text-slate-400">{icon}</span>
-      <span className="text-[17px] font-black text-white tabular-nums" style={{ fontFamily: MONO_FONT }}>
+      <span className="text-[var(--text-muted)]">{icon}</span>
+      <span className="text-[17px] font-black text-[var(--text-primary)] tabular-nums" style={{ fontFamily: MONO_FONT }}>
         {value}
       </span>
-      <span className="text-[9.5px] font-semibold uppercase tracking-[0.05em] text-slate-500">{label}</span>
+      <span className="text-[9.5px] font-semibold uppercase tracking-[0.05em] text-[var(--text-faint)]">{label}</span>
     </div>
   );
 }
@@ -95,7 +95,7 @@ export default function NexusProfileOverlay({ open, user, onClose, onCreateProfi
   const badge = profile && stats ? rankBadge(usageDays, stats.total_clones) : null;
 
   return (
-    <div className="full-screen-in fixed inset-0 z-[110] flex flex-col bg-[#030304] text-white" style={{ animation: "fullScreenIn 0.32s cubic-bezier(0.32,0.72,0,1)" }}>
+    <div className="full-screen-in fixed inset-0 z-[110] flex flex-col bg-[var(--bg-app)] text-[var(--text-primary)]" style={{ animation: "fullScreenIn 0.32s cubic-bezier(0.32,0.72,0,1)" }}>
       <div
         className="fixed inset-0 z-0 pointer-events-none"
         aria-hidden="true"
@@ -112,8 +112,8 @@ export default function NexusProfileOverlay({ open, user, onClose, onCreateProfi
         <button
           onClick={onClose}
           aria-label="Kapat"
-          className="w-9 h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white transition-colors"
-          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+          className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          style={{ background: "rgba(var(--overlay-rgb),0.06)", border: "1px solid rgba(var(--overlay-rgb),0.1)" }}
         >
           <X className="w-4 h-4" />
         </button>
@@ -121,12 +121,12 @@ export default function NexusProfileOverlay({ open, user, onClose, onCreateProfi
 
       <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar px-5 pb-[calc(env(safe-area-inset-bottom)+24px)] flex flex-col gap-5">
         {loading ? (
-          <div className="flex-1 flex items-center justify-center text-slate-500 text-[13px]">Yükleniyor...</div>
+          <div className="flex-1 flex items-center justify-center text-[var(--text-faint)] text-[13px]">Yükleniyor...</div>
         ) : !profile ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-4">
             <span className="text-[36px]">👤</span>
-            <p className="text-[14px] font-bold text-white">Henüz bir Nexus profilin yok</p>
-            <p className="text-[12.5px] text-slate-400">Şablon paylaşmak ve topluluğa katılmak için önce bir profil oluştur.</p>
+            <p className="text-[14px] font-bold text-[var(--text-primary)]">Henüz bir Nexus profilin yok</p>
+            <p className="text-[12.5px] text-[var(--text-muted)]">Şablon paylaşmak ve topluluğa katılmak için önce bir profil oluştur.</p>
             <button
               onClick={onCreateProfile}
               className="mt-2 rounded-full px-5 py-2.5 text-[12.5px] font-bold text-black"
@@ -144,7 +144,7 @@ export default function NexusProfileOverlay({ open, user, onClose, onCreateProfi
                   <h2 className="text-[17px] font-black truncate">{profile.display_name || profile.username}</h2>
                   {profile.is_bot && <BadgeCheck className="w-4 h-4 shrink-0 text-cyan-400" />}
                 </div>
-                <p className="text-[12px] text-slate-400">@{profile.username}</p>
+                <p className="text-[12px] text-[var(--text-muted)]">@{profile.username}</p>
                 {badge && (
                   <span
                     className="mt-1.5 w-fit flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full text-black"
@@ -156,28 +156,28 @@ export default function NexusProfileOverlay({ open, user, onClose, onCreateProfi
               </div>
             </div>
 
-            {profile.bio && <p className="text-[12.5px] text-slate-300 leading-relaxed">{profile.bio}</p>}
+            {profile.bio && <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">{profile.bio}</p>}
 
             {/* Şablonlarım — eski DrawerMenu'deki müstakil sekmenin YERİNE
                 doğrudan burada, profil bilgisinin hemen altında. */}
             <div>
-              <p className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.05em] text-slate-500 mb-2">
+              <p className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.05em] text-[var(--text-faint)] mb-2">
                 <FileText className="w-3 h-3" /> Şablonlarım {templates ? `(${templates.length})` : ""}
               </p>
               {templates === null ? (
-                <p className="text-[12px] text-slate-500">Yükleniyor...</p>
+                <p className="text-[12px] text-[var(--text-faint)]">Yükleniyor...</p>
               ) : templates.length === 0 ? (
-                <p className="text-[12px] text-slate-500">Henüz bir şablon paylaşmadın.</p>
+                <p className="text-[12px] text-[var(--text-faint)]">Henüz bir şablon paylaşmadın.</p>
               ) : (
                 <div className="flex flex-col gap-2">
                   {templates.map((t) => {
                     const cat = categoryOf(t.category);
                     return (
-                      <div key={t.id} className="flex items-center gap-2.5 rounded-xl p-2 border border-white/10">
+                      <div key={t.id} className="flex items-center gap-2.5 rounded-xl p-2 border border-[var(--border-default)]">
                         <CoverPattern coverId={t.cover_url} className="w-10 h-10 rounded-lg shrink-0" />
                         <span className="min-w-0">
-                          <span className="block text-[12.5px] font-semibold text-white truncate">{t.title}</span>
-                          <span className="block text-[10.5px] text-slate-500">
+                          <span className="block text-[12.5px] font-semibold text-[var(--text-primary)] truncate">{t.title}</span>
+                          <span className="block text-[10.5px] text-[var(--text-faint)]">
                             {cat.emoji} {cat.label}
                           </span>
                         </span>
@@ -189,7 +189,7 @@ export default function NexusProfileOverlay({ open, user, onClose, onCreateProfi
             </div>
 
             <div>
-              <p className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-slate-500 mb-2">Nexus İstatistikleri</p>
+              <p className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-[var(--text-faint)] mb-2">Nexus İstatistikleri</p>
               <div className="grid grid-cols-3 gap-2">
                 <StatTile icon="📄" value={stats?.template_count ?? "—"} label="Şablon" />
                 <StatTile icon="🏆" value={stats?.total_clones ?? "—"} label="Hayata Dokundu" />
@@ -198,7 +198,7 @@ export default function NexusProfileOverlay({ open, user, onClose, onCreateProfi
             </div>
 
             <div>
-              <p className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-slate-500 mb-2">Genel İlerleme</p>
+              <p className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-[var(--text-faint)] mb-2">Genel İlerleme</p>
               <div className="grid grid-cols-3 gap-2">
                 <StatTile icon={<ListChecks className="w-4 h-4" strokeWidth={2.25} />} value={productivity?.completedTasks ?? 0} label="Tamamlanan Görev" />
                 <StatTile icon={<Repeat2 className="w-4 h-4" strokeWidth={2.25} />} value={productivity?.activeRoutines ?? 0} label="Aktif Rutin" />
@@ -206,7 +206,7 @@ export default function NexusProfileOverlay({ open, user, onClose, onCreateProfi
               </div>
             </div>
 
-            <p className="text-[11.5px] font-semibold text-slate-500 text-center mt-1">⚡ {usageDays} gündür Routinix üyesi</p>
+            <p className="text-[11.5px] font-semibold text-[var(--text-faint)] text-center mt-1">⚡ {usageDays} gündür Routinix üyesi</p>
           </>
         )}
       </div>

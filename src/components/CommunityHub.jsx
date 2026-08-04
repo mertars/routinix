@@ -32,7 +32,7 @@ const NEXUS_BACKGROUND_STYLE = {
     "radial-gradient(circle at 8% -6%, rgba(178,107,255,0.28) 0%, transparent 45%)",
     "radial-gradient(circle at 96% 108%, rgba(34,211,238,0.24) 0%, transparent 45%)",
     "radial-gradient(circle at 78% 38%, rgba(16,185,129,0.14) 0%, transparent 40%)",
-    "#030304",
+    "var(--bg-app)",
   ].join(", "),
 };
 
@@ -171,7 +171,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
         <button
           onClick={() => setFollowingOnly((v) => !v)}
           className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[12px] font-bold border transition-colors duration-200 ${
-            followingOnly ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 bg-[#030304]/90 text-slate-300"
+            followingOnly ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-default)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"
           }`}
         >
           <Users className="w-3.5 h-3.5" /> Takip Edilenler
@@ -179,11 +179,11 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
       )}
 
       <div>
-        <p className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-slate-500 mb-2">Kategori</p>
+        <p className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-[var(--text-faint)] mb-2">Kategori</p>
         <div className="flex flex-col gap-1">
           <button
             onClick={() => setSelectedCategory(null)}
-            className={`text-left rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors duration-200 ${!selectedCategory ? "bg-white/10 text-white" : "text-slate-400"}`}
+            className={`text-left rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors duration-200 ${!selectedCategory ? "bg-[rgba(var(--overlay-rgb),0.1)] text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}
           >
             Tümü
           </button>
@@ -191,7 +191,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
             <button
               key={k}
               onClick={() => setSelectedCategory(k)}
-              className={`text-left rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors duration-200 ${selectedCategory === k ? "bg-white/10 text-white" : "text-slate-400"}`}
+              className={`text-left rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors duration-200 ${selectedCategory === k ? "bg-[rgba(var(--overlay-rgb),0.1)] text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}
             >
               {CATEGORIES[k].emoji} {CATEGORIES[k].label}
             </button>
@@ -210,7 +210,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
             key={t}
             onClick={() => toggleTagFilter(t)}
             className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold border transition-colors duration-200 ${
-              active ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"
+              active ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-default)] text-[var(--text-secondary)]"
             }`}
           >
             {t}
@@ -221,10 +221,10 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col text-white">
+    <div className="fixed inset-0 z-[100] flex flex-col text-[var(--text-primary)]">
       <NexusBackground />
       <div className="relative z-10 flex flex-col h-full">
-        <div className="shrink-0 px-4 sm:px-6 lg:px-8 pt-5 pb-3 flex items-center justify-between gap-2 border-b border-white/10">
+        <div className="shrink-0 px-4 sm:px-6 lg:px-8 pt-5 pb-3 flex items-center justify-between gap-2 border-b border-[var(--border-default)]">
           <h2 className="text-[17px] font-bold">Routinix Nexus</h2>
           <div className="flex items-center gap-2">
             <button
@@ -235,7 +235,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
             >
               <Plus className="w-3.5 h-3.5" /> Nexus'ta Paylaş
             </button>
-            <button onClick={onClose} aria-label="Kapat" className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+            <button onClick={onClose} aria-label="Kapat" className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -249,19 +249,19 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
             <span className="flex items-center gap-1.5 text-[12.5px] font-bold text-cyan-200">
               <Sparkles className="w-3.5 h-3.5" /> Haftalık Özeti Gör
             </span>
-            <span className="text-[10.5px] text-slate-400 hidden sm:inline">Bu haftaki verimlilik karnen hazır →</span>
+            <span className="text-[10.5px] text-[var(--text-muted)] hidden sm:inline">Bu haftaki verimlilik karnen hazır →</span>
           </button>
         )}
 
         {!profileLoading && user && !myProfile && (
-          <div className="shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-b border-white/10 flex items-center gap-2 flex-wrap">
-            <span className="text-[12px] text-slate-400">Nexus'a katılmak için bir kullanıcı adı seç:</span>
+          <div className="shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-b border-[var(--border-default)] flex items-center gap-2 flex-wrap">
+            <span className="text-[12px] text-[var(--text-muted)]">Nexus'a katılmak için bir kullanıcı adı seç:</span>
             <input
               value={usernameDraft}
               onChange={(e) => setUsernameDraft(e.target.value.toLowerCase())}
               onKeyDown={(e) => e.key === "Enter" && handleCreateProfile()}
               placeholder="kullanici_adi"
-              className="rounded-lg border border-white/10 bg-[#030304]/90 px-3 py-1.5 text-[12px] text-white outline-none focus:border-cyan-500/50"
+              className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-input)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-cyan-500/50"
             />
             <button
               onClick={handleCreateProfile}
@@ -284,7 +284,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
             `translate-y` geçişi: her iki taraf da SABİT bir max-height'a
             (içeriğin gerçek boyundan cömertçe büyük) katlanıp açılıyor —
             JS ile yükseklik ölçmeye gerek yok, tamamen CSS transition. */}
-        <div className="lg:hidden shrink-0 border-b border-white/10">
+        <div className="lg:hidden shrink-0 border-b border-[var(--border-default)]">
           <div
             className={`overflow-hidden transition-all duration-300 ease-out ${
               mobileBarCollapsed ? "max-h-0 opacity-0 -translate-y-2" : "max-h-[240px] opacity-100 translate-y-0"
@@ -292,12 +292,12 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
           >
             <div className="px-4 sm:px-6 pt-3 pb-2 flex flex-col gap-2.5">
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Şablon ara..."
-                  className="w-full rounded-xl border border-white/10 bg-[#030304]/90 pl-9 pr-3 py-2.5 text-[13px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
+                  className="w-full rounded-xl border border-[var(--border-default)] bg-[var(--bg-input)] pl-9 pr-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none focus:border-cyan-500/50"
                 />
               </div>
               <div className="edge-fade-x flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
@@ -305,7 +305,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
                   <button
                     onClick={() => setFollowingOnly((v) => !v)}
                     className={`shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold border transition-colors duration-200 ${
-                      followingOnly ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"
+                      followingOnly ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-default)] text-[var(--text-secondary)]"
                     }`}
                   >
                     <Users className="w-3 h-3" /> Takip Edilenler
@@ -313,7 +313,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
                 )}
                 <button
                   onClick={() => setSelectedCategory(null)}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold border transition-colors duration-200 ${!selectedCategory ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"}`}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold border transition-colors duration-200 ${!selectedCategory ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-default)] text-[var(--text-secondary)]"}`}
                 >
                   Tümü
                 </button>
@@ -321,7 +321,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
                   <button
                     key={k}
                     onClick={() => setSelectedCategory(k)}
-                    className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold border transition-colors duration-200 ${selectedCategory === k ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"}`}
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold border transition-colors duration-200 ${selectedCategory === k ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-default)] text-[var(--text-secondary)]"}`}
                   >
                     {CATEGORIES[k].emoji} {CATEGORIES[k].label}
                   </button>
@@ -337,7 +337,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
               <button
                 onClick={() => setMobileBarCollapsed(false)}
                 aria-label="Aramayı ve etiketleri aç"
-                className="w-9 h-9 rounded-full flex items-center justify-center border border-white/10 bg-[#030304]/90 text-slate-300 hover:border-cyan-500/40 transition-colors"
+                className="w-9 h-9 rounded-full flex items-center justify-center border border-[var(--border-default)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:border-cyan-500/40 transition-colors"
               >
                 <Search className="w-4 h-4" />
               </button>
@@ -349,7 +349,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
           <div className="lg:flex lg:h-full">
             {/* Masaüstü: sol sabit filtre paneli — YALNIZCA ana kategoriler
                 (spesifik etiketler artık sağdaki yatay çip şeridinde). */}
-            <div className="hidden lg:flex lg:w-56 shrink-0 border-r border-white/10 p-5 flex-col gap-5 overflow-y-auto no-scrollbar">{CategorySidebar}</div>
+            <div className="hidden lg:flex lg:w-56 shrink-0 border-r border-[var(--border-default)] p-5 flex-col gap-5 overflow-y-auto no-scrollbar">{CategorySidebar}</div>
 
             {/* `min-w-0` KRİTİK: bu bir flex item'ı (üst parent `lg:flex`) —
                 flex item'lar VARSAYILAN OLARAK `min-width: auto` taşır, yani
@@ -362,12 +362,12 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
               {/* Masaüstü: arama + yatay etiket çipleri, sidebar'ın DIŞINDA */}
               <div className="hidden lg:flex lg:flex-col gap-2 px-8 pt-4 pb-2 shrink-0">
                 <div className="relative max-w-md">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Şablon ara..."
-                    className="w-full rounded-xl border border-white/10 bg-[#030304]/90 pl-9 pr-3 py-2.5 text-[13px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full rounded-xl border border-[var(--border-default)] bg-[var(--bg-input)] pl-9 pr-3 py-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none focus:border-cyan-500/50 transition-colors"
                   />
                 </div>
                 {TagChipsRow}
@@ -376,11 +376,11 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
               {/* 3'lü grid (masaüstü) / dikey akış (mobil) */}
               <div className="flex-1 min-h-0 min-w-0 lg:overflow-y-auto p-4 sm:p-6 lg:px-8 lg:pb-8 pb-mobile-safe w-full max-w-[1400px] mx-auto">
                 {loading ? (
-                  <p className="text-[12.5px] text-slate-400 text-center py-16">Yükleniyor...</p>
+                  <p className="text-[12.5px] text-[var(--text-muted)] text-center py-16">Yükleniyor...</p>
                 ) : fetchError ? (
                   <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
                     <p className="text-[13px] font-semibold text-red-400 max-w-[420px]">Şablonlar yüklenemedi</p>
-                    <p className="text-[11.5px] text-slate-400 max-w-[420px] font-mono break-words">{fetchError}</p>
+                    <p className="text-[11.5px] text-[var(--text-muted)] max-w-[420px] font-mono break-words">{fetchError}</p>
                   </div>
                 ) : templates.length === 0 ? (
                   <div className="grid grid-cols-1">

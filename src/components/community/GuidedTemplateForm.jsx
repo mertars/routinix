@@ -14,7 +14,7 @@ const STEPS = ["Planını Seç", "Kapak & Etiketler", "Hayatınıza Katkısı", 
 function StepShell({ title, children }) {
   return (
     <div className="flex flex-col gap-4">
-      <h3 className="text-[16px] font-bold text-white">{title}</h3>
+      <h3 className="text-[16px] font-bold text-[var(--text-primary)]">{title}</h3>
       {children}
     </div>
   );
@@ -23,13 +23,13 @@ function StepShell({ title, children }) {
 function TextField({ label, placeholder, value, onChange, rows = 8 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-slate-400">{label}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{label}</span>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="w-full rounded-xl border border-white/10 bg-[#030304]/95 px-3.5 py-3 text-[13px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50 transition-colors resize-none"
+        className="w-full rounded-xl border border-[var(--border-default)] bg-[var(--bg-input)] px-3.5 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none focus:border-cyan-500/50 transition-colors resize-none"
       />
     </label>
   );
@@ -156,15 +156,15 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center px-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/80" />
-      <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-lg max-h-[85vh] rounded-2xl border border-white/10 bg-[#030304]/95 shadow-2xl flex flex-col">
-        <div className="shrink-0 px-6 pt-5 pb-4 border-b border-white/10 flex items-center justify-between">
+      <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-lg max-h-[85vh] rounded-2xl border border-[var(--border-default)] bg-[rgba(var(--glass-rgb),0.95)] shadow-2xl flex flex-col">
+        <div className="shrink-0 px-6 pt-5 pb-4 border-b border-[var(--border-default)] flex items-center justify-between">
           <div>
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--text-muted)]">
               Adım {step + 1}/{STEPS.length}
             </p>
-            <h2 className="text-[15px] font-bold text-white">{STEPS[step]}</h2>
+            <h2 className="text-[15px] font-bold text-[var(--text-primary)]">{STEPS[step]}</h2>
           </div>
-          <button onClick={onClose} aria-label="Kapat" className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Kapat" className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -180,9 +180,9 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
           {step === 0 && (
             <StepShell title="Aktif veya Tamamlanan Planlarından Birini Seç">
               {loadingPlans ? (
-                <p className="text-[12.5px] text-slate-400">Planların yükleniyor...</p>
+                <p className="text-[12.5px] text-[var(--text-muted)]">Planların yükleniyor...</p>
               ) : myPlans.length === 0 ? (
-                <p className="text-[12.5px] text-slate-400">Henüz kayıtlı bir planın yok — önce bir plan oluşturman gerekiyor.</p>
+                <p className="text-[12.5px] text-[var(--text-muted)]">Henüz kayıtlı bir planın yok — önce bir plan oluşturman gerekiyor.</p>
               ) : (
                 <div className="flex flex-col gap-2">
                   {myPlans.map((p) => {
@@ -193,13 +193,13 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
                         key={p.id}
                         onClick={() => handlePickPlan(p.id)}
                         className={`text-left rounded-xl px-4 py-3 border transition-colors duration-200 flex items-center gap-3 ${
-                          active ? "border-cyan-500/50 bg-cyan-500/10" : "border-white/10 bg-white/[0.02] hover:border-white/20"
+                          active ? "border-cyan-500/50 bg-cyan-500/10" : "border-[var(--border-default)] bg-[rgba(var(--overlay-rgb),0.03)] hover:border-[var(--border-strong)]"
                         }`}
                       >
                         <span className="text-[18px] shrink-0">{cat.emoji}</span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-[13px] font-semibold text-white truncate">{p.title || "İsimsiz Plan"}</span>
-                          <span className="block text-[10.5px] text-slate-400">
+                          <span className="block text-[13px] font-semibold text-[var(--text-primary)] truncate">{p.title || "İsimsiz Plan"}</span>
+                          <span className="block text-[10.5px] text-[var(--text-muted)]">
                             {cat.label} · {p.total_days || "?"} gün
                           </span>
                         </span>
@@ -214,16 +214,16 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
               {selectedPlanDetail && (
                 <div className="flex flex-col gap-3 mt-2">
                   <TextField label="Şablon Başlığı" placeholder="Şablona vereceğin başlık" value={title} onChange={setTitle} rows={2} />
-                  <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
-                    <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-300">
+                  <div className="flex items-center gap-3 rounded-xl border border-[var(--border-default)] bg-[rgba(var(--overlay-rgb),0.03)] px-4 py-3">
+                    <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)]">
                       <ClipboardList className="w-3.5 h-3.5 text-cyan-400" /> {totalRoutines} Rutin
                     </span>
                     <span className="w-px h-4 bg-white/10" />
-                    <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-300">
+                    <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)]">
                       <Timer className="w-3.5 h-3.5 text-cyan-400" /> {focusHoursLabel(totalFocusMin)} Odak
                     </span>
                     <span className="w-px h-4 bg-white/10" />
-                    <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-300">
+                    <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)]">
                       <Zap className="w-3.5 h-3.5 text-cyan-400" /> {selectedPlanDetail.tasks.length} Görev
                     </span>
                   </div>
@@ -261,7 +261,7 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
               <div className="flex flex-col gap-2.5 mt-2">
                 {TAG_GROUPS.map((g) => (
                   <div key={g.key}>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-slate-500 mb-1.5">{g.label}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[var(--text-faint)] mb-1.5">{g.label}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {g.tags.map((t) => {
                         const active = tags.includes(t);
@@ -270,7 +270,7 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
                             key={t}
                             onClick={() => toggleTag(t)}
                             className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors duration-200 ${
-                              active ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"
+                              active ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-default)] text-[var(--text-secondary)]"
                             }`}
                           >
                             {t}
@@ -286,7 +286,7 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
                     onChange={(e) => setCustomTag(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomTag())}
                     placeholder="Özel etiket ekle..."
-                    className="flex-1 rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-[12px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
+                    className="flex-1 rounded-lg border border-[var(--border-default)] bg-[var(--bg-input)] px-3 py-2 text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none focus:border-cyan-500/50"
                   />
                   <button onClick={addCustomTag} className="text-[11px] font-bold px-3 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 text-black">
                     Ekle
@@ -295,7 +295,7 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {tags.map((t) => (
-                      <span key={t} onClick={() => toggleTag(t)} className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-white/10 text-white cursor-pointer">
+                      <span key={t} onClick={() => toggleTag(t)} className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-white/10 text-[var(--text-primary)] cursor-pointer">
                         {t} ✕
                       </span>
                     ))}
@@ -331,21 +331,21 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
 
           {step === 6 && (
             <StepShell title="Önizleme">
-              <div className="rounded-xl overflow-hidden border border-white/10">
+              <div className="rounded-xl overflow-hidden border border-[var(--border-default)]">
                 <CoverPattern coverId={effectiveCover.id} className="w-full h-24" />
-                <div className="p-4 bg-black/60">
-                  <h4 className="text-[14px] font-bold text-white">{title || "(başlıksız)"}</h4>
-                  <p className="text-[11px] text-slate-400 mt-1">
+                <div className="p-4 bg-[rgba(var(--overlay-rgb),0.04)]">
+                  <h4 className="text-[14px] font-bold text-[var(--text-primary)]">{title || "(başlıksız)"}</h4>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1">
                     {categoryOf(category).emoji} {categoryOf(category).label} · {totalDays} gün · ⚡ {totalRoutines} Rutin · ⏱️ {focusHoursLabel(totalFocusMin)} Odak
                   </p>
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {tags.map((t) => (
-                      <span key={t} className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-white/10 text-slate-400">
+                      <span key={t} className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-[var(--border-default)] text-[var(--text-muted)]">
                         {t}
                       </span>
                     ))}
                   </div>
-                  <p className="text-[12px] text-slate-300 leading-relaxed mt-3 whitespace-pre-line line-clamp-6">{formatTemplateStory({ impact, process, prosCons, tips })}</p>
+                  <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed mt-3 whitespace-pre-line line-clamp-6">{formatTemplateStory({ impact, process, prosCons, tips })}</p>
                 </div>
               </div>
               {error && <p className="text-[12px] font-medium text-red-400 mt-3">{error}</p>}
@@ -353,8 +353,8 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
           )}
         </div>
 
-        <div className="shrink-0 px-6 py-4 border-t border-white/10 flex items-center justify-between gap-3">
-          <button onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0} className="flex items-center gap-1 text-[12px] font-semibold text-slate-400 disabled:opacity-30">
+        <div className="shrink-0 px-6 py-4 border-t border-[var(--border-default)] flex items-center justify-between gap-3">
+          <button onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0} className="flex items-center gap-1 text-[12px] font-semibold text-[var(--text-muted)] disabled:opacity-30">
             <ChevronLeft className="w-4 h-4" /> Geri
           </button>
           {step < STEPS.length - 1 ? (

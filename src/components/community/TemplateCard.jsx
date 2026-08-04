@@ -15,7 +15,7 @@ function focusHoursLabel(minutes) {
 // Routinix Nexus şablon kartı — PERFORMANS ÖNCELİKLİ: `backdrop-blur` /
 // `box-shadow` / transform HİÇBİRİ yok (bir grid'de aynı anda düzinelerce
 // kartta çalışan backdrop-filter + sürekli transform, MacBook fanını
-// açtıracak kadar GPU/CPU maliyetliydi). Zemin TAMAMEN OPAK (`bg-[#0f172a]`
+// açtıracak kadar GPU/CPU maliyetliydi). Zemin TAMAMEN OPAK (`bg-[var(--bg-card)]`
 // — yarı saydam/alpha-blend bir arka plan bile, altında ne olursa olsun her
 // karede yeniden compositing gerektirir; opak zemin tek seferlik bir paint).
 // Hover'da TEK etki: border rengi (`transition-colors duration-150`) — ne
@@ -36,7 +36,7 @@ function TemplateCardImpl({ template, onOpen, onOpenAuthor }) {
       // layout/paint maliyetini tarayıcı atlar — scroll performansı için ucuz
       // bir güvence, bugün 16 şablonla da zararsız.
       style={{ contentVisibility: "auto", containIntrinsicSize: "0 400px" }}
-      className="group text-left rounded-2xl overflow-hidden border border-white/10 bg-[#0f172a] hover:border-cyan-500/40 transition-colors duration-150 flex flex-col"
+      className="group text-left rounded-2xl overflow-hidden border border-[var(--border-default)] bg-[var(--bg-card)] hover:border-cyan-500/40 transition-colors duration-150 flex flex-col"
     >
       {/* Kapak — gerçek fotoğraf (bkz. CoverPattern.jsx), sabit yükseklik (kart
           genişliğine göre ORANTISIZ büyümesin diye aspect-ratio değil h-40) */}
@@ -56,21 +56,21 @@ function TemplateCardImpl({ template, onOpen, onOpenAuthor }) {
 
       <div className="p-4 flex flex-col gap-3 flex-1">
         <div>
-          <h3 className="text-[15px] font-bold text-white leading-snug line-clamp-2">{template.title}</h3>
-          <p className="text-[12px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">{template.story_impact}</p>
+          <h3 className="text-[15px] font-bold text-[var(--text-primary)] leading-snug line-clamp-2">{template.title}</h3>
+          <p className="text-[12px] text-[var(--text-muted)] mt-1 line-clamp-2 leading-relaxed">{template.story_impact}</p>
         </div>
 
         {template.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {template.tags.slice(0, 3).map((t) => (
-              <span key={t} className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-white/10 text-slate-300">
+              <span key={t} className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-[var(--border-default)] text-[var(--text-secondary)]">
                 {t}
               </span>
             ))}
           </div>
         )}
 
-        <div className="mt-auto pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+        <div className="mt-auto pt-3 border-t border-[var(--border-default)] flex items-center justify-between gap-2">
           <span
             onClick={(e) => {
               e.stopPropagation();
@@ -79,11 +79,11 @@ function TemplateCardImpl({ template, onOpen, onOpenAuthor }) {
             className="flex items-center gap-1.5 min-w-0 hover:opacity-70 transition-opacity"
           >
             <Avatar src={author?.avatar_url} name={author?.display_name || author?.username} />
-            <span className="text-[11.5px] font-semibold text-slate-300 truncate">{author?.display_name || author?.username}</span>
+            <span className="text-[11.5px] font-semibold text-[var(--text-secondary)] truncate">{author?.display_name || author?.username}</span>
             {author?.is_bot && <BadgeCheck className="w-3 h-3 shrink-0 text-cyan-400" aria-label="Onaylı" />}
           </span>
 
-          <div className="flex items-center gap-2.5 shrink-0 text-slate-500">
+          <div className="flex items-center gap-2.5 shrink-0 text-[var(--text-faint)]">
             <span className="flex items-center gap-1 text-[11px] font-semibold">
               <Heart className="w-3.5 h-3.5" /> {stats.like_count}
             </span>
@@ -107,10 +107,10 @@ export function TemplateEmptyState({ message = "Bu kritere uyan bir şablon bulu
   return (
     <div className="col-span-full flex flex-col items-center justify-center gap-4 py-20 text-center">
       <svg width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-        <circle cx="32" cy="32" r="30" stroke="currentColor" strokeWidth="1.5" className="text-slate-700" />
-        <path d="M22 26h20M22 32h14M22 38h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-slate-700" />
+        <circle cx="32" cy="32" r="30" stroke="currentColor" strokeWidth="1.5" className="text-[var(--border-strong)]" />
+        <path d="M22 26h20M22 32h14M22 38h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-[var(--border-strong)]" />
       </svg>
-      <p className="text-[13px] font-medium text-slate-400 max-w-[280px]">{message}</p>
+      <p className="text-[13px] font-medium text-[var(--text-muted)] max-w-[280px]">{message}</p>
     </div>
   );
 }

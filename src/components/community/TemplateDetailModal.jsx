@@ -34,17 +34,17 @@ function CommentRow({ comment, isTemplateAuthor, onReply }) {
         <Avatar src={author?.avatar_url} name={author?.display_name} size="w-7 h-7" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[12px] font-bold text-white">{author?.display_name || author?.username}</span>
+            <span className="text-[12px] font-bold text-[var(--text-primary)]">{author?.display_name || author?.username}</span>
             {author?.is_bot && <BadgeCheck className="w-3 h-3 text-cyan-400" />}
             {comment.usage_days_at_comment > 0 && (
-              <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">
+              <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-[rgba(var(--overlay-rgb),0.1)] text-[var(--text-secondary)]">
                 🔥 {comment.usage_days_at_comment} Gün Uyguladı
               </span>
             )}
           </div>
-          <p className="text-[12.5px] text-slate-300 leading-relaxed mt-0.5">{comment.content}</p>
+          <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed mt-0.5">{comment.content}</p>
           {isTemplateAuthor && !replying && (
-            <button onClick={() => setReplying(true)} className="text-[10.5px] font-semibold text-slate-500 hover:text-cyan-400 mt-1 transition-colors">
+            <button onClick={() => setReplying(true)} className="text-[10.5px] font-semibold text-[var(--text-faint)] hover:text-cyan-400 mt-1 transition-colors">
               Yanıtla
             </button>
           )}
@@ -56,7 +56,7 @@ function CommentRow({ comment, isTemplateAuthor, onReply }) {
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && submitReply()}
                 placeholder="Yazar olarak yanıtla..."
-                className="flex-1 rounded-lg border border-white/10 bg-[#030304]/95 px-2.5 py-1.5 text-[11.5px] text-white outline-none focus:border-cyan-500/50"
+                className="flex-1 rounded-lg border border-[var(--border-default)] bg-[var(--bg-input)] px-2.5 py-1.5 text-[11.5px] text-[var(--text-primary)] outline-none focus:border-cyan-500/50"
               />
               <button
                 onClick={submitReply}
@@ -74,14 +74,14 @@ function CommentRow({ comment, isTemplateAuthor, onReply }) {
       {comment.replies?.length > 0 && (
         <div className="pl-9 flex flex-col gap-2">
           {comment.replies.map((r) => (
-            <div key={r.id} className="rounded-xl px-3 py-2 border border-white/10 bg-white/[0.03]">
+            <div key={r.id} className="rounded-xl px-3 py-2 border border-[var(--border-default)] bg-[rgba(var(--overlay-rgb),0.04)]">
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-black" style={{ background: "linear-gradient(90deg, #22D3EE, #B26BFF)" }}>
                   YAZAR
                 </span>
-                <span className="text-[11px] font-semibold text-slate-300">{r.author?.display_name || r.author?.username}</span>
+                <span className="text-[11px] font-semibold text-[var(--text-secondary)]">{r.author?.display_name || r.author?.username}</span>
               </div>
-              <p className="text-[12px] text-slate-300 leading-relaxed mt-1">{r.content}</p>
+              <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed mt-1">{r.content}</p>
             </div>
           ))}
         </div>
@@ -95,8 +95,8 @@ function CommentRow({ comment, isTemplateAuthor, onReply }) {
 // PERFORMANS: modal gövdesindeki `backdrop-blur-xl` ve ağır `box-shadow`
 // ışımaları kaldırıldı — arkasında zaten hareket etmeyen statik bir zemin
 // (NexusBackground) olduğu için blur'un görsel katkısı çok azdı, GPU maliyeti
-// ise yüksekti. Sabit koyu mat zemin (`bg-[#030304]/95`) + border aynı "cam"
-// hissini, bir çerçeve daha az iş yaparak veriyor.
+// ise yüksekti. Sabit, tema-uyumlu mat zemin (`rgba(var(--glass-rgb),0.95)`)
+// + border aynı "cam" hissini, bir çerçeve daha az iş yaparak veriyor.
 // KLONLAMA MİMARİSİ NOTU: "Planlarıma Ekle" tıklanınca `template.template_tasks`/
 // `preview_routines` alanındaki GERÇEK veriden ANINDA yeni bir plan+routines+
 // tasks satırı oluşturulur (communityService.cloneTemplateToMyPlans) — AI
@@ -258,7 +258,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
       <div className="absolute inset-0 bg-black/80" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-2xl max-h-full rounded-2xl border border-white/10 bg-[#030304]/95 shadow-2xl flex flex-col overflow-hidden"
+        className="relative w-full max-w-2xl max-h-full rounded-2xl border border-[var(--border-default)] bg-[rgba(var(--glass-rgb),0.95)] shadow-2xl flex flex-col overflow-hidden"
       >
         <CoverPattern coverId={template.cover_url} className="w-full h-40 shrink-0">
           <button onClick={onClose} aria-label="Kapat" className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black/55 text-white">
@@ -274,10 +274,10 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
 
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-6 py-5 flex flex-col gap-5">
           <div>
-            <h2 className="text-[19px] font-bold text-white">{template.title}</h2>
+            <h2 className="text-[19px] font-bold text-[var(--text-primary)]">{template.title}</h2>
             <button onClick={() => onOpenAuthor?.(template.author)} className="flex items-center gap-1.5 mt-2 hover:opacity-70 transition-opacity">
               <Avatar src={template.author?.avatar_url} name={template.author?.display_name} />
-              <span className="text-[12.5px] font-semibold text-slate-300">{template.author?.display_name || template.author?.username}</span>
+              <span className="text-[12.5px] font-semibold text-[var(--text-secondary)]">{template.author?.display_name || template.author?.username}</span>
               {template.author?.is_bot && <BadgeCheck className="w-3 h-3 text-cyan-400" />}
             </button>
           </div>
@@ -285,7 +285,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
           {template.tags?.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {template.tags.map((t) => (
-                <span key={t} className="text-[10.5px] font-semibold px-2.5 py-1 rounded-full border border-white/10 text-slate-400">
+                <span key={t} className="text-[10.5px] font-semibold px-2.5 py-1 rounded-full border border-[var(--border-default)] text-[var(--text-muted)]">
                   {t}
                 </span>
               ))}
@@ -297,7 +297,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
               <button
                 onClick={handleLike}
                 className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-bold border transition-colors duration-200 ${
-                  liked ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 text-slate-300"
+                  liked ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-default)] text-[var(--text-secondary)]"
                 }`}
               >
                 <Heart className="w-3.5 h-3.5" fill={liked ? "currentColor" : "none"} /> {likeCount}
@@ -305,7 +305,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
               <button
                 onClick={handleCopyLink}
                 aria-label="Linki Kopyala"
-                className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-bold border border-white/10 text-slate-300 hover:border-cyan-500/40 transition-colors duration-200"
+                className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-bold border border-[var(--border-default)] text-[var(--text-secondary)] hover:border-cyan-500/40 transition-colors duration-200"
               >
                 {linkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
                 {linkCopied ? "Kopyalandı" : "Paylaş"}
@@ -334,7 +334,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
           {!editMode && myProfile && cloneState === "idle" && (
             <button
               onClick={handleEnterEditMode}
-              className="flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-bold text-white border border-white/15 hover:border-cyan-500/40 transition-colors duration-200"
+              className="flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-bold text-[var(--text-primary)] border border-[var(--border-strong)] hover:border-cyan-500/40 transition-colors duration-200"
             >
               <Pencil className="w-3.5 h-3.5" /> Planı Düzenle & Öyle Ekle
             </button>
@@ -366,7 +366,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
                 <button
                   onClick={handleCancelEdit}
                   disabled={cloneState !== "idle"}
-                  className="text-[12px] font-semibold text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-60"
+                  className="text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-60"
                 >
                   Vazgeç
                 </button>
@@ -378,19 +378,19 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
               <div className="flex flex-col gap-4">
                 {sections.map((s) => (
                   <div key={s.title}>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-slate-500 mb-1">{s.title}</p>
-                    <p className="text-[13px] leading-relaxed text-slate-300 whitespace-pre-line">{s.body}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--text-faint)] mb-1">{s.title}</p>
+                    <p className="text-[13px] leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{s.body}</p>
                   </div>
                 ))}
               </div>
 
               {/* Yorumlar */}
-              <div className="pt-4 border-t border-white/10 flex flex-col gap-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-slate-500">Yorumlar ({comments.length})</p>
+              <div className="pt-4 border-t border-[var(--border-default)] flex flex-col gap-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--text-faint)]">Yorumlar ({comments.length})</p>
                 {loadingComments ? (
-                  <p className="text-[12px] text-slate-500">Yükleniyor...</p>
+                  <p className="text-[12px] text-[var(--text-faint)]">Yükleniyor...</p>
                 ) : comments.length === 0 ? (
-                  <p className="text-[12px] text-slate-500">Henüz yorum yok — ilk yorumu sen yaz.</p>
+                  <p className="text-[12px] text-[var(--text-faint)]">Henüz yorum yok — ilk yorumu sen yaz.</p>
                 ) : (
                   comments.map((c) => <CommentRow key={c.id} comment={c} isTemplateAuthor={isTemplateAuthor} onReply={handleReply} />)
                 )}
@@ -402,7 +402,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
                       onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handlePostComment()}
                       placeholder="Deneyimini paylaş..."
-                      className="flex-1 rounded-xl border border-white/10 bg-[#030304]/95 px-3.5 py-2.5 text-[12.5px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
+                      className="flex-1 rounded-xl border border-[var(--border-default)] bg-[var(--bg-input)] px-3.5 py-2.5 text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none focus:border-cyan-500/50"
                     />
                     <button
                       onClick={handlePostComment}
