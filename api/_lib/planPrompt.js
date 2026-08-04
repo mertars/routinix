@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { wrapGeminiError } from "./aiErrors.js";
 
 // AI plan üretim pipeline'ının SUNUCU TARAFI portu. Eskiden bu dosyanın
 // içeriği src/services/aiPipelineService.js'te idi ve VITE_GEMINI_API_KEY ile
@@ -65,7 +66,7 @@ async function runJson(systemInstruction, userPrompt, label = "AI isteği") {
     const result = await model.generateContent(userPrompt);
     text = result.response.text();
   } catch (err) {
-    throw new Error(err?.message || `${label} başarısız oldu (Gemini SDK hatası).`);
+    throw wrapGeminiError(err, `${label} başarısız oldu (Gemini SDK hatası).`);
   }
 
   try {

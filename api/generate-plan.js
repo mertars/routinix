@@ -1,6 +1,7 @@
 import { getUserFromRequest } from "./_lib/supabaseAdmin.js";
 import { generateOnboardingQuestions, createEnrichedPlan, fetchNextWeekTasks } from "./_lib/planPrompt.js";
 import { checkPlanRateLimit, logApiRequest } from "./_lib/planRateLimit.js";
+import { classifyGeminiError } from "./_lib/aiErrors.js";
 
 // Plan üretim pipeline'ının TEK sunucu tarafı giriş noktası. Eskiden client
 // (anon key) VITE_GEMINI_API_KEY ile Gemini'yi doğrudan çağırıyordu — anahtar
@@ -65,12 +66,14 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, data });
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error("[generate-plan] hata:", action, err?.message, err?.stack);
+    console.error("[generate-plan] hata:", action, "status:", err?.status, err?.message, err?.stack);
     // GÜVENLİK: ham err.message istemciye YANSITILMAZ — Gemini SDK'sından
     // gelen bir hata (ör. kota/kimlik doğrulama hatası) teorik olarak istek
-    // detayı/iç yapı bilgisi taşıyabilir. coach-action.js ve rhythm-report.js
-    // ile AYNI desen: tam detay yalnızca sunucu logunda (console.error),
-    // istemciye her zaman sabit, güvenli bir mesaj döner.
-    return res.status(500).json({ ok: false, message: "Plan üretilirken beklenmedik bir hata oluştu." });
+    // detayı/iç yapı bilgisi taşıyabilir. Tam detay yalnızca sunucu logunda;
+    // istemciye classifyGeminiError'ın seçtiği sabit, güvenli mesaj döner —
+    // ör. Gemini tarafında kota/bütçe tükenmişse (429) kullanıcı "plan
+    // üretilirken hata oluştu" yerine gerçekten NEDEN görüyor.
+    const { httpStatus, message } = classifyGeminiError(err);
+    return res.status(httpStatus).json({ ok: false, message });
   }
 }

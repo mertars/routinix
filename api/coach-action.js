@@ -2,6 +2,7 @@ import { getSupabaseAdmin, getUserFromRequest } from "./_lib/supabaseAdmin.js";
 import { getRemaining, consumeOne, TRIAL_LIMIT } from "./_lib/quota.js";
 import { isAdminUser } from "./_lib/adminAccess.js";
 import { runCoachIntent } from "./_lib/coachPrompt.js";
+import { classifyGeminiError } from "./_lib/aiErrors.js";
 import { lightenTasks, intensifyTasks, postponeDayTasks, findTodayDay, analyzeProgress } from "../src/services/aiCoachService.js";
 
 // AI Koç'un TEK sunucu tarafı giriş noktası. Eskiden client (anon key) hem
@@ -98,8 +99,14 @@ export default async function handler(req, res) {
     return res.status(result.ok === false ? 400 : 200).json(result);
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error("[coach-action] hata:", err?.message, err?.stack);
-    return res.status(500).json({ ok: false, consumed: false, message: "Sunucu tarafında beklenmedik bir hata oluştu." });
+    console.error("[coach-action] hata:", "status:", err?.status, err?.message, err?.stack);
+    // "Beklenmedik bir sunucu yanıtı alındı." (frontend'in JSON-parse-edilemedi
+    // fallback'i) ile KARIŞTIRILMASIN — bu, sunucunun GERÇEKTEN döndürdüğü,
+    // geçerli bir JSON hata yanıtı. Gemini tarafında kota/bütçe tükenmişse
+    // (429) kullanıcı bunu net görür, sunucu tarafındaki genel bir hatadan
+    // ayırt edebilir.
+    const { httpStatus, message } = classifyGeminiError(err);
+    return res.status(httpStatus).json({ ok: false, consumed: false, message });
   }
 }
 

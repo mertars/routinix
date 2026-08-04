@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { wrapGeminiError } from "./aiErrors.js";
 
 // AI Koç'un serbest metin niyet tespiti — SUNUCU TARAFI port'u. Eskiden
 // src/services/aiPipelineService.js içinde tarayıcıdan VITE_GEMINI_API_KEY ile
@@ -71,7 +72,7 @@ fields ve new_tasks nesnelerinde yalnızca gerçekten değişen/gerekli alanlar�
     const result = await model.generateContent(userPrompt);
     text = result.response.text();
   } catch (err) {
-    throw new Error(err?.message || "Yapay zeka isteği başarısız oldu.");
+    throw wrapGeminiError(err, "Yapay zeka isteği başarısız oldu.");
   }
 
   let parsed;

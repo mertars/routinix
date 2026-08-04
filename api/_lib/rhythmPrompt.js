@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { wrapGeminiError } from "./aiErrors.js";
 
 // "Rhythm & Insights" — Günlük Ritim Raporu üretimi. SUNUCU TARAFI, aynı
 // desen coachPrompt.js ile (bkz. o dosyadaki yorum): process.env.GEMINI_API_KEY
@@ -65,7 +66,7 @@ Yanıtın SADECE ve KESİNLİKLE şu JSON şeması olmalı, şema dışına hiç
     const result = await model.generateContent(context);
     text = result.response.text();
   } catch (err) {
-    throw new Error(err?.message || "Yapay zeka isteği başarısız oldu.");
+    throw wrapGeminiError(err, "Yapay zeka isteği başarısız oldu.");
   }
 
   let parsed;

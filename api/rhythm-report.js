@@ -1,5 +1,6 @@
 import { getSupabaseAdmin, getUserFromRequest } from "./_lib/supabaseAdmin.js";
 import { generateRhythmReport } from "./_lib/rhythmPrompt.js";
+import { classifyGeminiError } from "./_lib/aiErrors.js";
 import { findTodayDay, postponeDayTasks } from "../src/services/aiCoachService.js";
 
 // "Rhythm & Insights" modülünün TEK sunucu tarafı giriş noktası — desen
@@ -189,7 +190,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, message: `Bilinmeyen aksiyon: ${action}` });
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error("[rhythm-report] hata:", err?.message, err?.stack);
-    return res.status(500).json({ ok: false, message: "Sunucu tarafında beklenmedik bir hata oluştu." });
+    console.error("[rhythm-report] hata:", "status:", err?.status, err?.message, err?.stack);
+    const { httpStatus, message } = classifyGeminiError(err);
+    return res.status(httpStatus).json({ ok: false, message });
   }
 }

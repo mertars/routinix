@@ -1,6 +1,13 @@
 import { supabase } from "../lib/supabaseClient";
 import logger from "../utils/logger";
 
+// Sunucu fonksiyonundan (Vercel) daha erken, KONTROLLÜ bir zaman aşımı —
+// coachActionService.js'teki AYNI gerekçe: Gemini asılı kalırsa, kullanıcı
+// platform seviyesindeki ham bir hata yanıtını beklemek yerine net bir
+// "zaman aşımı" mesajı görür. Plan üretimi (özellikle create_plan) diğer
+// AI çağrılarından biraz daha uzun sürebildiği için süre biraz daha geniş.
+const REQUEST_TIMEOUT_MS = 35_000;
+
 // AI plan üretim pipeline'ının client tarafı — artık Gemini'yi DOĞRUDAN
 // çağırmıyor (VITE_GEMINI_API_KEY tamamen kaldırıldı, tarayıcı bundle'ında
 // hiçbir AI anahtarı yok). Bu dosya, tıpkı coachActionService.js gibi, JWT ile
@@ -21,6 +28,9 @@ async function callGeneratePlan(action, payload, label) {
 
   logger.info("AI_PIPELINE", `${label} isteği gönderiliyor`);
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   let res;
   try {
     res = await fetch("/api/generate-plan", {
@@ -30,10 +40,14 @@ async function callGeneratePlan(action, payload, label) {
         Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({ action, payload }),
+      signal: controller.signal,
     });
   } catch (err) {
-    logger.error("AI_PIPELINE", `${label} başarısız oldu (sunucuya ulaşılamadı)`, { error: err?.message });
-    throw new Error("Sunucuya ulaşılamadı — bağlantını kontrol edip tekrar dener misin?");
+    const timedOut = err?.name === "AbortError";
+    logger.error("AI_PIPELINE", `${label} başarısız oldu (${timedOut ? "zaman aşımı" : "sunucuya ulaşılamadı"})`, { error: err?.message });
+    throw new Error(timedOut ? "Yapay zeka yanıt vermekte gecikti, lütfen tekrar dener misin?" : "Sunucuya ulaşılamadı — bağlantını kontrol edip tekrar dener misin?");
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   let body;
@@ -44,7 +58,10 @@ async function callGeneratePlan(action, payload, label) {
   }
 
   if (!res.ok || !body?.ok) {
-    const message = body?.message || "Yapay zeka isteği başarısız oldu.";
+    // Sunucu (generate-plan.js) artık HER durumda geçerli JSON döner (bkz.
+    // api/_lib/aiErrors.js) — `body` yalnızca gerçekten anormal bir
+    // durumda (ör. Vercel platform seviyesinde bir hata sayfası) null olur.
+    const message = body?.message || "Sistem şu an hizmet veremiyor, lütfen birazdan tekrar dener misin?";
     logger.error("AI_PIPELINE", `${label} başarısız oldu`, { status: res.status, message });
     throw new Error(message);
   }

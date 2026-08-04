@@ -12,6 +12,10 @@ import logger from "../utils/logger";
 //      supabase/migration.sql 7-8 numaralı bölümler). logService.js'nin
 //      logs tablosuna doğrudan insert deseniyle aynı.
 
+// Sunucu fonksiyonundan (Vercel) daha erken, KONTROLLÜ bir zaman aşımı —
+// coachActionService.js/aiPipelineService.js ile AYNI gerekçe.
+const REQUEST_TIMEOUT_MS = 25_000;
+
 // action: "generate" | "endDay"
 export async function callRhythmAction({ action, lapsedRoutineTitles }) {
   const {
@@ -22,6 +26,9 @@ export async function callRhythmAction({ action, lapsedRoutineTitles }) {
     return { ok: false, message: "Devam etmek için giriş yapmalısın." };
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   let res;
   try {
     res = await fetch("/api/rhythm-report", {
@@ -31,10 +38,17 @@ export async function callRhythmAction({ action, lapsedRoutineTitles }) {
         Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({ action, lapsedRoutineTitles }),
+      signal: controller.signal,
     });
   } catch (err) {
-    logger.error("RHYTHM", "Sunucuya ulaşılamadı", { action, error: err?.message });
-    return { ok: false, message: "Sunucuya ulaşılamadı — bağlantını kontrol edip tekrar dener misin?" };
+    const timedOut = err?.name === "AbortError";
+    logger.error("RHYTHM", timedOut ? "İstek zaman aşımına uğradı" : "Sunucuya ulaşılamadı", { action, error: err?.message });
+    return {
+      ok: false,
+      message: timedOut ? "Yapay zeka yanıt vermekte gecikti, lütfen tekrar dener misin?" : "Sunucuya ulaşılamadı — bağlantını kontrol edip tekrar dener misin?",
+    };
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   let body;
@@ -48,7 +62,9 @@ export async function callRhythmAction({ action, lapsedRoutineTitles }) {
     logger.warn("RHYTHM", "rhythm-report isteği başarısız", { action, status: res.status, message: body?.message });
   }
 
-  return body || { ok: false, message: "Beklenmedik bir sunucu yanıtı alındı." };
+  // Sunucu artık HER durumda geçerli JSON döner (bkz. api/_lib/aiErrors.js);
+  // `body` yalnızca gerçekten anormal bir durumda null olur.
+  return body || { ok: false, message: "Sistem şu an hizmet veremiyor, lütfen birazdan tekrar dener misin?" };
 }
 
 // Tamamlanmış (yarıda bırakılmamış) bir Pomodoro odak aralığını kaydeder —
