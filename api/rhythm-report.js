@@ -59,6 +59,15 @@ export default async function handler(req, res) {
   if (!user) {
     return res.status(401).json({ ok: false, message: "Oturum doğrulanamadı, tekrar giriş yapar mısın?" });
   }
+  // GÜVENLİK: coach-action.js/generate-plan.js ile AYNI sınır, burada
+  // eksikti — anonim (misafir) oturumlar da GERÇEK bir auth.uid()'ye sahip
+  // olduğu için getUserFromRequest bunları da geçerli `user` olarak
+  // döndürüyordu. Bu kontrol olmadan, bir paylaşım linkine gelen HERKES
+  // (hesap açmadan, signInAnonymously çağırarak) bu endpoint'i (ve altındaki
+  // gerçek Gemini çağrısını) sınırsızca tetikleyebilirdi.
+  if (user.is_anonymous) {
+    return res.status(403).json({ ok: false, message: "403 Forbidden - Login Required: Ritim raporu için ücretsiz hesabını tamamlaman gerekiyor." });
+  }
 
   const { action, lapsedRoutineTitles } = req.body || {};
   if (!action) {
@@ -70,6 +79,22 @@ export default async function handler(req, res) {
 
   try {
     if (action === "generate") {
+      // GÜVENLİK/MALİYET: bu action GERÇEK bir Gemini çağrısı yapar ve
+      // öncesinde HİÇBİR hak/hız sınırı yoktu (AI Koç'un user_ai_trial'ının
+      // aksine) — bir istemci bu uç noktayı art arda çağırarak sınırsız,
+      // ücretsiz Gemini isteği tetikleyebilirdi. Aynı gün için 60 saniye
+      // içinde zaten bir rapor üretildiyse Gemini'ye TEKRAR gidilmez,
+      // mevcut rapor doğrudan döner.
+      const { data: recentReport } = await admin
+        .from("daily_reports")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("report_date", dateStr)
+        .maybeSingle();
+      if (recentReport && Date.now() - new Date(recentReport.updated_at).getTime() < 60_000) {
+        return res.status(200).json({ ok: true, report: recentReport });
+      }
+
       // Bugünün odaklanma (Pomodoro) süresi — focus_sessions'tan, gün UTC
       // sınırlarıyla. Plan/task sorgusundan BAĞIMSIZ (ikisi de yalnızca
       // user.id/dateStr'ye ihtiyaç duyar) — sıralı await yerine Promise.all

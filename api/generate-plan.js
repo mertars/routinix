@@ -1,5 +1,6 @@
 import { getUserFromRequest } from "./_lib/supabaseAdmin.js";
 import { generateOnboardingQuestions, createEnrichedPlan, fetchNextWeekTasks } from "./_lib/planPrompt.js";
+import { checkCooldown } from "./_lib/rateLimit.js";
 
 // Plan üretim pipeline'ının TEK sunucu tarafı giriş noktası. Eskiden client
 // (anon key) VITE_GEMINI_API_KEY ile Gemini'yi doğrudan çağırıyordu — anahtar
@@ -31,6 +32,19 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, message: "'action' alanı zorunlu." });
   }
 
+  // GÜVENLİK: bu üç action da GERÇEK, ücretli Gemini çağrısı yapar ve
+  // öncesinde hiçbir hak/hız sınırı yoktu — bir istemci bu uç noktayı
+  // script ile döngüde çağırıp sınırsız Gemini isteği tetikleyebilirdi
+  // (10 plan limiti burada işe yaramaz: create_plan'ın SONUCU client
+  // tarafında hiç kaydedilmeden atılabilir, plans tablosuna hiç yazılmadan
+  // AI çağrısı zaten yapılmış/ücretlendirilmiş olur). 3sn'lik bir soğuma
+  // süresi meşru kullanımda görünmez (bir yanıt beklemek zaten bundan uzun
+  // sürer) ama bir spam döngüsünü ilk denemede durdurur.
+  const allowed = await checkCooldown(user.id, 3000);
+  if (!allowed) {
+    return res.status(429).json({ ok: false, message: "Çok hızlı istek gönderiyorsun, birkaç saniye bekleyip tekrar dener misin?" });
+  }
+
   try {
     let data;
     if (action === "onboarding_questions") {
@@ -47,6 +61,11 @@ export default async function handler(req, res) {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("[generate-plan] hata:", action, err?.message, err?.stack);
-    return res.status(500).json({ ok: false, message: err?.message || "Plan üretilirken beklenmedik bir hata oluştu." });
+    // GÜVENLİK: ham err.message istemciye YANSITILMAZ — Gemini SDK'sından
+    // gelen bir hata (ör. kota/kimlik doğrulama hatası) teorik olarak istek
+    // detayı/iç yapı bilgisi taşıyabilir. coach-action.js ve rhythm-report.js
+    // ile AYNI desen: tam detay yalnızca sunucu logunda (console.error),
+    // istemciye her zaman sabit, güvenli bir mesaj döner.
+    return res.status(500).json({ ok: false, message: "Plan üretilirken beklenmedik bir hata oluştu." });
   }
 }
