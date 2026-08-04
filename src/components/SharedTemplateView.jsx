@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Share2, Check, Pencil, Sparkles, X, Lock, FileDown, PencilLine } from "lucide-react";
+import { Share2, Check, Pencil, Sparkles, X, Lock, FileDown, PencilLine, Plus } from "lucide-react";
 import { categoryOf } from "../constants";
 import CoverPattern from "./community/CoverPattern";
 import Avatar from "./community/Avatar";
@@ -118,6 +118,8 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
     }
   };
 
+  const handlePrint = () => window.print();
+
   // Başarı ekranını kısa bir süre GÖSTER, sonra app.jsx'e devret (o da
   // URL'i temizleyip normal uygulamayı yeni planı doğrudan açık şekilde
   // render eder — bkz. app.jsx handleSharedTemplateDone). Kullanıcı
@@ -128,14 +130,13 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
     return () => clearTimeout(id);
   }, [successPlan, onDone]);
 
-  // "🚀 Planı Ekle ve Çıktısını Çıkar" — HİÇ düzenlemeden, orijinal şablon
-  // verisiyle anında klonlar (edit state'inden TAMAMEN bağımsız — kullanıcı
-  // daha önce düzenleme moduna girip geri dönmüş olsa bile bu buton her
-  // zaman ORİJİNAL/pristine `template`'i kullanır). Ardından sosyal-kanıt
-  // olayını (template_clones — bkz. TemplateDetailModal.jsx'teki aynı desen)
-  // best-effort kaydeder ve `window.print()`'i HENÜZ önizleme (preview)
-  // içeriği ekrandayken tetikler — `successPlan` ekranına geçmeden ÖNCE,
-  // aksi halde yazdırma diyaloğu boş bir "✅ eklendi" ekranını yakalardı.
+  // "➕ Planı Ekle" — HİÇ düzenlemeden, orijinal şablon verisiyle anında
+  // klonlar (edit state'inden TAMAMEN bağımsız — kullanıcı daha önce
+  // düzenleme moduna girip geri dönmüş olsa bile bu buton her zaman
+  // ORİJİNAL/pristine `template`'i kullanır). Ardından sosyal-kanıt olayını
+  // (template_clones — bkz. TemplateDetailModal.jsx'teki aynı desen)
+  // best-effort kaydeder. Yazdırma artık AYRI bir aksiyon (bkz. handlePrint)
+  // — iki net buton, iki net iş: biri ekler, biri yazdırır.
   const handleQuickAdd = async () => {
     if (adding || !auth.user) return;
     setAdding(true);
@@ -144,7 +145,6 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
       const plan = await cloneTemplateToMyPlans(template, auth.user.id);
       const myProfile = await fetchProfileByAuthUserId(auth.user.id);
       if (myProfile) recordTemplateClone(template.id, myProfile.id);
-      window.print();
       setSuccessPlan(plan);
     } catch (err) {
       logger.error("SHARED_TEMPLATE", "Plan eklenemedi (hızlı ekle)", { idOrSlug, templateDbId: template?.id, error: err?.message });
@@ -292,22 +292,14 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
 
         {/* Güvenlik/şeffaflık şeridi — bu sayfaya ("şüpheli link" hissini
             kırmak için) hesap açmadan/ödeme yapmadan güvenle gelinebileceğini
-            AÇIKÇA belirtir. Yazdırma/PDF butonu (`window.print()`) burada
-            GERÇEKTEN çalışır — "PDF Çıktısı Alınabilir" etiketi boş bir
-            vaat DEĞİL, aşağıdaki `@media print` bloğu içerik dışındaki her
-            şeyi (buton/şerit/kenarlık) yazdırmadan gizler. */}
+            AÇIKÇA belirtir. Asıl PDF/yazdırma aksiyonu artık aşağıdaki 2 ana
+            butondan biri (bkz. handlePrint) — burada yalnızca bilgi verilir. */}
         <div className="no-print rounded-xl border border-white/10 bg-zinc-900/60 px-3.5 py-2.5 flex flex-col gap-2">
           <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-300">
             <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             Güvenli Ön İzleme: Bu bir Routinix Nexus şablonudur. Hesap açma veya ödeme gerektirmez.
           </p>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              onClick={() => ctaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
-              className="flex items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-[10.5px] font-semibold text-slate-300 hover:border-cyan-500/40 transition-colors"
-            >
-              <FileDown className="w-3 h-3" /> PDF Çıktısı Alınabilir
-            </button>
             <span className="flex items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-[10.5px] font-semibold text-slate-300">
               <PencilLine className="w-3 h-3" /> Serbestçe Düzenle
             </span>
@@ -371,26 +363,34 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
 
         {addError && <p className="no-print text-[12px] font-medium text-red-400">{addError}</p>}
 
-        {/* İki net yol: (1) hiç değiştirmeden anında ekle, (2) önce düzenle
-            sonra ekle. Düzenleme modundayken yalnızca "değişikliklerle ekle"
-            + "vazgeç" gösterilir — iki farklı "ekle" butonunun AYNI ANDA
-            görünüp kafa karıştırmasını önler. */}
+        {/* 2 net ana aksiyon, yan yana ve eşit belirginlikte: yazdır / ekle.
+            Düzenleme akışı (Planı Düzenle & Öyle Ekle) daha küçük bir üçüncül
+            bağlantı olarak altta kalır — iki ana butonla görsel rekabete
+            girmesin. */}
         {mode === "preview" ? (
           <div ref={ctaRef} className="no-print sticky bottom-4 flex flex-col gap-2">
-            <button
-              onClick={handleQuickAdd}
-              disabled={adding || !auth.user}
-              className="w-full flex items-center justify-center gap-2 rounded-full px-5 py-3.5 text-[13.5px] font-bold text-black disabled:opacity-60 transition-transform active:scale-[0.98]"
-              style={{ background: "linear-gradient(90deg, #22D3EE, #B26BFF)", boxShadow: "0 12px 30px -10px rgba(178,107,255,0.5)" }}
-            >
-              🚀 {adding ? "Ekleniyor..." : "Planı Ekle ve Çıktısını Çıkar"}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handlePrint}
+                className="w-full flex items-center justify-center gap-2 rounded-full px-4 py-3.5 text-[13px] font-bold text-white border border-white/15 bg-zinc-900/85 backdrop-blur-md transition-transform active:scale-[0.98] hover:border-cyan-500/40"
+              >
+                <FileDown className="w-4 h-4" /> PDF Çıktı Al
+              </button>
+              <button
+                onClick={handleQuickAdd}
+                disabled={adding || !auth.user}
+                className="w-full flex items-center justify-center gap-2 rounded-full px-4 py-3.5 text-[13px] font-bold text-black disabled:opacity-60 transition-transform active:scale-[0.98]"
+                style={{ background: "linear-gradient(90deg, #22D3EE, #B26BFF)", boxShadow: "0 12px 30px -10px rgba(178,107,255,0.5)" }}
+              >
+                <Plus className="w-4 h-4" strokeWidth={2.75} /> {adding ? "Ekleniyor..." : "Planı Ekle"}
+              </button>
+            </div>
             <button
               onClick={() => setMode("edit")}
               disabled={adding}
-              className="w-full flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[13px] font-bold text-white border border-white/15 bg-zinc-900/80 backdrop-blur-md disabled:opacity-60 transition-colors hover:border-cyan-500/40"
+              className="w-full text-[11.5px] font-semibold text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-60"
             >
-              <Pencil className="w-4 h-4" /> Planı Düzenle & Öyle Ekle
+              <Pencil className="w-3 h-3 inline -mt-0.5 mr-1" /> Planı Düzenle & Öyle Ekle
             </button>
           </div>
         ) : (

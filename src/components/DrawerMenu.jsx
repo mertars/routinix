@@ -1,34 +1,21 @@
-import { memo, useState, useEffect } from "react";
-import { X, Plus, Trash2, LogOut, Repeat2, Compass, ListChecks, Users2, BarChart3, Timer, FolderOpen, FileText } from "lucide-react";
-import { fetchProfileByAuthUserId, fetchTemplatesByAuthor } from "../services/profileService";
+import { memo } from "react";
+import { X, Plus, Trash2, LogOut, Repeat2, Compass, ListChecks, Users2, BarChart3, Timer, FolderOpen } from "lucide-react";
 
-// Sade toggle atomu — Ayarlar bölümünde kullanılır.
-function ToggleSwitch({ checked, onChange, accent }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={onChange}
-      className="w-10 h-[22px] rounded-full relative shrink-0 transition-colors duration-200"
-      style={{ background: checked ? accent : "rgba(var(--overlay-rgb),0.14)" }}
-    >
-      <span
-        className="absolute top-[2px] w-[18px] h-[18px] rounded-full bg-white transition-all duration-200"
-        style={{ left: checked ? "20px" : "2px" }}
-      />
-    </button>
-  );
-}
-
-// 2 sütunlu bento tuşu — "Orta Grid Menü Tuşları" bölümü için.
+// 2 sütunlu bento tuşu — "Orta Grid Menü Tuşları" bölümü için. "Siyah Cam"
+// (Black Glassmorphism): düz opak `var(--bg-card)` yerine ince, saydam
+// `rgba(var(--overlay-rgb),0.04)` zemin + üstte hafif ışık yansıması
+// (inset shadow). BİLEREK `backdrop-blur` YOK — çekmecenin kendi zemini
+// (`blur-cap-mobile`) zaten arkayı bulanıklaştırıyor; bunun üstüne HER
+// tek tuşa ayrı bir blur katmanı eklemek mobilde gereksiz GPU maliyeti
+// (ve performans isteğiyle doğrudan çelişki) olurdu — aynı "cam" hissi
+// saydamlık + kenarlık + iç ışıkla, sıfır ekstra blur maliyetiyle veriliyor.
 function GridButton({ icon, color, label, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="flex flex-col items-start gap-2 rounded-xl p-3 border border-slate-200 dark:border-white/10 text-left transition-colors"
-      style={{ background: "var(--bg-card)" }}
+      style={{ background: "rgba(var(--overlay-rgb),0.04)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.08)" }}
     >
       <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}1A`, color }}>
         {icon}
@@ -42,10 +29,13 @@ function GridButton({ icon, color, label, onClick }) {
 
 // Standart Hamburger Menü — sağdan kayan klasik çekmece (bkz. GlobalStyles.jsx
 // .drawer-panel, AiCoachWidget.jsx'in kendi yan paneliyle AYNI, kanıtlanmış
-// desen). Sade: tek hatlı kenarlık, gradyan/glow yok.
+// desen). "Şablonlarım" artık BURADA değil — doğrudan NexusProfileOverlay.jsx
+// içinde, profil bilgisinin hemen altında (bkz. o dosyanın yorumu). "Ayarlar"
+// (Hatırlatıcı/Haptics) henüz aktif olmadığı için tamamen kaldırıldı.
 //
-// Yerleşim: [Profil satırı + Nexus Hesabım] → [Şablonlarım] → [Ayarlar] →
-// [2 sütunlu gezinme grid'i] → [Plan Ekle | Plan Sil] → [Çıkış Yap (tam genişlik)].
+// Yerleşim: [Profil satırı + Nexus Hesabım] → [2 sütunlu gezinme grid'i] →
+// [Plan Ekle | Plan Sil] → [Çıkış Yap (tam genişlik)] — tek ekrana sığar,
+// kaydırma gerekmez.
 function DrawerMenu({
   open,
   onClose,
@@ -53,10 +43,6 @@ function DrawerMenu({
   user,
   planGoal,
   savedPlansCount,
-  remindersOn,
-  onToggleReminders,
-  hapticsOn,
-  onToggleHaptics,
   onNewPlan,
   onDeletePlan,
   onSignOut,
@@ -69,26 +55,6 @@ function DrawerMenu({
   onOpenPomodoro,
   onOpenProfile,
 }) {
-  const [myTemplates, setMyTemplates] = useState(null);
-
-  // "Şablonlarım" — kullanıcının Nexus'ta yayınladığı gerçek şablonlar
-  // (bkz. PublicProfileCard.jsx'in AYNI fetchTemplatesByAuthor kullanımı).
-  useEffect(() => {
-    if (!open || !user) {
-      setMyTemplates(null);
-      return;
-    }
-    let cancelled = false;
-    fetchProfileByAuthUserId(user.id).then((p) => {
-      if (cancelled) return;
-      if (!p) return setMyTemplates([]);
-      fetchTemplatesByAuthor(p.id).then((t) => !cancelled && setMyTemplates(t));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, user]);
-
   if (!open) return null;
 
   const go = (fn) => () => {
@@ -153,60 +119,6 @@ function DrawerMenu({
               🎯 {planGoal}
             </p>
           )}
-
-          {/* Şablonlarım */}
-          {user && (
-            <button
-              onClick={go(onOpenCommunity)}
-              className="w-full text-left rounded-xl border border-slate-200 dark:border-white/10 p-3.5"
-              style={{ background: "var(--bg-card)" }}
-            >
-              <p className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.05em] mb-2" style={{ color: "var(--text-faint)" }}>
-                <FileText className="w-3 h-3" /> Şablonlarım {myTemplates ? `(${myTemplates.length})` : ""}
-              </p>
-              {myTemplates === null ? (
-                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                  Yükleniyor...
-                </p>
-              ) : myTemplates.length === 0 ? (
-                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                  Henüz şablon paylaşmadın — Nexus'a git.
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-1">
-                  {myTemplates.slice(0, 3).map((t) => (
-                    <li key={t.id} className="text-[12.5px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-                      • {t.title}
-                    </li>
-                  ))}
-                  {myTemplates.length > 3 && (
-                    <li className="text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>
-                      +{myTemplates.length - 3} tane daha
-                    </li>
-                  )}
-                </ul>
-              )}
-            </button>
-          )}
-
-          {/* Ayarlar */}
-          <div className="rounded-xl border border-slate-200 dark:border-white/10 p-3.5 flex flex-col gap-3" style={{ background: "var(--bg-card)" }}>
-            <p className="text-[10.5px] font-bold uppercase tracking-[0.05em]" style={{ color: "var(--text-faint)" }}>
-              ⚙️ Ayarlar
-            </p>
-            <div className="flex items-center justify-between">
-              <span className="text-[12.5px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                🔔 Günlük Hatırlatıcılar
-              </span>
-              <ToggleSwitch checked={remindersOn} onChange={onToggleReminders} accent={accent} />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[12.5px] font-semibold leading-snug" style={{ color: "var(--text-primary)" }}>
-                📳 Ses & Dokunsal Geri Bildirim
-              </span>
-              <ToggleSwitch checked={hapticsOn} onChange={onToggleHaptics} accent={accent} />
-            </div>
-          </div>
 
           {/* Orta grid menü tuşları — 2 sütun */}
           <div className="grid grid-cols-2 gap-2">

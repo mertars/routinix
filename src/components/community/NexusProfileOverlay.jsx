@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { X, BadgeCheck, Flame, Trophy, ListChecks, Repeat2, FolderOpen } from "lucide-react";
+import { X, BadgeCheck, Flame, Trophy, ListChecks, Repeat2, FolderOpen, FileText } from "lucide-react";
 import Avatar from "./Avatar";
-import { fetchProfileByAuthUserId, fetchProfileStats, getUsageDays } from "../../services/profileService";
+import CoverPattern from "./CoverPattern";
+import { fetchProfileByAuthUserId, fetchProfileStats, fetchTemplatesByAuthor, getUsageDays } from "../../services/profileService";
 import { fetchDashboardData } from "../../services/planService";
-import { MONO_FONT } from "../../constants";
+import { categoryOf, MONO_FONT } from "../../constants";
 import logger from "../../utils/logger";
 
 // PublicProfileCard.jsx'teki GERÇEK rozet mantığıyla AYNI (tek doğruluk
@@ -51,6 +52,7 @@ export default function NexusProfileOverlay({ open, user, onClose, onCreateProfi
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState(null);
   const [productivity, setProductivity] = useState(null);
+  const [templates, setTemplates] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -70,6 +72,14 @@ export default function NexusProfileOverlay({ open, user, onClose, onCreateProfi
         });
         if (p) {
           fetchProfileStats(p.id).then((s) => !cancelled && setStats(s));
+          // Kullanıcının Nexus'ta yayınladığı şablonlar — PublicProfileCard.jsx'in
+          // BAŞKA bir kullanıcının profilinde gösterdiği "Paylaştığı Şablonlar"
+          // ile AYNI kaynak/fonksiyon; kamuya açık satırlar zaten RLS ile
+          // herkese okunur olduğundan bu liste başka kullanıcıların profilinde
+          // de (PublicProfileCard üzerinden) görünür.
+          fetchTemplatesByAuthor(p.id).then((t) => !cancelled && setTemplates(t));
+        } else {
+          setTemplates([]);
         }
       })
       .catch((err) => logger.error("NEXUS_PROFILE_OVERLAY", "Profil verisi getirilemedi", { error: err?.message }))
@@ -147,6 +157,36 @@ export default function NexusProfileOverlay({ open, user, onClose, onCreateProfi
             </div>
 
             {profile.bio && <p className="text-[12.5px] text-slate-300 leading-relaxed">{profile.bio}</p>}
+
+            {/* Şablonlarım — eski DrawerMenu'deki müstakil sekmenin YERİNE
+                doğrudan burada, profil bilgisinin hemen altında. */}
+            <div>
+              <p className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.05em] text-slate-500 mb-2">
+                <FileText className="w-3 h-3" /> Şablonlarım {templates ? `(${templates.length})` : ""}
+              </p>
+              {templates === null ? (
+                <p className="text-[12px] text-slate-500">Yükleniyor...</p>
+              ) : templates.length === 0 ? (
+                <p className="text-[12px] text-slate-500">Henüz bir şablon paylaşmadın.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {templates.map((t) => {
+                    const cat = categoryOf(t.category);
+                    return (
+                      <div key={t.id} className="flex items-center gap-2.5 rounded-xl p-2 border border-white/10">
+                        <CoverPattern coverId={t.cover_url} className="w-10 h-10 rounded-lg shrink-0" />
+                        <span className="min-w-0">
+                          <span className="block text-[12.5px] font-semibold text-white truncate">{t.title}</span>
+                          <span className="block text-[10.5px] text-slate-500">
+                            {cat.emoji} {cat.label}
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             <div>
               <p className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-slate-500 mb-2">Nexus İstatistikleri</p>

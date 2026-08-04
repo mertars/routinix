@@ -234,8 +234,6 @@ export default function App() {
     ps.setMenuOpen(false);
     setDeleteOpen(true);
   }, [ps.setMenuOpen]);
-  const onToggleReminders = useCallback(() => ps.setRemindersOn((v) => !v), [ps.setRemindersOn]);
-  const onToggleHaptics = useCallback(() => ps.setHapticsOn((v) => !v), [ps.setHapticsOn]);
 
   // Giriş/Kayıt modalı JSX'i TEK yerde tanımlanır — hem normal uygulama
   // kabuğunda hem de SharedTemplateView'ın erken-return dalında (aşağıda)
@@ -343,10 +341,6 @@ export default function App() {
           onOpenPomodoro={togglePomodoro}
           onOpenProfile={openNexusProfile}
           onSignOut={requestSignOut}
-          remindersOn={ps.remindersOn}
-          onToggleReminders={onToggleReminders}
-          hapticsOn={ps.hapticsOn}
-          onToggleHaptics={onToggleHaptics}
         />
 
         <main
