@@ -203,13 +203,13 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#080d1a] text-slate-400 text-[13px]">Yükleniyor...</div>
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#030304] text-slate-400 text-[13px]">Yükleniyor...</div>
     );
   }
 
   if (error || !template) {
     return (
-      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-3 bg-[#080d1a] text-center px-6">
+      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-3 bg-[#030304] text-center px-6">
         <span className="text-[40px]">🔗</span>
         <p className="text-[14px] font-bold text-white">{error || "Şablon bulunamadı"}</p>
         <button onClick={() => onDone?.(null)} className="mt-2 text-[12.5px] font-bold text-cyan-300">
@@ -221,7 +221,7 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
 
   if (successPlan) {
     return (
-      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-3 bg-[#080d1a] text-center px-6 animate-[fadeIn_0.2s_ease]">
+      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-3 bg-[#030304] text-center px-6 animate-[fadeIn_0.2s_ease]">
         <span
           className="w-16 h-16 rounded-full flex items-center justify-center text-[28px]"
           style={{ background: "rgba(46,217,163,0.15)", border: "1px solid rgba(46,217,163,0.4)" }}
@@ -239,7 +239,7 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
   const author = template.author;
 
   return (
-    <div className="shared-template-print-root fixed inset-0 z-[200] overflow-y-auto bg-[#080d1a] text-white">
+    <div className="shared-template-print-root fixed inset-0 z-[200] overflow-y-auto bg-[#030304] text-white">
       {/* Yazdırma/PDF desteği — `.no-print` işaretli her şey (üst şerit,
           güvenlik/CTA butonları, kapak fotoğrafı) VE her `<button>` yazdırırken
           tamamen kaldırılır; geriye yalnızca başlık, hikaye bölümleri ve
@@ -271,7 +271,7 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
           background: [
             "radial-gradient(circle at 8% -6%, rgba(178,107,255,0.28) 0%, transparent 45%)",
             "radial-gradient(circle at 96% 108%, rgba(34,211,238,0.24) 0%, transparent 45%)",
-            "#080d1a",
+            "#030304",
           ].join(", "),
         }}
       />

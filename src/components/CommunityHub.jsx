@@ -32,7 +32,7 @@ const NEXUS_BACKGROUND_STYLE = {
     "radial-gradient(circle at 8% -6%, rgba(178,107,255,0.28) 0%, transparent 45%)",
     "radial-gradient(circle at 96% 108%, rgba(34,211,238,0.24) 0%, transparent 45%)",
     "radial-gradient(circle at 78% 38%, rgba(16,185,129,0.14) 0%, transparent 40%)",
-    "#080d1a",
+    "#030304",
   ].join(", "),
 };
 
@@ -171,7 +171,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
         <button
           onClick={() => setFollowingOnly((v) => !v)}
           className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[12px] font-bold border transition-colors duration-200 ${
-            followingOnly ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 bg-[#0c1322]/90 text-slate-300"
+            followingOnly ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300" : "border-white/10 bg-[#030304]/90 text-slate-300"
           }`}
         >
           <Users className="w-3.5 h-3.5" /> Takip Edilenler
@@ -261,7 +261,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
               onChange={(e) => setUsernameDraft(e.target.value.toLowerCase())}
               onKeyDown={(e) => e.key === "Enter" && handleCreateProfile()}
               placeholder="kullanici_adi"
-              className="rounded-lg border border-white/10 bg-[#0c1322]/90 px-3 py-1.5 text-[12px] text-white outline-none focus:border-cyan-500/50"
+              className="rounded-lg border border-white/10 bg-[#030304]/90 px-3 py-1.5 text-[12px] text-white outline-none focus:border-cyan-500/50"
             />
             <button
               onClick={handleCreateProfile}
@@ -297,7 +297,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Şablon ara..."
-                  className="w-full rounded-xl border border-white/10 bg-[#0c1322]/90 pl-9 pr-3 py-2.5 text-[13px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
+                  className="w-full rounded-xl border border-white/10 bg-[#030304]/90 pl-9 pr-3 py-2.5 text-[13px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
                 />
               </div>
               <div className="edge-fade-x flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
@@ -337,7 +337,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
               <button
                 onClick={() => setMobileBarCollapsed(false)}
                 aria-label="Aramayı ve etiketleri aç"
-                className="w-9 h-9 rounded-full flex items-center justify-center border border-white/10 bg-[#0c1322]/90 text-slate-300 hover:border-cyan-500/40 transition-colors"
+                className="w-9 h-9 rounded-full flex items-center justify-center border border-white/10 bg-[#030304]/90 text-slate-300 hover:border-cyan-500/40 transition-colors"
               >
                 <Search className="w-4 h-4" />
               </button>
@@ -367,7 +367,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Şablon ara..."
-                    className="w-full rounded-xl border border-white/10 bg-[#0c1322]/90 pl-9 pr-3 py-2.5 text-[13px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full rounded-xl border border-white/10 bg-[#030304]/90 pl-9 pr-3 py-2.5 text-[13px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50 transition-colors"
                   />
                 </div>
                 {TagChipsRow}

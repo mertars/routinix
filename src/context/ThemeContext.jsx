@@ -34,7 +34,7 @@ function applyThemeToDocument(theme) {
   // iOS Safari toolbar rengi (bkz. index.html <meta name="theme-color">) tema
   // ile birlikte güncellensin.
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", theme === "dark" ? "#0b0c10" : "#f8fafc");
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#030304" : "#f8fafc");
 }
 
 export function ThemeProvider({ children }) {

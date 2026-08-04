@@ -342,6 +342,7 @@ export default function App() {
           onOpenCommunity={toggleCommunity}
           onOpenPomodoro={togglePomodoro}
           onOpenProfile={openNexusProfile}
+          onSignOut={requestSignOut}
           remindersOn={ps.remindersOn}
           onToggleReminders={onToggleReminders}
           hapticsOn={ps.hapticsOn}

@@ -85,7 +85,7 @@ export default function NexusProfileOverlay({ open, user, onClose, onCreateProfi
   const badge = profile && stats ? rankBadge(usageDays, stats.total_clones) : null;
 
   return (
-    <div className="full-screen-in fixed inset-0 z-[110] flex flex-col bg-[#080d1a] text-white" style={{ animation: "fullScreenIn 0.32s cubic-bezier(0.32,0.72,0,1)" }}>
+    <div className="full-screen-in fixed inset-0 z-[110] flex flex-col bg-[#030304] text-white" style={{ animation: "fullScreenIn 0.32s cubic-bezier(0.32,0.72,0,1)" }}>
       <div
         className="fixed inset-0 z-0 pointer-events-none"
         aria-hidden="true"

@@ -27,7 +27,7 @@ export default function TemplateTaskEditor({ title, onTitleChange, totalDays, on
         <input
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
-          className="rounded-xl border border-white/10 bg-[#0c1322] px-3.5 py-2.5 text-[13px] text-white outline-none focus:border-cyan-500/50"
+          className="rounded-xl border border-white/10 bg-[#030304] px-3.5 py-2.5 text-[13px] text-white outline-none focus:border-cyan-500/50"
         />
       </label>
       <label className="flex flex-col gap-1.5 w-28">
@@ -37,7 +37,7 @@ export default function TemplateTaskEditor({ title, onTitleChange, totalDays, on
           min={1}
           value={totalDays}
           onChange={(e) => onTotalDaysChange(e.target.value)}
-          className="rounded-xl border border-white/10 bg-[#0c1322] px-3.5 py-2.5 text-[13px] text-white outline-none focus:border-cyan-500/50"
+          className="rounded-xl border border-white/10 bg-[#030304] px-3.5 py-2.5 text-[13px] text-white outline-none focus:border-cyan-500/50"
         />
       </label>
 
@@ -55,12 +55,12 @@ export default function TemplateTaskEditor({ title, onTitleChange, totalDays, on
                 value={r.content}
                 onChange={(e) => updateRoutine(i, { content: e.target.value })}
                 placeholder="Rutin açıklaması"
-                className="flex-1 rounded-lg border border-white/10 bg-[#0c1322] px-3 py-2 text-[12.5px] text-white outline-none focus:border-cyan-500/50"
+                className="flex-1 rounded-lg border border-white/10 bg-[#030304] px-3 py-2 text-[12.5px] text-white outline-none focus:border-cyan-500/50"
               />
               <select
                 value={r.frequency}
                 onChange={(e) => updateRoutine(i, { frequency: e.target.value })}
-                className="rounded-lg border border-white/10 bg-[#0c1322] px-2 py-2 text-[11.5px] text-slate-300 outline-none"
+                className="rounded-lg border border-white/10 bg-[#030304] px-2 py-2 text-[11.5px] text-slate-300 outline-none"
               >
                 {FREQUENCIES.map((f) => (
                   <option key={f.value} value={f.value}>
@@ -86,7 +86,7 @@ export default function TemplateTaskEditor({ title, onTitleChange, totalDays, on
         </div>
         <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto no-scrollbar pr-0.5">
           {tasks.map((t, i) => (
-            <div key={i} className="rounded-lg border border-white/10 bg-[#0c1322] p-2.5 flex flex-col gap-1.5">
+            <div key={i} className="rounded-lg border border-white/10 bg-[#030304] p-2.5 flex flex-col gap-1.5">
               <div className="flex items-center gap-2">
                 <input
                   type="number"

@@ -86,7 +86,7 @@ function BackgroundScene({ category, suspended = false }) {
           {/* Dağ dolgusu — antrasit, aşağı doğru zemine karışır (yalnızca koyu tema) */}
           <linearGradient id="bgMountain" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#161A22" />
-            <stop offset="100%" stopColor="#0b0c10" />
+            <stop offset="100%" stopColor="#030304" />
           </linearGradient>
           {/* Üstte hafif sisli mor perde (yalnızca koyu tema) */}
           <radialGradient id="bgHaze" cx="50%" cy="18%" r="70%">

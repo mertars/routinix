@@ -56,7 +56,7 @@ function CommentRow({ comment, isTemplateAuthor, onReply }) {
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && submitReply()}
                 placeholder="Yazar olarak yanıtla..."
-                className="flex-1 rounded-lg border border-white/10 bg-[#0c1322]/95 px-2.5 py-1.5 text-[11.5px] text-white outline-none focus:border-cyan-500/50"
+                className="flex-1 rounded-lg border border-white/10 bg-[#030304]/95 px-2.5 py-1.5 text-[11.5px] text-white outline-none focus:border-cyan-500/50"
               />
               <button
                 onClick={submitReply}
@@ -95,7 +95,7 @@ function CommentRow({ comment, isTemplateAuthor, onReply }) {
 // PERFORMANS: modal gövdesindeki `backdrop-blur-xl` ve ağır `box-shadow`
 // ışımaları kaldırıldı — arkasında zaten hareket etmeyen statik bir zemin
 // (NexusBackground) olduğu için blur'un görsel katkısı çok azdı, GPU maliyeti
-// ise yüksekti. Sabit koyu mat zemin (`bg-[#0c1322]/95`) + border aynı "cam"
+// ise yüksekti. Sabit koyu mat zemin (`bg-[#030304]/95`) + border aynı "cam"
 // hissini, bir çerçeve daha az iş yaparak veriyor.
 // KLONLAMA MİMARİSİ NOTU: "Planlarıma Ekle" tıklanınca `template.template_tasks`/
 // `preview_routines` alanındaki GERÇEK veriden ANINDA yeni bir plan+routines+
@@ -258,7 +258,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
       <div className="absolute inset-0 bg-black/80" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-2xl max-h-full rounded-2xl border border-white/10 bg-[#0c1322]/95 shadow-2xl flex flex-col overflow-hidden"
+        className="relative w-full max-w-2xl max-h-full rounded-2xl border border-white/10 bg-[#030304]/95 shadow-2xl flex flex-col overflow-hidden"
       >
         <CoverPattern coverId={template.cover_url} className="w-full h-40 shrink-0">
           <button onClick={onClose} aria-label="Kapat" className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black/55 text-white">
@@ -402,7 +402,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
                       onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handlePostComment()}
                       placeholder="Deneyimini paylaş..."
-                      className="flex-1 rounded-xl border border-white/10 bg-[#0c1322]/95 px-3.5 py-2.5 text-[12.5px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
+                      className="flex-1 rounded-xl border border-white/10 bg-[#030304]/95 px-3.5 py-2.5 text-[12.5px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
                     />
                     <button
                       onClick={handlePostComment}

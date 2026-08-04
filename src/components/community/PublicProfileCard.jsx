@@ -82,7 +82,7 @@ export default function PublicProfileCard({ profile, myProfile, onClose, onFollo
     <FocusSidePanel open={!!profile} onClose={onClose} side="right" icon={null} title="">
       {/* FocusSidePanel'in kendi gövdesi zaten `p-4` taşıyor — burada ekstra
           dolgu EKLEMİYORUZ, yalnızca monokrom zemin/metin rengini bindiriyoruz. */}
-      <div className="-m-4 p-5 flex flex-col gap-5 bg-[#080d1a] min-h-[calc(100%+2rem)] text-white">
+      <div className="-m-4 p-5 flex flex-col gap-5 bg-[#030304] min-h-[calc(100%+2rem)] text-white">
         <div className="flex items-center gap-3">
           <Avatar src={profile.avatar_url} name={profile.display_name || profile.username} size="w-14 h-14" textSize="text-[18px]" />
           <div className="min-w-0">

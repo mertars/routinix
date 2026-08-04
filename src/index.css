@@ -14,9 +14,13 @@
 :root {
   color-scheme: dark;
 
-  --bg-app: #0b0c10;
-  --bg-card: #12181f;
-  --bg-elevated: #161d25;
+  /* Derin "sedefli OLED siyahı" — eski #0b0c10 soluk/grimsi kalıyordu.
+     Kartlar (--bg-card/--bg-elevated) BİLEREK zeminden biraz daha açık
+     bırakıldı (aksi halde katmanlar birbirinden hiç ayrışmaz, tamamen
+     düz bir tuval gibi görünürdü) — yalnızca EN dıştaki zemin katı siyaha çekildi. */
+  --bg-app: #030304;
+  --bg-card: #101319;
+  --bg-elevated: #14181f;
   --bg-input: #0f151b;
   --disabled-bg: #1a222b;
 
@@ -33,7 +37,7 @@
 
   /* rgba(var(--x-rgb), alpha) tekniği: bileşenler kendi alpha değerini korur,
      yalnızca renk tabanı temaya göre değişir. */
-  --glass-rgb: 15, 20, 27; /* popover/modal/drawer koyu cam zemini */
+  --glass-rgb: 4, 4, 6; /* popover/modal/drawer koyu cam zemini — derin OLED siyahı */
   --overlay-rgb: 255, 255, 255; /* ince beyaz overlay border/hover tonu */
   --lock-rgb: 20, 24, 32; /* kilitli gün rozetlerinin buzlu cam zemini */
   --lock-border: rgba(255, 255, 255, 0.06);
@@ -86,8 +90,8 @@
   --pomo-work-accent: #00f2fe;
   --pomo-break-accent: #34f5c5;
   --pomo-accent: #00f2fe;
-  --pomo-bg: #0b0f17;
-  --pomo-bg-focus: #050709;
+  --pomo-bg: #030304;
+  --pomo-bg-focus: #000000;
 }
 
 :root[data-theme="light"] {

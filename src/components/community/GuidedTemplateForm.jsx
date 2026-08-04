@@ -29,7 +29,7 @@ function TextField({ label, placeholder, value, onChange, rows = 8 }) {
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="w-full rounded-xl border border-white/10 bg-[#0c1322]/95 px-3.5 py-3 text-[13px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50 transition-colors resize-none"
+        className="w-full rounded-xl border border-white/10 bg-[#030304]/95 px-3.5 py-3 text-[13px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50 transition-colors resize-none"
       />
     </label>
   );
@@ -156,7 +156,7 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center px-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/80" />
-      <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-lg max-h-[85vh] rounded-2xl border border-white/10 bg-[#0c1322]/95 shadow-2xl flex flex-col">
+      <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-lg max-h-[85vh] rounded-2xl border border-white/10 bg-[#030304]/95 shadow-2xl flex flex-col">
         <div className="shrink-0 px-6 pt-5 pb-4 border-b border-white/10 flex items-center justify-between">
           <div>
             <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-slate-400">
@@ -286,7 +286,7 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
                     onChange={(e) => setCustomTag(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomTag())}
                     placeholder="Özel etiket ekle..."
-                    className="flex-1 rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 text-[12px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
+                    className="flex-1 rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-[12px] text-white placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
                   />
                   <button onClick={addCustomTag} className="text-[11px] font-bold px-3 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 text-black">
                     Ekle
@@ -333,7 +333,7 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
             <StepShell title="Önizleme">
               <div className="rounded-xl overflow-hidden border border-white/10">
                 <CoverPattern coverId={effectiveCover.id} className="w-full h-24" />
-                <div className="p-4 bg-slate-900/60">
+                <div className="p-4 bg-black/60">
                   <h4 className="text-[14px] font-bold text-white">{title || "(başlıksız)"}</h4>
                   <p className="text-[11px] text-slate-400 mt-1">
                     {categoryOf(category).emoji} {categoryOf(category).label} · {totalDays} gün · ⚡ {totalRoutines} Rutin · ⏱️ {focusHoursLabel(totalFocusMin)} Odak
