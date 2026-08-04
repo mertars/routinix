@@ -446,22 +446,6 @@ export default function App() {
         onCancel={() => setLogoutConfirmOpen(false)}
       />
 
-      {/* 10 aktif plan limiti — startNewPlan tetikler (bkz. usePlanStudio.js).
-          Gerçek engel sunucuda (supabase/plan_limit.sql trigger'ı) — bu
-          yalnızca kullanıcıyı wizard'a hiç sokmadan önce durduran UX katmanı. */}
-      <ConfirmModal
-        open={ps.planLimitOpen}
-        title="Maksimum plan limitine ulaştın"
-        message="Ücretsiz hesabında en fazla 10 aktif plan bulunabilir. Yeni bir plan açmak için mevcut planlarını düzenleyebilir veya silebilirsin."
-        confirmLabel="Planlarımı Yönet"
-        cancelLabel="Kapat"
-        onConfirm={() => {
-          ps.closePlanLimit();
-          togglePlans();
-        }}
-        onCancel={ps.closePlanLimit}
-      />
-
       <DeletePlanModal
         open={deleteOpen}
         plans={ps.savedPlans}

@@ -10,7 +10,6 @@ import {
   FALLBACK_QUESTIONS,
   isLikelyGibberish,
   AI_GATE_MESSAGE,
-  MAX_ACTIVE_PLANS,
 } from "./constants";
 import { generateOnboardingQuestions, createEnrichedPlan, fetchNextWeekTasks } from "./services/aiPipelineService";
 import {
@@ -78,9 +77,6 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
 
   // "Planlarım" — oturum açıksa DB'den çekilen kayıtlı planların özeti.
   const [savedPlans, setSavedPlans] = useState([]);
-  // 10 plan limitine takılan "+ Plan Ekle" denemesinde açılır (bkz.
-  // startNewPlan) — app.jsx bunu ConfirmModal ile gösterir.
-  const [planLimitOpen, setPlanLimitOpen] = useState(false);
 
   // Şablon Keşfet'ten "Şablonu Kullan" ile gelen kesin gün sayısı — AI'ın
   // total_days tahminini ezmek için finalizeAndGenerate'de kullanılır.
@@ -122,13 +118,6 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
 
   const startNewPlan = useCallback(() => {
     setMenuOpen(false);
-    // Gerçek sınır sunucuda (bkz. supabase/plan_limit.sql trigger'ı, Nexus
-    // şablon klonlamayı da kapsar) — bu, kullanıcının 11. planı denemeden
-    // ÖNCE, wizard'a hiç girmeden şık bir modalla durdurulduğu UX katmanı.
-    if (savedPlans.length >= MAX_ACTIVE_PLANS) {
-      setPlanLimitOpen(true);
-      return;
-    }
     setGoal("");
     setExtraNote("");
     setErrorMsg("");
@@ -140,7 +129,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     setWizardStep(0);
     setTemplateDaysOverride(null);
     setStage(STAGE_INTRO);
-  }, [savedPlans.length]);
+  }, []);
 
   // Ortak: verilen kategori/hedef için dinamik onboarding sorularını üretip
   // wizard'a geçer. startOnboarding (manuel "Başla") ve startFromTemplate
@@ -357,15 +346,24 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   // task değişikliklerini local `weeks` state'ine optimistic olarak yansıtır.
   // Yalnızca ekranda AÇIK olan plan için çağrılır (başka bir plan mutasyona
   // uğradıysa board'u rahatsız etmeyiz — kullanıcı isterse "Görüntüle" ile geçer).
-  const applyServerTaskChanges = useCallback((mutatedTasks = [], newTasks = []) => {
-    if (!mutatedTasks.length && !newTasks.length) return;
-    setWeeks((prev) => {
-      const flat = prev.flatMap((w) => w.days.flatMap((d) => d.tasks));
-      const byId = new Map(flat.map((t) => [t.id, t]));
-      for (const mt of mutatedTasks) byId.set(mt.id, mt);
-      for (const nt of newTasks) byId.set(nt.id, nt);
-      return groupTasksToWeeks([...byId.values()]);
-    });
+  // deletedTaskIds: AI Koç'un "kaldır/sil" dediği, sunucuda ZATEN silinmiş
+  // görevlerin id'leri — burada yalnızca local `weeks` state'inden düşülürler
+  // (DB'ye ikinci bir istek gerekmez, silme zaten api/coach-action.js'te oldu).
+  // updatedPlan: "planı N güne indir/uzat" gibi isteklerde güncellenmiş
+  // `plans` satırı (total_days dahil) — PlanBoard'un ızgara boyutu bundan
+  // türediği için dbPlan'a da yansıtılır.
+  const applyServerTaskChanges = useCallback((mutatedTasks = [], newTasks = [], deletedTaskIds = [], updatedPlan = null) => {
+    if (mutatedTasks.length || newTasks.length || deletedTaskIds.length) {
+      setWeeks((prev) => {
+        const flat = prev.flatMap((w) => w.days.flatMap((d) => d.tasks));
+        const byId = new Map(flat.map((t) => [t.id, t]));
+        for (const id of deletedTaskIds) byId.delete(id);
+        for (const mt of mutatedTasks) byId.set(mt.id, mt);
+        for (const nt of newTasks) byId.set(nt.id, nt);
+        return groupTasksToWeeks([...byId.values()]);
+      });
+    }
+    if (updatedPlan) setDbPlan((prev) => (prev ? { ...prev, ...updatedPlan } : prev));
   }, []);
 
   // ---- AI Koç: hazır aksiyon çipleri (Planı Hafiflet / Tempoyu Sıkılaştır /
@@ -379,8 +377,8 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
 
       const result = await callCoachAction({ action: actionKey, targetPlanId: dbPlan.id });
       if (result?.ok) {
-        applyServerTaskChanges(result.mutatedTasks, result.newTasks);
-        if (result.mutatedTasks?.length || result.newTasks?.length) refreshSavedPlans();
+        applyServerTaskChanges(result.mutatedTasks, result.newTasks, result.deletedTaskIds, result.updatedPlan);
+        if (result.mutatedTasks?.length || result.newTasks?.length || result.deletedTaskIds?.length || result.updatedPlan) refreshSavedPlans();
       }
       return result;
     },
@@ -404,8 +402,8 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       const result = await callCoachAction({ action: "freeText", message: text, targetPlanId: targetPlanId || dbPlan?.id });
 
       if (result?.ok && result.targetPlanId && result.targetPlanId === dbPlan?.id) {
-        applyServerTaskChanges(result.mutatedTasks, result.newTasks);
-        if (result.mutatedTasks?.length || result.newTasks?.length) refreshSavedPlans();
+        applyServerTaskChanges(result.mutatedTasks, result.newTasks, result.deletedTaskIds, result.updatedPlan);
+        if (result.mutatedTasks?.length || result.newTasks?.length || result.deletedTaskIds?.length || result.updatedPlan) refreshSavedPlans();
       }
 
       return result;
@@ -427,7 +425,6 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   return {
     // durum
     category, mode, goal, extraNote, stage, errorMsg, menuOpen, savedPlans,
-    planLimitOpen, closePlanLimit: () => setPlanLimitOpen(false),
     remindersOn, hapticsOn,
     goalTrimmed, goalTooShort, canStart,
     // onboarding wizard

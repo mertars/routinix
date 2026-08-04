@@ -64,13 +64,6 @@ export const STAGE_PLAN = "plan";
 
 export const MIN_GOAL_LENGTH = 5;
 
-// Ücretsiz hesap başına maksimum aktif plan sayısı — GERÇEK sınır sunucu
-// tarafında bir DB trigger'ı (bkz. supabase/plan_limit.sql, hangi client
-// yolundan gelirse gelsin: wizard İLE de Nexus şablon klonlama İLE de
-// aşılamaz). Buradaki sabit yalnızca UX içindir — kullanıcı 11. planı
-// denemeden ÖNCE şık bir modalla durdurulsun diye.
-export const MAX_ACTIVE_PLANS = 10;
-
 // "✨ Şablon Keşfet" (Template Hub) için görsel ağırlıklı, hazır rota kütüphanesi.
 // Her şablon: kapak görseli, süre, 2 cümlelik tanıtım, illüstratif tamamlanma
 // oranı ve önizleme için kısa rutin/gün listesi taşır. "Şablonu Kullan" tıklanınca

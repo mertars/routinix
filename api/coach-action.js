@@ -170,6 +170,26 @@ async function insertNewTasks(admin, planId, userId, rows) {
   return data || [];
 }
 
+// AI'ın "kaldır/sil/gereksiz" olarak işaretlediği görevler — id'ler dispatch()
+// içinde ÖNCEDEN plan.tasks'a ait olduğu doğrulanmış olmalı (validIds).
+// `.select("id")` ile silinen satırların id'lerini geri döner, client bunları
+// local `weeks` state'inden anında çıkarabilsin diye.
+async function deleteTasks(admin, ids) {
+  if (!ids?.length) return [];
+  const { data, error } = await admin.from("tasks").delete().in("id", ids).select("id");
+  if (error) throw error;
+  return data || [];
+}
+
+// "Planı N güne indir/uzat" — plans.total_days'i günceller (görev
+// day_number'larının yeniden dağıtımı zaten ayrı mutations ile yapılır, bu
+// yalnızca planın "N Gün" rozetini/PlanBoard ızgara boyutunu günceller).
+async function updatePlanTotalDays(admin, planId, totalDays) {
+  const { data, error } = await admin.from("plans").update({ total_days: totalDays }).eq("id", planId).select().single();
+  if (error) throw error;
+  return data;
+}
+
 async function dispatch(action, { message, targetPlanId, allPlans, userId, admin }) {
   if (action === "analyze") {
     const subset = targetPlanId ? allPlans.filter((p) => p.id === targetPlanId) : allPlans;
@@ -177,11 +197,18 @@ async function dispatch(action, { message, targetPlanId, allPlans, userId, admin
   }
 
   if (action === "freeText") {
-    const aiResult = await runCoachIntent({ message, plans: allPlans });
+    // targetPlanId: widget'ın "Konuştuğun Plan" seçicisinden gelen, İSTEMCİNİN
+    // ZATEN BİLDİĞİ hedef — AI'a bir tahmin olarak DEĞİL, doğrudan bağlam
+    // olarak verilir (bkz. coachPrompt.js). Önceden buraya hiç geçmiyordu,
+    // bu yüzden AI her mesajda planlar arasında körlemesine seçim yapmaya
+    // çalışıyor, emin olamayınca da sürekli "hangi planı kastettin?" diye
+    // sorup duruyordu.
+    const aiResult = await runCoachIntent({ message, plans: allPlans, selectedPlanId: targetPlanId });
 
-    if (!aiResult.mutations.length && !aiResult.newTasks.length) {
+    const hasChanges = aiResult.mutations.length || aiResult.newTasks.length || aiResult.deletedTaskIds.length || aiResult.planTotalDays;
+    if (!hasChanges) {
       const unclear = aiResult.intent === "unclear";
-      return { ok: true, consumed: !unclear, message: aiResult.reply };
+      return { ok: true, consumed: !unclear, message: aiResult.reply, targetPlanId: aiResult.targetPlanId || null };
     }
 
     const effectivePlanId = aiResult.targetPlanId || targetPlanId;
@@ -196,11 +223,27 @@ async function dispatch(action, { message, targetPlanId, allPlans, userId, admin
     const patches = aiResult.mutations
       .filter((m) => m?.task_id && m?.fields && validIds.has(m.task_id))
       .map((m) => ({ id: m.task_id, fields: m.fields }));
+    const deleteIds = aiResult.deletedTaskIds.filter((id) => validIds.has(id));
 
     const mutatedTasks = await applyPatches(admin, patches);
     const newTasks = await insertNewTasks(admin, plan.id, userId, aiResult.newTasks);
+    const deletedTasks = await deleteTasks(admin, deleteIds);
 
-    return { ok: true, consumed: true, message: aiResult.reply, targetPlanId: plan.id, mutatedTasks, newTasks };
+    let updatedPlan = null;
+    if (aiResult.planTotalDays && aiResult.planTotalDays !== plan.total_days) {
+      updatedPlan = await updatePlanTotalDays(admin, plan.id, aiResult.planTotalDays);
+    }
+
+    return {
+      ok: true,
+      consumed: true,
+      message: aiResult.reply,
+      targetPlanId: plan.id,
+      mutatedTasks,
+      newTasks,
+      deletedTaskIds: deletedTasks.map((t) => t.id),
+      updatedPlan,
+    };
   }
 
   // Hazır aksiyonlar (lighten/intensify/postponeToday) — client'ın ekranda
