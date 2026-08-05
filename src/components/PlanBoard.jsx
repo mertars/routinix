@@ -138,10 +138,24 @@ export default function PlanBoard({
     const target = Number(plan?.total_days) || Math.max(maxLoaded, 7);
     // Tam target kadar hücre: yüklüyse gerçek veri, değilse kilitli placeholder.
     // (Veri fazladan gün içeriyorsa Map araması target'ı aşmadığı için doğal kesilir.)
+    //
+    // ÖNEMLİ AYRIM: bir gün numarasının `byDay`'de bulunmaması İKİ FARKLI
+    // durumdan biri olabilir — (a) o hafta henüz hiç üretilmedi (dayNumber >
+    // maxLoaded — GERÇEKTEN kilitli, "sonraki haftayı yükle" ile açılır), ya
+    // da (b) o gün ZATEN yüklenmiş bir haftanın İÇİNDE ama AI o günü boş
+    // bırakmış/hiç satır oluşmamış (dayNumber <= maxLoaded — eski, bu
+    // düzeltmeden ÖNCE oluşturulmuş planlarda görülebilir). Yalnızca (a)
+    // gerçekten kilitli sayılmalı; (b)'yi kilitli göstermek kullanıcının o
+    // güne asla erişemediği bir "sahte kilit"e yol açıyordu (planlar arasında
+    // hangi günün etkileneceği AI çıktısına bağlı olduğundan rastgele 1. veya
+    // 2. gün gibi görünüyordu). Yeni planlarda flattenWeek (planService.js)
+    // artık her güne en az bir satır garanti ediyor, ama bu ayrım ESKİ
+    // planları da anında (veri migrasyonu gerekmeden) düzeltir.
     const cells = Array.from({ length: target }, (_, i) => {
       const dayNumber = i + 1;
       const loaded = byDay.get(dayNumber);
-      return loaded ? { ...loaded, locked: false } : { dayNumber, tasks: [], locked: true };
+      if (loaded) return { ...loaded, locked: false };
+      return { dayNumber, tasks: [], locked: dayNumber > maxLoaded };
     });
     return { loadedDays: days, targetDays: target, calendar: cells, firstLockedDay: maxLoaded + 1 };
   }, [weeks, plan?.total_days]);
@@ -156,10 +170,16 @@ export default function PlanBoard({
   // tatil/fitness/genel rutinde zamanlama kavramı yok, zorunlu göstermiyoruz.
   const showPomodoro = plan.mode === "software";
 
-  // Aktif gün: seçili olan hâlâ yüklüyse onu, değilse ilk yüklü günü kullan.
+  // Aktif gün: seçili olan hâlâ erişilebilirse (kilitli DEĞİLSE) onu, değilse
+  // ilk erişilebilir günü kullan. BİLEREK `loadedDays` değil `calendar`'ın
+  // kilitsiz hücreleri kullanılır — eski planlarda bir günün DB'de hiç
+  // satırı olmayabilir (bkz. yukarıdaki "sahte kilit" notu) ama artık
+  // `locked: false` ile erişilebilir sayılıyor; `loadedDays`'ten türetilseydi
+  // bu gün hiç bulunamaz, tıklanınca sessizce başka bir güne geri düşerdi.
+  const unlockedCells = calendar.filter((c) => !c.locked);
   const effectiveActiveDay =
-    loadedDays.find((d) => d.dayNumber === activeDay)?.dayNumber ?? loadedDays[0]?.dayNumber ?? null;
-  const activeDayObj = loadedDays.find((d) => d.dayNumber === effectiveActiveDay) || null;
+    unlockedCells.find((d) => d.dayNumber === activeDay)?.dayNumber ?? unlockedCells[0]?.dayNumber ?? null;
+  const activeDayObj = unlockedCells.find((d) => d.dayNumber === effectiveActiveDay) || null;
 
   const dayPct = (d) => {
     const total = d.tasks.length;
@@ -310,6 +330,18 @@ export default function PlanBoard({
                   style={{ borderColor: "rgba(46,217,163,0.3)", background: "rgba(46,217,163,0.08)", color: "#7DE9C3" }}
                 >
                   ✅ Bugünkü disiplin halkan tamamlandı. Zarif bir tutarlılık — devam et.
+                </div>
+              )}
+
+              {/* Eski (bu düzeltmeden önce oluşturulmuş) planlarda AI bu günü
+                  boş bırakmış olabilir — artık kilitli göstermek yerine
+                  bunu açıkça belirtiyoruz, sessiz bir boşluk yerine. */}
+              {activeDayObj.tasks.length === 0 && (
+                <div
+                  className="rounded-xl border px-4 py-3 text-[12.5px] font-medium leading-relaxed text-left"
+                  style={{ borderColor: "var(--border-default)", background: "rgba(var(--overlay-rgb),0.04)", color: "var(--text-muted)" }}
+                >
+                  🌿 Bu gün için planlanmış bir görev yok — dinlenmek ya da serbest zaman geçirmek için iyi bir fırsat.
                 </div>
               )}
 

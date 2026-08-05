@@ -43,10 +43,37 @@ import logger from "../utils/logger";
 
 // aiPipelineService'in gün dizisini ([{ day, title, tasks: [...] }]) düz tasks
 // satırlarına çevirir. first_week_tasks ve fetchNextWeekTasks.week_tasks aynı şekli paylaşır.
+//
+// GÜN ATLAMA KORUMASI: AI bazen bir günü (ör. bir dinlenme/rest günü) boş
+// `tasks: []` ile döndürüyor — bu durumda o gün için DB'de HİÇ satır
+// oluşmuyordu. PlanBoard.jsx, bir gün numarasının `tasks` tablosunda hiç
+// satırı olmamasını "bu hafta henüz üretilmedi" (🔒 kilitli, sonraki hafta
+// yüklemesi bekleniyor) ile AYIRT EDEMİYOR — ikisi de aynı şekilde
+// görünüyor. Sonuç: o gün kalıcı olarak "kilitli" gösteriliyor, kullanıcı
+// hiçbir zaman ona dokunamıyor (hangi günün etkileneceği AI'ın o seferki
+// çıktısına bağlı olduğundan planlar arasında 1. gün ya da 2. gün gibi
+// rastgele farklı günlerde ortaya çıkıyordu). Kalıcı çözüm: her günün
+// EN AZ bir satırı olmasını burada garanti et.
 function flattenWeek(weekDays, { planId, userId, weekNumber }) {
   const rows = [];
   for (const dayObj of weekDays || []) {
     const dayNumber = dayObj.day ?? dayObj.day_number ?? null;
+    if (!dayObj.tasks || dayObj.tasks.length === 0) {
+      rows.push({
+        plan_id: planId,
+        user_id: userId,
+        week_number: weekNumber,
+        day_number: dayNumber,
+        title: "Dinlenme / Serbest Gün",
+        detail: "Bu gün için planlanmış özel bir görev yok — dinlenmek ya da serbest zaman geçirmek için iyi bir fırsat.",
+        duration_min: null,
+        priority: null,
+        estimated_cost: null,
+        map_search_query: null,
+        is_completed: false,
+      });
+      continue;
+    }
     for (const t of dayObj.tasks || []) {
       rows.push({
         plan_id: planId,
