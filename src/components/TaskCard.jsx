@@ -60,24 +60,57 @@ function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onSt
           {task.is_completed ? "✓" : ""}
         </button>
 
-        <button
-          onClick={() => hasDetails && setDetailOpen(true)}
-          className="flex-1 min-w-0 flex items-center gap-2 text-left"
-          disabled={!hasDetails}
-        >
-          <span
-            className="flex-1 min-w-0 truncate text-[14px] font-bold"
-            style={{ color: task.is_completed ? "var(--text-faint)" : "var(--text-primary)", textDecoration: task.is_completed ? "line-through" : "none" }}
+        <div className="flex-1 min-w-0 flex flex-col gap-1">
+          <button
+            onClick={() => hasDetails && setDetailOpen(true)}
+            className="flex-1 min-w-0 flex items-center gap-2 text-left"
+            disabled={!hasDetails}
           >
-            {task.title}
-          </span>
-          {pomodoros ? (
-            <span className="shrink-0 text-[10.5px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: soft, color: accent }}>
-              🍅×{pomodoros}
+            <span
+              className="flex-1 min-w-0 truncate text-[14px] font-bold"
+              style={{ color: task.is_completed ? "var(--text-faint)" : "var(--text-primary)", textDecoration: task.is_completed ? "line-through" : "none" }}
+            >
+              {task.title}
             </span>
-          ) : null}
-          {hasDetails && <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-faint)" }} />}
-        </button>
+            {pomodoros ? (
+              <span className="shrink-0 text-[10.5px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: soft, color: accent }}>
+                🍅×{pomodoros}
+              </span>
+            ) : null}
+            {hasDetails && <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-faint)" }} />}
+          </button>
+
+          {/* Gezi görevlerinde bütçe/konum — ÖNCEDEN yalnızca detay çekmecesinde
+              görünüyordu (FocusSidePanel, aşağıda), kullanıcı karta dokunmadan
+              göremiyordu. Artık kartın kendisinde, ikinci/küçük bir satırda —
+              ana satırı (checkbox/başlık/Pomodoro/play) kalabalıklaştırmadan.
+              Link/etiket, başlık butonunun DIŞINDA (kardeş eleman) olduğu için
+              tıklanınca detay çekmecesini AÇMAZ — ayrı bir stopPropagation
+              gerekmez. */}
+          {isVacation && (task.map_search_query || task.estimated_cost) && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {task.estimated_cost && (
+                <span
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                  style={{ background: "var(--disabled-bg)", color: "var(--amber-accent)" }}
+                >
+                  🏷️ {task.estimated_cost}
+                </span>
+              )}
+              {task.map_search_query && (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(task.map_search_query)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 transition-colors"
+                  style={{ background: soft, color: accent }}
+                >
+                  📍 Google Maps'te Aç
+                </a>
+              )}
+            </div>
+          )}
+        </div>
 
         {onStartPomodoro && (
           <button
