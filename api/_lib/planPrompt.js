@@ -1,5 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { wrapGeminiError } from "./aiErrors.js";
+import { getRoutedModel } from "./geminiRouter.js";
 
 // AI plan üretim pipeline'ının SUNUCU TARAFI portu. Eskiden bu dosyanın
 // içeriği src/services/aiPipelineService.js'te idi ve VITE_GEMINI_API_KEY ile
@@ -12,18 +12,9 @@ import { wrapGeminiError } from "./aiErrors.js";
 //   2) Token Tasarrufu (Lazy Loading): tüm plan tek seferde İSTENMEZ. İlk çağrı
 //      sadece genel rutinleri + 1. haftanın görevlerini üretir; sonraki
 //      haftalar ayrı isteklerle (fetchNextWeekTasks) üretilir.
-const MODEL = "gemini-flash-latest";
-
-function getModel(systemInstruction) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY ortam değişkeni tanımlı değil (sunucu).");
-  const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({
-    model: MODEL,
-    systemInstruction,
-    generationConfig: { responseMimeType: "application/json" },
-  });
-}
+//   3) Model + maxOutputTokens seçimi artık BURADA DEĞİL, geminiRouter.js'te
+//      merkezi — hangi operasyonun hangi modeli/tavanı kullandığını görmek/
+//      değiştirmek için oraya bak.
 
 // ---------------------------------------------------------------------------
 // Persona Haritası — kategori → uzman şapkası (system instruction)
@@ -58,8 +49,9 @@ function taskFieldGuide(category) {
 }
 
 // Verilen system instruction ile modeli çalıştırıp katı JSON'ı parse eder.
-async function runJson(systemInstruction, userPrompt, label = "AI isteği") {
-  const model = getModel(systemInstruction);
+// operation: geminiRouter.js'teki ROUTES anahtarlarından biri.
+async function runJson(operation, systemInstruction, userPrompt, label = "AI isteği") {
+  const model = getRoutedModel(operation, systemInstruction);
 
   let text;
   try {
@@ -119,7 +111,7 @@ Yanıtın SADECE şu JSON olmalı, şema dışına metin ekleme, Türkçe:
 
   const userPrompt = `Kategori: ${category}\nKullanıcının hedefi: "${(goal || "").trim()}"`;
 
-  const parsed = await runJson(systemInstruction, userPrompt, "Onboarding soruları üretimi");
+  const parsed = await runJson("plan.onboarding_questions", systemInstruction, userPrompt, "Onboarding soruları üretimi");
   const questions = parsed?.questions;
   if (!Array.isArray(questions) || questions.length === 0) {
     throw new Error("Onboarding soruları üretilemedi.");
@@ -164,7 +156,7 @@ first_week_tasks, total_days 7'den küçükse tam olarak total_days kadar gün; 
 
   const userPrompt = `${describeUserInput(userInput)}\n\nYukarıdaki bilgilere göre planın toplam süresini (total_days), tüm planın haftalık iskeletini (week_topics), genel rutinlerini ve 1. haftasının detayını üret.`;
 
-  const parsed = await runJson(systemInstruction, userPrompt, "Plan oluşturma");
+  const parsed = await runJson("plan.create", systemInstruction, userPrompt, "Plan oluşturma");
   if (!parsed?.plan_title || !Array.isArray(parsed?.first_week_tasks)) {
     throw new Error("Yapay zeka yanıtında beklenen plan alanları eksik.");
   }
@@ -217,7 +209,7 @@ week_tasks tam olarak 7 gün (day ${startDay}..${endDay}) içermeli.`;
 Plan özeti / genel strateji: "${planSummary || ""}"
 Üretilecek hafta: ${week}. hafta (gün ${startDay}-${endDay}).`;
 
-  const parsed = await runJson(systemInstruction, userPrompt, `${week}. hafta üretimi`);
+  const parsed = await runJson("plan.next_week", systemInstruction, userPrompt, `${week}. hafta üretimi`);
   if (!Array.isArray(parsed?.week_tasks) || parsed.week_tasks.length === 0) {
     throw new Error("Yapay zeka yanıtında beklenen hafta görevleri eksik.");
   }

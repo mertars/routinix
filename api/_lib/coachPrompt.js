@@ -1,23 +1,14 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { wrapGeminiError } from "./aiErrors.js";
+import { getCachedCoachModel } from "./coachCache.js";
 
 // AI Koç'un serbest metin niyet tespiti — SUNUCU TARAFI port'u. Eskiden
 // src/services/aiPipelineService.js içinde tarayıcıdan VITE_GEMINI_API_KEY ile
 // doğrudan çağrılıyordu (anahtar client bundle'ına gömülüyordu — güvensiz).
 // Artık yalnızca burada, process.env.GEMINI_API_KEY (VITE_ önekSİZ, yalnızca
-// sunucuda okunur) ile çalışır.
-const MODEL = "gemini-flash-latest";
-
-function getModel(systemInstruction) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY ortam değişkeni tanımlı değil (sunucu).");
-  const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({
-    model: MODEL,
-    systemInstruction,
-    generationConfig: { responseMimeType: "application/json" },
-  });
-}
+// sunucuda okunur) ile çalışır. Model = gemini-flash-lite-latest, GEMİNİ
+// CONTEXT CACHING ile (bkz. coachCache.js) — bu system instruction (~1426
+// token) projedeki 5 Gemini çağrısı arasında Gemini'nin caching alt sınırını
+// (1024 token) geçen TEK'i olduğu için caching yalnızca burada uygulanır.
 
 // plans: [{ id, title, mode, total_days, tasks: [...] }] — service_role ile
 // önceden kullanıcıya ait olduğu doğrulanmış planlar (bkz. api/coach-action.js).
@@ -91,7 +82,7 @@ fields ve new_tasks nesnelerinde yalnızca gerçekten değişen/gerekli alanlar�
 
   const userPrompt = `Kullanıcının planları:\n${context}\n\nKullanıcının mesajı: "${String(message || "").trim()}"`;
 
-  const model = getModel(systemInstruction);
+  const model = await getCachedCoachModel(systemInstruction);
   let text;
   try {
     const result = await model.generateContent(userPrompt);

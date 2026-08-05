@@ -1,21 +1,10 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { wrapGeminiError } from "./aiErrors.js";
+import { getRoutedModel } from "./geminiRouter.js";
 
 // "Rhythm & Insights" — Günlük Ritim Raporu üretimi. SUNUCU TARAFI, aynı
 // desen coachPrompt.js ile (bkz. o dosyadaki yorum): process.env.GEMINI_API_KEY
-// yalnızca burada okunur, client'a asla sızmaz.
-const MODEL = "gemini-flash-latest";
-
-function getModel(systemInstruction) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY ortam değişkeni tanımlı değil (sunucu).");
-  const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({
-    model: MODEL,
-    systemInstruction,
-    generationConfig: { responseMimeType: "application/json" },
-  });
-}
+// yalnızca burada okunur, client'a asla sızmaz. Model + maxOutputTokens
+// seçimi geminiRouter.js'te merkezi (bkz. "rhythm.report" route'u).
 
 // stats: {
 //   completedTasks, totalTasks, focusMinutesToday, activePlanCount,
@@ -60,7 +49,7 @@ Yanıtın SADECE ve KESİNLİKLE şu JSON şeması olmalı, şema dışına hiç
   "tomorrowFocus": ["kısa somut madde 1", "kısa somut madde 2"]
 }`;
 
-  const model = getModel(systemInstruction);
+  const model = getRoutedModel("rhythm.report", systemInstruction);
   let text;
   try {
     const result = await model.generateContent(context);
