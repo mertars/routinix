@@ -204,26 +204,43 @@ export async function saveManualPlanToSupabase(builder, userId) {
   const taskRows = [];
   for (const [dayKey, dayTasks] of Object.entries(builder.days || {})) {
     const dayNumber = Math.max(1, Number(dayKey) || 1);
-    for (const t of dayTasks || []) {
+    (dayTasks || []).forEach((t, idx) => {
       const title = (t.title ?? "").toString().trim();
-      if (!title) continue;
+      if (!title) return;
       taskRows.push({
         plan_id: plan.id,
         user_id: userId,
         week_number: Math.max(1, Math.ceil(dayNumber / 7)),
         day_number: dayNumber,
         title,
+        detail: t.detail ?? null,
         duration_min: t.duration_min ?? null,
         priority: t.priority ?? null,
         estimated_cost: t.estimated_cost ?? null,
         is_completed: false,
+        // Builder'daki sürükle-bırak sırası — array index'i BİREBİR yazılır
+        // (bkz. supabase/task_sort_order.sql + fetchPlanDetail/
+        // fetchDashboardData'nın ikincil .order("sort_order") sorgusu).
+        sort_order: idx,
       });
-    }
+    });
   }
 
   let tasks = [];
   if (taskRows.length > 0) {
-    const { data, error } = await supabase.from("tasks").insert(taskRows).select();
+    let { data, error } = await supabase.from("tasks").insert(taskRows).select();
+    // sort_order sütunu (bkz. supabase/task_sort_order.sql) henüz
+    // ÇALIŞTIRILMAMIŞ bir migration olabilir — PostgREST bunu "şema
+    // önbelleğinde böyle bir sütun yok" (PGRST204) hatasıyla reddeder.
+    // BU DURUMDA planın TAMAMEN kaydedilememesi YERİNE (sürükle-bırak
+    // sırası henüz kalıcı olmasa bile) sort_order'sız tekrar denenir —
+    // aynı fail-open ilkesi: eksik bir migration, kullanıcının GERÇEK
+    // planını kaydetmesini ASLA engellememeli.
+    if (error?.code === "PGRST204") {
+      logger.warn("SUPABASE", "tasks.sort_order sütunu henüz yok (migration çalıştırılmamış) — sort_order'sız kaydediliyor", { error: error.message });
+      const withoutSortOrder = taskRows.map(({ sort_order, ...rest }) => rest);
+      ({ data, error } = await supabase.from("tasks").insert(withoutSortOrder).select());
+    }
     if (error) {
       logger.error("SUPABASE", "Manuel plan görevleri kaydedilemedi", { table: "tasks", action: "insert", planId: plan.id, error });
       throw error;
@@ -275,6 +292,24 @@ export async function deletePlan(planId) {
   }
 }
 
+// tasks.sort_order YENİ bir sütun (bkz. supabase/task_sort_order.sql) —
+// bu migration Supabase'de henüz ÇALIŞTIRILMAMIŞ olabilir. Sorgu önce bu
+// sütunla sıralamayı dener; PostgREST "sütun yok" hatası (42703,
+// undefined_column) dönerse SESSİZCE sütunsuz haliyle tekrar dener —
+// migration'ın çalıştırılıp çalıştırılmadığından TAMAMEN BAĞIMSIZ olarak
+// uygulama asla çökmez (aynı fail-open ilkesi, bkz. api/_lib/
+// planRateLimit.js). `queryFactory` HER ÇAĞRIDA TAZE bir query builder
+// döndürmeli — Supabase'in builder'ları .order() ile MUTATE olduğundan
+// aynı örneği iki kez kullanmak ilk denemenin sıralamasını taşırdı.
+async function selectTasksOrdered(queryFactory) {
+  const withSort = await queryFactory().order("sort_order", { ascending: true, nullsFirst: false });
+  if (withSort.error?.code === "42703") {
+    logger.warn("SUPABASE", "tasks.sort_order sütunu henüz yok (migration çalıştırılmamış) — sıralamasız devam ediliyor", { error: withSort.error.message });
+    return queryFactory();
+  }
+  return withSort;
+}
+
 // "Bugünün Görevleri" popover'ı için: kullanıcının TÜM planlarını + tüm
 // rutinlerini + tüm görevlerini 3 sorguda çekip plana göre gruplar.
 // Döner: [{ ...plan, routines: [...], tasks: [...] }]
@@ -282,7 +317,7 @@ export async function fetchDashboardData(userId) {
   const [plansRes, routinesRes, tasksRes] = await Promise.all([
     supabase.from("plans").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
     supabase.from("routines").select("*").eq("user_id", userId),
-    supabase.from("tasks").select("*").eq("user_id", userId).order("week_number", { ascending: true }),
+    selectTasksOrdered(() => supabase.from("tasks").select("*").eq("user_id", userId).order("week_number", { ascending: true })),
   ]);
   if (plansRes.error) {
     logger.error("SUPABASE", "Planlar çekilemedi (dashboard)", { table: "plans", action: "select", userId, error: plansRes.error });
@@ -344,7 +379,7 @@ export async function fetchPlanDetail(planId) {
   const [{ data: plan, error: pErr }, routinesRes, tasksRes] = await Promise.all([
     supabase.from("plans").select("*").eq("id", planId).single(),
     supabase.from("routines").select("*").eq("plan_id", planId).order("created_at", { ascending: true }),
-    supabase.from("tasks").select("*").eq("plan_id", planId).order("week_number", { ascending: true }),
+    selectTasksOrdered(() => supabase.from("tasks").select("*").eq("plan_id", planId).order("week_number", { ascending: true })),
   ]);
   if (pErr) {
     logger.error("SUPABASE", "Plan detayı çekilemedi", { table: "plans", action: "select", planId, error: pErr });

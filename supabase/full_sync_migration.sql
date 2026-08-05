@@ -118,10 +118,13 @@ alter table public.tasks add column if not exists duration_min int;
 alter table public.tasks add column if not exists priority text;
 alter table public.tasks add column if not exists estimated_cost text;
 alter table public.tasks add column if not exists map_search_query text;
+-- ManualPlanBuilder.jsx sürükle-bırak sıralaması (bkz. task_sort_order.sql).
+alter table public.tasks add column if not exists sort_order int;
 
 create index if not exists tasks_plan_id_idx on public.tasks (plan_id);
 create index if not exists tasks_user_id_idx on public.tasks (user_id);
 create index if not exists tasks_plan_week_idx on public.tasks (plan_id, week_number, day_number);
+create index if not exists tasks_plan_day_sort_idx on public.tasks (plan_id, day_number, sort_order);
 
 alter table public.tasks enable row level security;
 
