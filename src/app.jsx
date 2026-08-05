@@ -51,6 +51,7 @@ const MyPlansHub = lazy(() => import("./components/MyPlansHub"));
 const AiCoachWidget = lazy(() => import("./components/AiCoachWidget"));
 const PomodoroStudio = lazy(() => import("./components/PomodoroStudio"));
 const OnboardingWizard = lazy(() => import("./components/OnboardingWizard"));
+const ManualPlanBuilder = lazy(() => import("./components/ManualPlanBuilder"));
 const RhythmStudio = lazy(() => import("./components/RhythmStudio"));
 const CommunityHub = lazy(() => import("./components/CommunityHub"));
 const NexusProfileOverlay = lazy(() => import("./components/community/NexusProfileOverlay"));
@@ -377,6 +378,7 @@ export default function App() {
                 onOpenSavedPlan={ps.openSavedPlan}
                 errorMsg={ps.errorMsg}
                 onBackToIntro={ps.resetToIntro}
+                onOpenManualBuilder={ps.openManualBuilder}
               />
             )}
 
@@ -464,6 +466,29 @@ export default function App() {
         onDelete={ps.deletePlan}
         onClose={() => setDeleteOpen(false)}
       />
+
+      {/* Kendi Planını Hazırla — AI'dan bağımsız manuel plan akışı. Koşullu
+          mount + KENDİ ScopedErrorBoundary'si: plan-oluşturma akışının
+          sınırına DAHİL EDİLMEDİ çünkü o sınırın "Yeniden Dene"si
+          ps.resetToIntro'yu çağırıyor — bu, manualBuilderOpen'ı KAPATMAZ,
+          çöken bileşen anında yeniden mount olup TEKRAR çökerdi. Burada
+          onReset={ps.closeManualBuilder} bunu doğru şekilde temizler. */}
+      {ps.manualBuilderOpen && (
+        <ScopedErrorBoundary
+          scope="manual-plan-builder"
+          message="Plan oluşturucusunda beklenmedik bir hata oluştu. Tekrar dener misin?"
+          onReset={ps.closeManualBuilder}
+        >
+          <Suspense fallback={<OverlayFallback z={110} />}>
+            <ManualPlanBuilder
+              open={ps.manualBuilderOpen}
+              category={ps.category}
+              onClose={ps.closeManualBuilder}
+              onSave={ps.saveManualPlan}
+            />
+          </Suspense>
+        </ScopedErrorBoundary>
+      )}
 
       {/* Şablon Keşfet — hazır rota kütüphanesi. Koşullu mount. */}
       {hubOpen && (

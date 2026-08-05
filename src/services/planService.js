@@ -165,6 +165,75 @@ export async function savePlanToSupabase(aiOutput, userId, mode) {
   return { plan, routines, tasks };
 }
 
+// "Kendi Planını Hazırla" (ManualPlanBuilder.jsx) — savePlanToSupabase'in AI
+// ÇIKTISI olmadan çalışan eşdeğeri. Gemini'ye HİÇ gidilmez, bu yüzden
+// savePlanToSupabase'in "yalnızca 1. haftayı kaydet" (lazy-loading) kısıtı
+// BURADA YOK — kullanıcı kaç gün girdiyse (3'ten 365'e) TÜMÜ TEK SEFERDE
+// yazılır; zaten AI maliyeti olmadığından "sonraki haftayı sonra üret"
+// mantığının hiçbir anlamı kalmıyor.
+//
+// builder: { title, totalDays, days: { [dayNumber]: [{ title, duration_min,
+//   priority, estimated_cost }] }, category } — ManualPlanBuilder.jsx'in
+//   yerel state'i, kaydetmeden hemen önce boş başlıklı satırlar zaten
+//   filtrelenmiş olarak gelir.
+// Döner: { plan, tasks } — routines yok (manuel akışta rutin girişi
+// istenmedi; ileride eklenmek istenirse savePlanToSupabase'deki desenin
+// AYNISI kullanılabilir).
+export async function saveManualPlanToSupabase(builder, userId) {
+  if (!userId) throw new Error("Plan kaydı için oturum (userId) gerekli.");
+
+  const { data: plan, error: planErr } = await supabase
+    .from("plans")
+    .insert({
+      user_id: userId,
+      mode: builder.category,
+      title: (builder.title ?? "").toString().trim() || "Kendi Planım",
+      total_days: Number.isFinite(Number(builder.totalDays)) ? Number(builder.totalDays) : null,
+    })
+    .select()
+    .single();
+  if (planErr) {
+    logger.error("SUPABASE", "Manuel plan kaydedilemedi", { table: "plans", action: "insert", error: planErr });
+    throw planErr;
+  }
+
+  // Gün bazlı satırları düz bir insert payload'ına çevir — flattenWeek ile
+  // AYNI alan adları/week_number formülü (day/7'ye yuvarla) kullanılır ki
+  // week_number'a göre gruplayan mevcut kod (usePlanStudio.groupTasksToWeeks)
+  // bu planı AI'lı bir plandan AYIRT EDEMESİN.
+  const taskRows = [];
+  for (const [dayKey, dayTasks] of Object.entries(builder.days || {})) {
+    const dayNumber = Math.max(1, Number(dayKey) || 1);
+    for (const t of dayTasks || []) {
+      const title = (t.title ?? "").toString().trim();
+      if (!title) continue;
+      taskRows.push({
+        plan_id: plan.id,
+        user_id: userId,
+        week_number: Math.max(1, Math.ceil(dayNumber / 7)),
+        day_number: dayNumber,
+        title,
+        duration_min: t.duration_min ?? null,
+        priority: t.priority ?? null,
+        estimated_cost: t.estimated_cost ?? null,
+        is_completed: false,
+      });
+    }
+  }
+
+  let tasks = [];
+  if (taskRows.length > 0) {
+    const { data, error } = await supabase.from("tasks").insert(taskRows).select();
+    if (error) {
+      logger.error("SUPABASE", "Manuel plan görevleri kaydedilemedi", { table: "tasks", action: "insert", planId: plan.id, error });
+      throw error;
+    }
+    tasks = data || [];
+  }
+
+  return { plan, tasks };
+}
+
 // Sonraki bir haftanın görevlerini kaydeder (lazy-load devamı). Döner: task satırları.
 //   weekTasks: fetchNextWeekTasks(...).week_tasks
 export async function saveWeekTasks(planId, userId, weekNumber, weekTasks) {

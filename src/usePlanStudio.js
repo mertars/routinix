@@ -15,6 +15,7 @@ import { generateOnboardingQuestions, createEnrichedPlan, fetchNextWeekTasks } f
 import {
   savePlanToSupabase,
   saveWeekTasks,
+  saveManualPlanToSupabase,
   setTaskCompleted as setTaskCompletedSvc,
   fetchUserPlans,
   fetchPlanDetail,
@@ -81,6 +82,10 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   // Şablon Keşfet'ten "Şablonu Kullan" ile gelen kesin gün sayısı — AI'ın
   // total_days tahminini ezmek için finalizeAndGenerate'de kullanılır.
   const [templateDaysOverride, setTemplateDaysOverride] = useState(null);
+
+  // "Kendi Planını Hazırla" (ManualPlanBuilder.jsx) — CategoryIntro'daki
+  // merkez neon buton bunu açar. AI boru hattından TAMAMEN bağımsız.
+  const [manualBuilderOpen, setManualBuilderOpen] = useState(false);
 
   const mode = categoryOf(category);
 
@@ -228,6 +233,43 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       setStage(STAGE_ERROR);
     }
   }, [user, onRequireAuth, questions, answers, extraNote, category, goal, templateDaysOverride, refreshSavedPlans]);
+
+  // ---- "Kendi Planını Hazırla" — AI çağrısı OLMADAN, elle plan kaydı ----
+  // Diğer plan-oluşturma yollarıyla (startOnboarding/startFromTemplate)
+  // AYNI oturum kapısı: anonim/misafir oturumlar giriş yapmaya yönlendirilir
+  // — bu bir AI maliyeti koruması DEĞİL (manuel akış zaten Gemini'ye hiç
+  // gitmiyor), kalıcı bir hesaba BAĞLI plan saklama tutarlılığı içindir.
+  const openManualBuilder = useCallback(() => {
+    if (!user || user.is_anonymous) {
+      onRequireAuth?.();
+      return;
+    }
+    setManualBuilderOpen(true);
+  }, [user, onRequireAuth]);
+
+  const closeManualBuilder = useCallback(() => setManualBuilderOpen(false), []);
+
+  // builder: ManualPlanBuilder.jsx'in yerel state'i (bkz. o dosyadaki JSDoc).
+  // Başarılı kayıttan sonra AYNI finalizeAndGenerate deseniyle doğrudan
+  // STAGE_PLAN'a geçilir — kullanıcı "Kaydet"e bastığı anda yeni planını
+  // GÖRÜR, ayrıca "Planlarım"dan açması gerekmez.
+  const saveManualPlan = useCallback(
+    async (builder) => {
+      if (!user || user.is_anonymous) {
+        onRequireAuth?.();
+        throw new Error("Devam etmek için giriş yapmalısın.");
+      }
+      const { plan, tasks } = await saveManualPlanToSupabase(builder, user.id);
+      setDbPlan(plan);
+      setRoutines([]);
+      setWeeks(groupTasksToWeeks(tasks));
+      setCategory(plan.mode || "general");
+      setStage(STAGE_PLAN);
+      setManualBuilderOpen(false);
+      refreshSavedPlans();
+    },
+    [user, onRequireAuth, refreshSavedPlans]
+  );
 
   // ---- LAZY LOAD: sonraki haftayı üret + kaydet + ekle ----
   // Devamlılık bağlamı (OPSİYONEL, geriye dönük uyumlu): `weekTopic`,
@@ -427,6 +469,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     category, mode, goal, extraNote, stage, errorMsg, menuOpen, savedPlans,
     remindersOn, hapticsOn,
     goalTrimmed, goalTooShort, canStart,
+    manualBuilderOpen,
     // onboarding wizard
     questions, answers, wizardStep, currentAnswer,
     // aktif plan
@@ -437,5 +480,6 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     handleCategoryChange, startOnboarding, setAnswer, goNextQuestion, goPrevQuestion, finalizeAndGenerate,
     loadNextWeek, toggleTask, openSavedPlan, deletePlan, startNewPlan, resetToIntro, startFromTemplate,
     applyCoachAction, sendCoachMessage,
+    openManualBuilder, closeManualBuilder, saveManualPlan,
   };
 }

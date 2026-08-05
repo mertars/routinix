@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Wand2 } from "lucide-react";
 import { CATEGORIES, CATEGORY_KEYS, MIN_GOAL_LENGTH, TEMPLATE_CHIPS } from "../constants";
 
 // Giriş ekranı: kategori (persona) seçimi + hedef, "Planlarım" listesi ve
@@ -16,6 +17,7 @@ export default function CategoryIntro({
   onOpenSavedPlan,
   errorMsg,
   onBackToIntro,
+  onOpenManualBuilder,
 }) {
   const mode = CATEGORIES[category] || CATEGORIES.general;
   const [pulse, setPulse] = useState(false);
@@ -111,9 +113,13 @@ export default function CategoryIntro({
         </div>
       </div>
 
-      {/* ORTA GRUP: 4'lü odak kartları — mobilde dikey alanı doldurur */}
+      {/* ORTA GRUP: 4'lü odak kartları — mobilde dikey alanı doldurur.
+          `relative` sarmalayıcı, merkezdeki "Kendi Planını Hazırla" butonunu
+          2x2 ızgaranın TAM kesişim noktasına (top-1/2 left-1/2 + translate)
+          konumlandırmak için gerekli — 4 kartın da eşit boyutta/simetrik
+          olduğu bu grid'de o nokta görsel olarak gerçekten "ortadır". */}
       <div className="flex-1 min-h-0 flex items-center md:flex-none md:block py-3 md:py-0">
-        <div className="w-full grid grid-cols-2 gap-2.5 md:gap-5">
+        <div className="relative w-full grid grid-cols-2 gap-2.5 md:gap-5">
           {CATEGORY_KEYS.map((key) => {
             const c = CATEGORIES[key];
             const active = key === category;
@@ -121,7 +127,11 @@ export default function CategoryIntro({
               <button
                 key={key}
                 onClick={() => onCategoryChange(key)}
-                className="category-card group relative flex flex-col items-start gap-1.5 md:gap-3 rounded-2xl p-3.5 md:p-6 text-left transition-all duration-200 card-glow"
+                // İçerik SAĞA yaslı (items-end + text-right) — ikon/başlık/alt
+                // açıklama kartın sağ kenarına hizalanır, sol taraftaki boşluk
+                // (padding) KORUNUR, yalnızca içerik kayar. Aktif-durum noktası
+                // bu yüzden SOLA taşındı (sağ kenar artık metinle dolu).
+                className="category-card group relative flex flex-col items-end gap-1.5 md:gap-3 rounded-2xl p-3.5 md:p-6 text-right transition-all duration-200 card-glow"
                 style={{
                   borderColor: active ? c.accent : undefined,
                   background: active ? `${c.accent}1f` : undefined,
@@ -134,11 +144,51 @@ export default function CategoryIntro({
                   {c.tagline}
                 </span>
                 {active && (
-                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full" style={{ background: c.accent, boxShadow: `0 0 8px ${c.accent}` }} />
+                  <span className="absolute top-3 left-3 w-2 h-2 rounded-full" style={{ background: c.accent, boxShadow: `0 0 8px ${c.accent}` }} />
                 )}
               </button>
             );
           })}
+
+          {/* Merkez neon floating buton — "Kendi Planını Hazırla". Manuel
+              plan akışı AI ÇAĞIRMAZ (Gemini maliyeti yok), bu yüzden 4
+              AI-persona kartından BİLEREK görsel olarak ayrışan, kendine
+              özel bir mor-magenta→camgöbeği gradyanı taşır (mevcut AI Koç
+              tetikleyicisiyle AYNI "gradyan + dış parıltı" dili, ama farklı
+              renk kimliği — "bu AI persona'larından biri DEĞİL" sinyali). */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+            <div className="group/manual relative flex items-center justify-center">
+              <button
+                onClick={onOpenManualBuilder}
+                aria-label="Kendi Planını Hazırla"
+                className="relative w-11 h-11 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95"
+                style={{
+                  background: "linear-gradient(135deg, #FF007F, #B026FF 55%, #00F3FF)",
+                  boxShadow: "0 8px 28px -8px rgba(255,0,127,0.65), 0 0 22px -6px rgba(0,243,255,0.55)",
+                }}
+              >
+                {/* Hover'da neon pulse halkası — AiCoachWidget tetikleyicisindeki
+                    "canlı durum noktası" ping deseniyle AYNI teknik. */}
+                <span className="absolute inset-0 rounded-full motion-safe:group-hover/manual:animate-ping opacity-0 group-hover/manual:opacity-60" style={{ background: "#FF007F" }} />
+                <Wand2 className="relative w-4 h-4 md:w-5 md:h-5 text-white drop-shadow-sm" strokeWidth={2.25} />
+              </button>
+
+              {/* Tooltip/label — yalnızca hover'da (masaüstü), AI Koç
+                  tetikleyicisiyle AYNI opacity/translate geçiş deseni. */}
+              <div
+                className="absolute top-full mt-2 pointer-events-none opacity-0 translate-y-1 group-hover/manual:opacity-100 group-hover/manual:translate-y-0 transition-all duration-200 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold hidden md:block"
+                style={{
+                  background: "rgba(var(--glass-rgb), var(--alpha-modal))",
+                  backdropFilter: "blur(16px) saturate(160%)",
+                  WebkitBackdropFilter: "blur(16px) saturate(160%)",
+                  border: "1px solid var(--modal-border)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                ✨ Kendi Planını Hazırla
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
