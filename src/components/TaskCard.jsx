@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { ChevronRight, Play } from "lucide-react";
+import { ChevronRight, Play, MapPin } from "lucide-react";
 import FocusSidePanel from "./FocusSidePanel";
 
 const PRIORITY_STYLE = {
@@ -80,37 +80,47 @@ function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onSt
             {hasDetails && <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-faint)" }} />}
           </button>
 
-          {/* Gezi görevlerinde bütçe/konum — ÖNCEDEN yalnızca detay çekmecesinde
+          {/* Gezi görevlerinde bütçe — ÖNCEDEN yalnızca detay çekmecesinde
               görünüyordu (FocusSidePanel, aşağıda), kullanıcı karta dokunmadan
               göremiyordu. Artık kartın kendisinde, ikinci/küçük bir satırda —
               ana satırı (checkbox/başlık/Pomodoro/play) kalabalıklaştırmadan.
-              Link/etiket, başlık butonunun DIŞINDA (kardeş eleman) olduğu için
-              tıklanınca detay çekmecesini AÇMAZ — ayrı bir stopPropagation
-              gerekmez. */}
-          {isVacation && (task.map_search_query || task.estimated_cost) && (
+              Harita butonu BURADAN kaldırıldı — artık sağdaki aksiyon
+              grubunda (play ile yan yana), bkz. aşağısı. */}
+          {isVacation && task.estimated_cost && (
             <div className="flex items-center gap-1.5 flex-wrap">
-              {task.estimated_cost && (
-                <span
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-                  style={{ background: "var(--disabled-bg)", color: "var(--amber-accent)" }}
-                >
-                  🏷️ {task.estimated_cost}
-                </span>
-              )}
-              {task.map_search_query && (
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(task.map_search_query)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 transition-colors"
-                  style={{ background: soft, color: accent }}
-                >
-                  📍 Google Maps'te Aç
-                </a>
-              )}
+              <span
+                className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                style={{ background: "var(--disabled-bg)", color: "var(--amber-accent)" }}
+              >
+                🏷️ {task.estimated_cost}
+              </span>
             </div>
           )}
         </div>
+
+        {/* Harita aksiyonu — kompakt ikon buton, sağdaki aksiyon grubunda
+            (Play'in solunda). `soft`/`accent` planın kategori temasından
+            gelir (gezi kategorisinin aksanı zaten yeşilimsi, #2ED9A3) —
+            projedeki HER yerde kullanılan aynı tema token deseni, sabit bir
+            Tailwind rengi (ör. emerald-500) YAZILMADI ki açık/koyu tema ve
+            diğer kategori aksanlarıyla tutarlı kalsın. Başlık butonunun
+            DIŞINDA bağımsız bir kardeş eleman olduğundan tıklanınca detay
+            çekmecesini açmaz; yine de stopPropagation defensif olarak
+            eklendi (checkbox/play'deki AYNI desen). */}
+        {isVacation && task.map_search_query && (
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(task.map_search_query)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Google Haritalar'da aç"
+            title="Haritada Aç"
+            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:opacity-80"
+            style={{ background: soft, color: accent }}
+          >
+            <MapPin className="w-3.5 h-3.5" strokeWidth={2.25} />
+          </a>
+        )}
 
         {onStartPomodoro && (
           <button
