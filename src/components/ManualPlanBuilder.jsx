@@ -11,6 +11,18 @@ const PRIORITY_STYLE = {
 };
 const PRIORITIES = ["Yüksek", "Orta", "Düşük"];
 
+// "Manuel Builder" kimliği — 4 AI-persona kategorisinden BİLEREK ayrışan,
+// kendine özel hibrit neon paleti (bkz. dosya sonu yorumu). Yalnızca BU
+// ekranda kullanılır; app-geneli BackgroundScene.jsx'in kategori-bazlı
+// mor/turuncu glow'undan (GLOW_BY_CATEGORY) BİLİNÇLİ OLARAK bağımsız.
+const NEON = { cyan: "#00F3FF", magenta: "#FF007F", violet: "#8B5CF6", emerald: "#10B981" };
+const GRADIENT = `linear-gradient(90deg, ${NEON.magenta}, ${NEON.violet}, ${NEON.cyan})`;
+const GLOW_ACTIVE_STYLE = {
+  background: GRADIENT,
+  color: "#fff",
+  boxShadow: `0 0 16px rgba(255,0,127,0.32), 0 0 16px rgba(0,243,255,0.24)`,
+};
+
 let localIdCounter = 0;
 function newLocalId() {
   localIdCounter += 1;
@@ -25,14 +37,16 @@ function newLocalId() {
 // mevcut plan özellikleri, bu planın AI mi elle mi oluşturulduğunu hiç
 // bilmeden aynen çalışır.
 //
-// RESPONSIVE MİMARİ: Masaüstünde (md+) tam ekran, TEK sayfalık akış (Gün
-// Sayısı + Editör aynı anda görünür/kaydırılabilir). Mobilde ekranın
-// ALTINDAN yükselen bir BottomSheet'e dönüşür (max-h-[90vh], rounded-t-3xl)
-// VE iki ADIMA bölünür (1: başlık+gün sayısı, 2: gün gün editör) — dar
-// ekranda ikisini AYNI ANDA göstermek sıkışıklığa yol açardı. Adım geçişi
-// SALT CSS/görünürlük ile yönetilir (`mobileStep` yalnızca <md ekranlarda
-// etkilidir, md+ her ikisi de `md:!block` ile ZORLA görünür kalır) — ayrı
-// bir mobil/masaüstü bileşen kopyası GEREKMEZ.
+// RESPONSIVE MİMARİ: Masaüstünde (lg+) tam genişlik "Studio" düzeni —
+// SOL sütun (Plan Başlığı + Gün Sayısı, dar/sabit 380px) + SAĞ sütun
+// (Gün Gün Editör, geniş) yan yana. Görev listesinin kendisi zaten CANLI
+// bir önizleme (eklenen her görev anında görünür) — AYRI bir "önizleme
+// paneli" BİLEREK eklenmedi, aynı bilgiyi iki kez göstermek gereksiz
+// kalabalık yaratırdı (bkz. bir önceki turda sidebar'ın geri alınma sebebi).
+// Mobilde ekranın ALTINDAN yükselen bir BottomSheet'e dönüşür VE iki ADIMA
+// bölünür (1: başlık+gün sayısı, 2: gün gün editör). Adım/sütun geçişi
+// SALT CSS/görünürlük ile yönetilir — ayrı bir mobil/masaüstü bileşen
+// kopyası GEREKMEZ.
 export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
   const cat = categoryOf(category);
   const isVacation = category === "vacation";
@@ -45,7 +59,7 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
   const [daysData, setDaysData] = useState({}); // { [dayNumber]: task[] }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [mobileStep, setMobileStep] = useState(1); // yalnızca <md ekranlarda anlamlı
+  const [mobileStep, setMobileStep] = useState(1); // yalnızca <lg ekranlarda anlamlı
 
   // Hızlı Görev Ekle satırının kendi yerel state'i.
   const [quickTitle, setQuickTitle] = useState("");
@@ -126,25 +140,41 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
     <>
       {/* Mobil-yalnız arkaplan karartma — BottomSheet tam ekranı kaplamadığı
           için (max-h-[90vh]) arkasındaki uygulamayı karartıp dokununca
-          kapatan bir katman gerekir. Masaüstünde builder ZATEN tam ekran
-          olduğundan bu katmana gerek yok (md:hidden). */}
-      <div className="fixed inset-0 z-[109] bg-black/60 backdrop-blur-sm md:hidden" onClick={onClose} />
+          kapatan bir katman gerekir. lg+'da builder ZATEN tam ekran
+          olduğundan bu katmana gerek yok (lg:hidden). */}
+      <div className="fixed inset-0 z-[109] bg-black/60 backdrop-blur-sm lg:hidden" onClick={onClose} />
 
       <div
-        className="fixed inset-x-0 bottom-0 z-[110] max-h-[90vh] rounded-t-3xl flex flex-col animate-[slideUpSheet_0.3s_ease] md:inset-0 md:max-h-none md:rounded-none md:animate-[fullScreenIn_0.25s_ease]"
+        className="fixed inset-x-0 bottom-0 z-[110] max-h-[90vh] rounded-t-3xl flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_ease] lg:inset-0 lg:max-h-none lg:rounded-none lg:animate-[fullScreenIn_0.25s_ease]"
         style={{ background: "var(--bg-app)" }}
       >
+        {/* --- Çoklu neon "aurora" glow — BackgroundScene.jsx'teki KURULU
+            .bg-blob tekniğinin (blur(70px), blobFloatA/B, tema-duyarlı
+            --blob-opacity: koyu 0.32 / açık 0.18) AYNISI, ama 4 kendine özel
+            renkle (cyan/magenta/violet/emerald). pointer-events-none +
+            içeriğin ARKASINDA (z-0) — tamamen dekoratif, dokunmayı engellemez.
+            Tema uyumu OTOMATİK: --blob-opacity zaten her iki temada da
+            tanımlı (index.css), burada yeniden hesaplamaya gerek yok. */}
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
+          <div className="bg-blob" style={{ width: 460, height: 460, top: "-10%", left: "-6%", background: `radial-gradient(circle, ${NEON.magenta} 0%, transparent 70%)`, animation: "blobFloatA 26s ease-in-out infinite" }} />
+          <div className="bg-blob" style={{ width: 420, height: 420, top: "-4%", right: "-8%", background: `radial-gradient(circle, ${NEON.cyan} 0%, transparent 70%)`, animation: "blobFloatB 32s ease-in-out infinite" }} />
+          <div className="bg-blob" style={{ width: 480, height: 480, bottom: "-14%", left: "18%", background: `radial-gradient(circle, ${NEON.violet} 0%, transparent 70%)`, animation: "blobFloatA 29s ease-in-out infinite", animationDelay: "-9s" }} />
+          <div className="bg-blob" style={{ width: 380, height: 380, bottom: "-8%", right: "10%", background: `radial-gradient(circle, ${NEON.emerald} 0%, transparent 70%)`, animation: "blobFloatB 35s ease-in-out infinite", animationDelay: "-14s" }} />
+        </div>
+
         {/* Sürükleme tutamacı — yalnızca mobil BottomSheet'te anlamlı. */}
-        <div className="shrink-0 pt-2.5 pb-1 flex justify-center md:hidden">
+        <div className="relative z-10 shrink-0 pt-2.5 pb-1 flex justify-center lg:hidden">
           <div className="w-10 h-1.5 rounded-full" style={{ background: "var(--border-strong)" }} />
         </div>
 
-        {/* Üst neon şerit — kategori aksanından merkez butonun magenta→camgöbeği
-            gradyanına geçiş, "bu manuel bir akış" kimliğini üstte de taşır. */}
-        <div className="h-[3px] shrink-0 hidden md:block" style={{ background: "linear-gradient(90deg, #FF007F, #B026FF, #00F3FF)" }} />
+        {/* Üst neon şerit */}
+        <div className="relative z-10 h-[3px] shrink-0 hidden lg:block" style={{ background: GRADIENT }} />
 
         {/* Başlık */}
-        <div className="shrink-0 px-4 md:px-8 pt-2 md:pt-5 pb-4 flex items-center justify-between gap-3 border-b" style={{ borderColor: "var(--border-default)" }}>
+        <div
+          className="relative z-10 shrink-0 px-4 md:px-8 lg:px-10 pt-2 lg:pt-5 pb-4 flex items-center justify-between gap-3 border-b"
+          style={{ borderColor: "var(--border-default)" }}
+        >
           <div className="flex items-center gap-3 min-w-0">
             <div
               className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 text-lg"
@@ -155,8 +185,8 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
             <div className="min-w-0">
               <h1 className="text-[16px] md:text-[19px] font-bold text-[var(--text-primary)] leading-tight truncate">Kendi Planını Hazırla</h1>
               <p className="text-[11px] md:text-[12.5px] text-[var(--text-faint)]">
-                {cat.label} · {mobileStep === 1 ? "1/2 · Süre" : "2/2 · Görevler"}
-                <span className="hidden md:inline"> · elle oluşturulan plan, yapay zeka kullanılmaz</span>
+                {cat.label} · <span className="lg:hidden">{mobileStep === 1 ? "1/2 · Süre" : "2/2 · Görevler"}</span>
+                <span className="hidden lg:inline">elle oluşturulan plan, yapay zeka kullanılmaz</span>
               </p>
             </div>
           </div>
@@ -170,99 +200,106 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
           </button>
         </div>
 
-        {/* Gövde — kaydırılabilir */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 py-5 md:py-7">
-          <div className="max-w-3xl mx-auto flex flex-col gap-7">
-            {/* ADIM 1 (mobilde tek başına görünür) — Başlık + Gün Sayısı */}
-            <section className={mobileStep === 1 ? "block" : "hidden md:block"}>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)] mb-2" style={{ fontFamily: MONO_FONT }}>
-                Plan Başlığı
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Örn: Kendi Disiplin Rutinim"
-                className="input-glow glass w-full rounded-2xl px-4 py-3.5 md:py-3 text-[14.5px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)] outline-none mb-5"
-              />
+        {/* Gövde — kaydırılabilir. lg+'da "Studio" iki sütunu: SOL (dar,
+            sabit genişlik) Plan Başlığı + Gün Sayısı, SAĞ (geniş, esnek)
+            Gün Gün Editör. <lg'de tek sütun, mobileStep ile adım adım. */}
+        <div className="relative z-10 flex-1 min-h-0 overflow-y-auto px-4 md:px-8 lg:px-10 py-5 lg:py-8">
+          <div className="max-w-[1600px] mx-auto flex flex-col lg:grid lg:grid-cols-[380px_1fr] lg:gap-8 lg:items-start">
+            {/* SOL SÜTUN (lg+) / ADIM 1 (mobilde tek başına görünür) */}
+            <section className={`${mobileStep === 1 ? "block" : "hidden"} lg:block lg:sticky lg:top-0`}>
+              <div className="glass rounded-3xl p-5 lg:p-6">
+                <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)] mb-2" style={{ fontFamily: MONO_FONT }}>
+                  Plan Başlığı
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Örn: Kendi Disiplin Rutinim"
+                  className="input-glow w-full rounded-2xl px-4 py-3.5 lg:py-3 text-[14.5px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)] outline-none mb-5 border"
+                  style={{ background: "var(--bg-input)", borderColor: "var(--border-default)" }}
+                />
 
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)] mb-2" style={{ fontFamily: MONO_FONT }}>
-                Gün Sayısı
-              </label>
-              <div className="flex flex-wrap items-center gap-2">
-                {DAY_COUNT_CHOICES.map((n) => {
-                  const active = !customOpen && totalDays === n;
-                  return (
+                <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)] mb-2" style={{ fontFamily: MONO_FONT }}>
+                  Gün Sayısı
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {DAY_COUNT_CHOICES.map((n) => {
+                    const active = !customOpen && totalDays === n;
+                    return (
+                      <button
+                        key={n}
+                        onClick={() => handleDayCountPick(n)}
+                        className="min-h-[48px] lg:min-h-0 rounded-full px-4 lg:py-2 text-[13px] font-semibold transition-all duration-200 border"
+                        style={
+                          active
+                            ? { ...GLOW_ACTIVE_STYLE, borderColor: "transparent" }
+                            : { borderColor: "var(--border-default)", background: "var(--bg-input)", color: "var(--text-secondary)" }
+                        }
+                      >
+                        {n} Gün
+                      </button>
+                    );
+                  })}
+                  {!customOpen ? (
                     <button
-                      key={n}
-                      onClick={() => handleDayCountPick(n)}
-                      className="min-h-[48px] md:min-h-0 rounded-full px-4 md:py-2 text-[13px] font-semibold transition-all duration-150 border"
-                      style={{
-                        borderColor: active ? cat.accent : "var(--border-default)",
-                        background: active ? cat.accentSoft : "var(--bg-input)",
-                        color: active ? cat.accent : "var(--text-secondary)",
+                      onClick={() => {
+                        setCustomOpen(true);
+                        setCustomVal(String(totalDays));
                       }}
+                      className="min-h-[48px] lg:min-h-0 rounded-full px-4 lg:py-2 text-[13px] font-semibold border transition-all duration-200"
+                      style={
+                        !DAY_COUNT_CHOICES.includes(totalDays)
+                          ? { ...GLOW_ACTIVE_STYLE, borderColor: "transparent" }
+                          : { borderColor: "var(--border-default)", background: "var(--bg-input)", color: "var(--text-secondary)" }
+                      }
                     >
-                      {n} Gün
+                      {!DAY_COUNT_CHOICES.includes(totalDays) ? `${totalDays} Gün (Özel)` : "Özel"}
                     </button>
-                  );
-                })}
-                {!customOpen ? (
-                  <button
-                    onClick={() => {
-                      setCustomOpen(true);
-                      setCustomVal(String(totalDays));
-                    }}
-                    className="min-h-[48px] md:min-h-0 rounded-full px-4 md:py-2 text-[13px] font-semibold border transition-colors"
-                    style={{
-                      borderColor: !DAY_COUNT_CHOICES.includes(totalDays) ? cat.accent : "var(--border-default)",
-                      background: !DAY_COUNT_CHOICES.includes(totalDays) ? cat.accentSoft : "var(--bg-input)",
-                      color: !DAY_COUNT_CHOICES.includes(totalDays) ? cat.accent : "var(--text-secondary)",
-                    }}
-                  >
-                    {!DAY_COUNT_CHOICES.includes(totalDays) ? `${totalDays} Gün (Özel)` : "Özel"}
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min={1}
-                      max={365}
-                      autoFocus
-                      value={customVal}
-                      onChange={(e) => setCustomVal(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && applyCustomDays()}
-                      className="min-h-[48px] md:min-h-0 w-20 rounded-full border px-3 md:py-2 text-[13px] text-center outline-none bg-transparent text-[var(--text-primary)]"
-                      style={{ borderColor: "var(--border-default)", background: "var(--bg-input)" }}
-                    />
-                    <button
-                      onClick={applyCustomDays}
-                      className="min-h-[48px] md:min-h-0 rounded-full px-3.5 md:py-2 text-[12.5px] font-semibold"
-                      style={{ background: cat.accent, color: "#0b0c10" }}
-                    >
-                      Uygula
-                    </button>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={1}
+                        max={365}
+                        autoFocus
+                        value={customVal}
+                        onChange={(e) => setCustomVal(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && applyCustomDays()}
+                        className="min-h-[48px] lg:min-h-0 w-20 rounded-full border px-3 lg:py-2 text-[13px] text-center outline-none bg-transparent text-[var(--text-primary)]"
+                        style={{ borderColor: "var(--border-default)", background: "var(--bg-input)" }}
+                      />
+                      <button
+                        onClick={applyCustomDays}
+                        className="min-h-[48px] lg:min-h-0 rounded-full px-3.5 lg:py-2 text-[12.5px] font-semibold"
+                        style={GLOW_ACTIVE_STYLE}
+                      >
+                        Uygula
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Mobilde bu adımın "İleri" kontrolü — masaüstünde gizli
-                  (orası zaten aşağıdaki editörle aynı ekranda). */}
+              {/* Mobilde/tablet'te bu adımın "İleri" kontrolü — lg+'da gizli
+                  (orası zaten sağdaki editörle aynı ekranda). */}
               <button
                 onClick={() => setMobileStep(2)}
-                className="md:hidden mt-7 w-full min-h-[48px] flex items-center justify-center gap-2 rounded-2xl text-[14px] font-bold"
-                style={{ background: "linear-gradient(90deg, #FF007F, #B026FF, #00F3FF)", color: "#fff" }}
+                className="lg:hidden mt-5 w-full min-h-[48px] flex items-center justify-center gap-2 rounded-2xl text-[14px] font-bold"
+                style={GLOW_ACTIVE_STYLE}
               >
                 Görevlere Geç <ChevronRight className="w-4 h-4" />
               </button>
             </section>
 
-            {/* ADIM 2 (mobilde tek başına görünür) — Gün Sekmeleri + Editör */}
-            <section className={mobileStep === 2 ? "block" : "hidden md:block"}>
-              {/* Mobilde geri dönüş — 1. adıma (gün sayısını değiştirmek için). */}
+            {/* SAĞ SÜTUN (lg+) / ADIM 2 (mobilde tek başına görünür) —
+                Gün Gün Editör. Eklenen her görev bu listede ANINDA görünür,
+                bu zaten kendi başına canlı bir önizlemedir. */}
+            <section className={`${mobileStep === 2 ? "block" : "hidden"} lg:block min-w-0`}>
+              {/* Mobilde/tablet'te geri dönüş — 1. adıma (gün sayısını değiştirmek için). */}
               <button
                 onClick={() => setMobileStep(1)}
-                className="md:hidden mb-4 flex items-center gap-1 text-[12.5px] font-semibold min-h-[44px]"
+                className="lg:hidden mb-4 flex items-center gap-1 text-[12.5px] font-semibold min-h-[44px]"
                 style={{ color: "var(--text-muted)" }}
               >
                 <ChevronLeft className="w-4 h-4" /> Süreyi Değiştir
@@ -286,17 +323,14 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                     <button
                       key={d}
                       onClick={() => setActiveDay(d)}
-                      className="shrink-0 min-h-[48px] md:min-h-0 flex items-center gap-1.5 rounded-xl px-3.5 md:py-2 text-[12.5px] font-semibold transition-all duration-150"
-                      style={{
-                        background: active ? cat.accent : "rgba(var(--overlay-rgb),0.05)",
-                        color: active ? "#0b0c10" : "var(--text-secondary)",
-                      }}
+                      className="shrink-0 min-h-[48px] lg:min-h-0 flex items-center gap-1.5 rounded-xl px-3.5 lg:py-2 text-[12.5px] font-semibold transition-all duration-200"
+                      style={active ? GLOW_ACTIVE_STYLE : { background: "rgba(var(--overlay-rgb),0.05)", color: "var(--text-secondary)" }}
                     >
                       {d}. Gün
                       {count > 0 && (
                         <span
                           className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9.5px] font-bold"
-                          style={{ background: active ? "rgba(11,12,16,0.2)" : cat.accentSoft, color: active ? "#0b0c10" : cat.accent }}
+                          style={{ background: active ? "rgba(255,255,255,0.25)" : cat.accentSoft, color: active ? "#fff" : cat.accent }}
                         >
                           {count}
                         </span>
@@ -306,11 +340,9 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                 })}
               </div>
 
-              {/* Hızlı Görev Ekle — ÖNCEDEN burada kategoriye göre sabit,
-                  sıkışık öneri "çip"leri vardı (tek tıkla ekleyen küçük
-                  pilller); YERİNE geniş, işlevsel tek satırlık bir form
-                  koyuldu — başlık + süre + öncelik + (gezi ise bütçe) +
-                  belirgin bir "+" ekle butonu. Enter da gönderir. */}
+              {/* Hızlı Görev Ekle — geniş, işlevsel tek satırlık form: başlık +
+                  süre + öncelik + (gezi ise bütçe) + belirgin "+" ekle butonu.
+                  Enter da gönderir. */}
               <div className="glass rounded-2xl p-3 mb-4">
                 <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--text-faint)] mb-2.5">
                   ✨ Hızlı Görev Ekle — {activeDay}. güne
@@ -364,7 +396,7 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                       disabled={!quickTitle.trim()}
                       aria-label="Görevi ekle"
                       className="min-h-[48px] sm:min-h-0 w-full sm:w-11 sm:h-11 flex items-center justify-center gap-1.5 rounded-xl font-bold transition-all disabled:opacity-40"
-                      style={{ background: cat.accent, color: "#0b0c10" }}
+                      style={GLOW_ACTIVE_STYLE}
                     >
                       <Plus className="w-4 h-4" />
                       <span className="sm:hidden text-[13px]">Ekle</span>
@@ -373,7 +405,8 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                 </div>
               </div>
 
-              {/* Aktif günün görev listesi — minimalist satır-form */}
+              {/* Aktif günün görev listesi — minimalist satır-form, AYNI ZAMANDA
+                  canlı önizleme (eklenen her görev burada anında görünür). */}
               <div className="flex flex-col gap-2.5">
                 {activeTasks.length === 0 && (
                   <div className="rounded-2xl border border-dashed p-6 text-center" style={{ borderColor: "var(--border-default)" }}>
@@ -451,11 +484,11 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
           </div>
         </div>
 
-        {/* Alt — sabit footer. Mobilde yalnızca 2. adımda "Kaydet" görünür
-            (1. adımda yerini yukarıdaki "Görevlere Geç" alıyor); masaüstünde
+        {/* Alt — sabit footer. <lg'de yalnızca 2. adımda "Kaydet" görünür
+            (1. adımda yerini yukarıdaki "Görevlere Geç" alıyor); lg+'da
             her zaman görünür. */}
         <div
-          className={`shrink-0 px-4 md:px-8 py-4 items-center justify-between gap-3 border-t ${mobileStep === 2 ? "flex" : "hidden md:flex"}`}
+          className={`relative z-10 shrink-0 px-4 md:px-8 lg:px-10 py-4 items-center justify-between gap-3 border-t ${mobileStep === 2 ? "flex" : "hidden lg:flex"}`}
           style={{
             borderColor: "var(--border-header)",
             background: "rgba(var(--glass-rgb), var(--alpha-chrome))",
@@ -470,12 +503,8 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="shrink-0 flex items-center gap-2 rounded-2xl px-6 min-h-[48px] md:py-3 text-[14px] font-bold transition-all disabled:opacity-60"
-            style={{
-              background: "linear-gradient(90deg, #FF007F, #B026FF, #00F3FF)",
-              color: "#fff",
-              boxShadow: "0 8px 28px -10px rgba(255,0,127,0.6)",
-            }}
+            className="shrink-0 flex items-center gap-2 rounded-2xl px-6 min-h-[48px] lg:py-3 text-[14px] font-bold transition-all disabled:opacity-60"
+            style={{ ...GLOW_ACTIVE_STYLE, boxShadow: "0 8px 28px -10px rgba(255,0,127,0.6), 0 0 16px rgba(0,243,255,0.24)" }}
           >
             {saving ? (
               <>
@@ -494,3 +523,20 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
     </>
   );
 }
+
+// TASARIM NOTLARI:
+// - Çoklu-neon blob'lar BackgroundScene.jsx/GlobalStyles.jsx'teki KURULU
+//   `.bg-blob` sınıfını (position/border-radius/blur(70px)/opacity:var(--blob-opacity)
+//   /will-change) OLDUĞU GİBİ kullanır — yalnızca `background` (radial-gradient)
+//   ve `animation` inline override edilir. Bu sayede tema geçişi (koyu 0.32 /
+//   açık 0.18 opaklık) SIFIR EK KOD ile otomatik doğru çalışır.
+// - Aktif/seçili kontroller (gün sayısı, gün sekmeleri, Kaydet, hızlı-ekle "+")
+//   artık `GLOW_ACTIVE_STYLE` ile AYNI magenta→violet→camgöbeği gradyanını ve
+//   çift-renkli glow box-shadow'unu paylaşıyor — "illuminated" bir kontrol
+//   ailesi hissi. Öncelik (Yüksek/Orta/Düşük) rozetleri BİLEREK bu paletin
+//   DIŞINDA bırakıldı — onlar ayrı bir semantik sistem (kırmızı/amber/yeşil),
+//   neon paletle karıştırılması bilgiyi belirsizleştirirdi.
+// - Glass yüzeyler (.glass sınıfı, quick-add kutusu + görev satırları + sol
+//   sütun kartı) zaten projenin KURULU backdrop-blur/tema sistemini kullanıyor
+//   — açık temada "modern cam efekti" bunun üzerinden otomatik geliyor, ayrı
+//   bir light-mode dalı YAZILMADI.
