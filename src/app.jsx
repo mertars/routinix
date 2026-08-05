@@ -562,7 +562,7 @@ export default function App() {
         <PrintModal
           open={printOpen}
           accent={mode.accent}
-          maxDays={ps.weeks.reduce((n, w) => n + (w.days?.length || 0), 0)}
+          maxDays={ps.weeks.reduce((n, w) => n + (w.days?.filter((d) => !Number.isFinite(ps.dbPlan?.total_days) || d.dayNumber <= ps.dbPlan.total_days).length || 0), 0)}
           onExport={(days) => {
             setPrintRange(days);
             setPrintOpen(false);

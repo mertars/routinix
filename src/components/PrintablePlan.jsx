@@ -8,7 +8,15 @@ export default function PrintablePlan({ plan, routines = [], weeks = [], days = 
     .flatMap((w) => w.days || [])
     .slice()
     .sort((a, b) => a.dayNumber - b.dayNumber);
-  const limited = Number.isFinite(days) ? loadedDays.slice(0, days) : loadedDays;
+  // GÜVENCE: `weeks` (dolayısıyla loadedDays) planın GÜNCEL total_days'inden
+  // FAZLA gün içerebilir — plan bir "N güne indir" isteğiyle küçültüldüğünde
+  // ve bu güne ait görevler (ör. AI'ın delta'sında atladığı bir kenar durum
+  // yüzünden) DB'de hâlâ duruyorsa, bu satır olmadan "Tüm Plan" (varsayılan,
+  // sınırsız) PDF ihracı bu ARTIK/stale günleri de basardı. plan.total_days
+  // BURADA, kullanıcının seçtiği `days` aralığından ÖNCE, her zaman uygulanır
+  // — DB'de zaten temizlenmiş olsa bile ikinci bir güvence katmanıdır.
+  const withinPlanRange = Number.isFinite(plan.total_days) ? loadedDays.filter((d) => d.dayNumber <= plan.total_days) : loadedDays;
+  const limited = Number.isFinite(days) ? withinPlanRange.slice(0, days) : withinPlanRange;
   const today = new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
 
   return (

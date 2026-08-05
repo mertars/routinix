@@ -63,6 +63,24 @@ async function updatePlanTotalDays(admin, planId, totalDays) {
   return data;
 }
 
+// SERT/DB SEVİYESİ GÜVENCE: "planı N güne indir" isteğinde AI'ın deltası
+// (mutations + deletedTaskIds) HER görevi doğru şekilde ele aldığını
+// VARSAYAR — model bir görevi ne yeniden dağıtır ne siler gibi bir uç durumu
+// (edge case) kaçırırsa (ör. çok sayıda görev nedeniyle yanıt maxOutputTokens
+// sınırında kesilirse), o görev day_number > yeni total_days ile DB'de ARTIK
+// (stale) olarak kalabilirdi. PlanBoard.jsx'in takvim şeridi zaten total_days
+// kadar hücre ürettiği için bu ARTIK günler UI'da görünmez/erişilemez hale
+// gelir — AMA hâlâ `tasks` tablosunda durur ve `weeks` state'i (dolayısıyla
+// "Tüm Plan" PDF ihracı, bkz. PrintablePlan.jsx) üzerinden SIZAR. Bu fonksiyon
+// AI'IN NE DEDİĞİNDEN BAĞIMSIZ, planın total_days'i her değiştiğinde bu
+// değişmezi (invariant) DOĞRUDAN veritabanı seviyesinde zorlar: bir planın
+// hiçbir görevi kendi total_days'ini AŞAMAZ.
+async function pruneTasksBeyondTotalDays(admin, planId, totalDays) {
+  const { data, error } = await admin.from("tasks").delete().eq("plan_id", planId).gt("day_number", totalDays).select("id");
+  if (error) throw error;
+  return data || [];
+}
+
 // delta: coachPrompt.js'in runCoachIntent() dönüşü — { mutations, newTasks,
 // deletedTaskIds, planTotalDays }. plan: allPlans içinden hedef plan (`.tasks`
 // alanı DOLU olmalı — validasyon bunu kullanır).
@@ -82,9 +100,15 @@ export async function applyPlanDelta(admin, plan, userId, delta) {
   const deletedTasks = await deleteTasks(admin, deleteIds);
 
   let updatedPlan = null;
+  let prunedTasks = [];
   if (delta.planTotalDays && delta.planTotalDays !== plan.total_days) {
     updatedPlan = await updatePlanTotalDays(admin, plan.id, delta.planTotalDays);
+    // Yukarıdaki applyPatches/insertNewTasks/deleteTasks ZATEN uygulandıktan
+    // SONRA çalışır — bu yüzden bu noktada DB'nin GERÇEK/güncel durumunu
+    // görür, yalnızca AI'ın kaçırdığı gerçek ARTIKLARI temizler.
+    prunedTasks = await pruneTasksBeyondTotalDays(admin, plan.id, delta.planTotalDays);
   }
 
-  return { mutatedTasks, newTasks, deletedTaskIds: deletedTasks.map((t) => t.id), updatedPlan };
+  const deletedTaskIds = [...deletedTasks.map((t) => t.id), ...prunedTasks.map((t) => t.id)];
+  return { mutatedTasks, newTasks, deletedTaskIds, updatedPlan };
 }
