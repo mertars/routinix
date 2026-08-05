@@ -83,7 +83,12 @@ export default function OnboardingWizard({
           />
         ) : (
           <div className="flex flex-col gap-2.5">
-            {q.options.map((opt) => {
+            {/* Belt-and-suspenders: generateOnboardingQuestions (api/_lib/planPrompt.js)
+                options'ı zaten her zaman diziye normalize ediyor, ama bu
+                bileşen yalnızca "questions" prop'unun şekline güvenmek
+                yerine kendi başına da savunmasız kalmasın diye (ScopedErrorBoundary
+                zaten bir güvenlik ağı, ama bu, ona hiç düşmeden önceki katman). */}
+            {(q.options || []).map((opt) => {
               const selected = currentAnswer === opt;
               return (
                 <button

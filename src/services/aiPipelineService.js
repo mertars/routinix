@@ -60,8 +60,17 @@ async function callGeneratePlan(action, payload, label) {
   if (!res.ok || !body?.ok) {
     // Sunucu (generate-plan.js) artık HER durumda geçerli JSON döner (bkz.
     // api/_lib/aiErrors.js) — `body` yalnızca gerçekten anormal bir
-    // durumda (ör. Vercel platform seviyesinde bir hata sayfası) null olur.
-    const message = body?.message || "Sistem şu an hizmet veremiyor, lütfen birazdan tekrar dener misin?";
+    // durumda (ör. Vercel platformunun KENDİSİNİN fonksiyon zaman aşımında
+    // döndürdüğü ham, JSON-olmayan 504 hata sayfası — bizim AbortController'
+    // ımız 35sn'de devreye girer, ama Vercel'in KENDİ platform limiti daha
+    // erken dolarsa `res.json()` burada patlar, `body` null kalır) null olur.
+    // Bu durumda bile `res.status` HÂLÂ okunabilir — body olmasa da 504'ü
+    // genel bir sunucu hatasından ayırt edip daha net bir mesaj verebiliriz.
+    const message =
+      body?.message ||
+      (res.status === 504
+        ? "Sunucu bu isteği zamanında yanıtlayamadı (zaman aşımı) — lütfen tekrar dener misin?"
+        : "Sistem şu an hizmet veremiyor, lütfen birazdan tekrar dener misin?");
     logger.error("AI_PIPELINE", `${label} başarısız oldu`, { status: res.status, message });
     throw new Error(message);
   }

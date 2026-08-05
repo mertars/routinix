@@ -10,6 +10,7 @@ import DrawerMenu from "./components/DrawerMenu";
 import DeletePlanModal from "./components/DeletePlanModal";
 import CategoryIntro from "./components/CategoryIntro";
 import PlanBoard from "./components/PlanBoard";
+import ScopedErrorBoundary from "./components/ScopedErrorBoundary";
 import BackgroundScene from "./components/BackgroundScene";
 import GlobalStyles from "./components/GlobalStyles";
 // Nexus link paylaşımı ("/t/:templateId") — anonim ziyaretçiler için ilk
@@ -352,56 +353,67 @@ export default function App() {
                 : "max-w-xl px-5 pt-6 pb-16"
           }`}
         >
-          {onIntroLike && (
-            <CategoryIntro
-              stage={stage}
-              category={ps.category}
-              goal={ps.goal}
-              goalTooShort={ps.goalTooShort}
-              canStart={ps.canStart}
-              savedPlans={ps.savedPlans}
-              onCategoryChange={ps.handleCategoryChange}
-              onGoalChange={ps.setGoal}
-              onStart={ps.startOnboarding}
-              onOpenSavedPlan={ps.openSavedPlan}
-              errorMsg={ps.errorMsg}
-              onBackToIntro={ps.resetToIntro}
-            />
-          )}
-
-          {stage === STAGE_WIZARD && (
-            <Suspense fallback={<InlineFallback />}>
-              <OnboardingWizard
-                accent={mode.accent}
-                accentSoft={mode.accentSoft}
-                questions={ps.questions}
-                wizardStep={ps.wizardStep}
-                currentAnswer={ps.currentAnswer}
-                onSetAnswer={ps.setAnswer}
-                onPrev={ps.goPrevQuestion}
-                onNext={ps.goNextQuestion}
-                onFinish={ps.finalizeAndGenerate}
+          {/* Plan oluşturma/görüntüleme akışının TAMAMI (intro/soru/hazır plan)
+              BURADA izole edilir — AI'dan gelen beklenmedik/bozuk bir veri
+              şekli ya da render hatası TÜM UYGULAMAYI (hamburger menü, AI
+              Koç widget'ı, açık diğer state) DEĞİL, yalnızca bu alanı
+              etkiler. "Yeniden Dene" tam sayfa yenilemesi GEREKTİRMEZ. */}
+          <ScopedErrorBoundary
+            scope="plan-creation-flow"
+            message="Plan oluşturulurken beklenmedik bir hata oluştu. Tekrar dener misin?"
+            onReset={ps.resetToIntro}
+          >
+            {onIntroLike && (
+              <CategoryIntro
+                stage={stage}
+                category={ps.category}
+                goal={ps.goal}
+                goalTooShort={ps.goalTooShort}
+                canStart={ps.canStart}
+                savedPlans={ps.savedPlans}
+                onCategoryChange={ps.handleCategoryChange}
+                onGoalChange={ps.setGoal}
+                onStart={ps.startOnboarding}
+                onOpenSavedPlan={ps.openSavedPlan}
+                errorMsg={ps.errorMsg}
+                onBackToIntro={ps.resetToIntro}
               />
-            </Suspense>
-          )}
+            )}
 
-          {stage === STAGE_PLAN && (
-            <PlanBoard
-              plan={ps.dbPlan}
-              routines={ps.routines}
-              weeks={ps.weeks}
-              overallPct={ps.overallPct}
-              completedTasks={ps.completedTasks}
-              totalTasks={ps.totalTasks}
-              loadingNextWeek={ps.loadingNextWeek}
-              nextWeekError={ps.nextWeekError}
-              onToggleTask={ps.toggleTask}
-              onLoadNextWeek={ps.loadNextWeek}
-              onStartPomodoro={startPomodoroForTask}
-              onPrint={() => setPrintOpen(true)}
-              onBack={ps.resetToIntro}
-            />
-          )}
+            {stage === STAGE_WIZARD && (
+              <Suspense fallback={<InlineFallback />}>
+                <OnboardingWizard
+                  accent={mode.accent}
+                  accentSoft={mode.accentSoft}
+                  questions={ps.questions}
+                  wizardStep={ps.wizardStep}
+                  currentAnswer={ps.currentAnswer}
+                  onSetAnswer={ps.setAnswer}
+                  onPrev={ps.goPrevQuestion}
+                  onNext={ps.goNextQuestion}
+                  onFinish={ps.finalizeAndGenerate}
+                />
+              </Suspense>
+            )}
+
+            {stage === STAGE_PLAN && (
+              <PlanBoard
+                plan={ps.dbPlan}
+                routines={ps.routines}
+                weeks={ps.weeks}
+                overallPct={ps.overallPct}
+                completedTasks={ps.completedTasks}
+                totalTasks={ps.totalTasks}
+                loadingNextWeek={ps.loadingNextWeek}
+                nextWeekError={ps.nextWeekError}
+                onToggleTask={ps.toggleTask}
+                onLoadNextWeek={ps.loadNextWeek}
+                onStartPomodoro={startPomodoroForTask}
+                onPrint={() => setPrintOpen(true)}
+                onBack={ps.resetToIntro}
+              />
+            )}
+          </ScopedErrorBoundary>
         </main>
       </div>
 
