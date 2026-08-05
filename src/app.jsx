@@ -379,6 +379,10 @@ export default function App() {
                 errorMsg={ps.errorMsg}
                 onBackToIntro={ps.resetToIntro}
                 onOpenManualBuilder={ps.openManualBuilder}
+                userId={auth.user?.id}
+                onOpenRhythm={toggleRhythm}
+                onOpenPomodoro={togglePomodoro}
+                onOpenHub={toggleHub}
               />
             )}
 
