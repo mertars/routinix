@@ -259,9 +259,9 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
         onRequireAuth?.();
         throw new Error("Devam etmek için giriş yapmalısın.");
       }
-      const { plan, tasks } = await saveManualPlanToSupabase(builder, user.id);
+      const { plan, routines, tasks } = await saveManualPlanToSupabase(builder, user.id);
       setDbPlan(plan);
-      setRoutines([]);
+      setRoutines(routines || []);
       setWeeks(groupTasksToWeeks(tasks));
       setCategory(plan.mode || "general");
       setStage(STAGE_PLAN);

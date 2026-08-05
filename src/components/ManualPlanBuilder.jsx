@@ -19,6 +19,11 @@ import {
   MapPin,
   Zap,
   Coffee,
+  CheckSquare,
+  Square,
+  ListChecks,
+  ClipboardPaste,
+  ClipboardX,
 } from "lucide-react";
 import { categoryOf, MONO_FONT } from "../constants";
 
@@ -38,13 +43,32 @@ const ENERGY_STYLE = {
 const ENERGY_LEVELS = ["Yüksek Odak", "Düşük Odak"];
 
 // "Manuel Builder" kimliği — 4 AI-persona kategorisinden BİLEREK ayrışan,
-// kendine özel hibrit neon paleti.
+// kendine özel hibrit neon paleti. Magenta artık yalnızca arka plandaki
+// Aurora Mesh'te (ambiyans) kullanılır — UI kromu/butonlar SADECE
+// violet+cyan üzerine kurulu: "baskın düz pembe/mavi neon buton" geri
+// bildirimi üzerine, dolgu yerine cam efektli (glassmorphism), ince
+// kenarlıklı, yumuşak parıltılı bir dokuya geçildi.
 const NEON = { cyan: "#00F3FF", magenta: "#FF007F", violet: "#8B5CF6", emerald: "#10B981" };
-const GRADIENT = `linear-gradient(90deg, ${NEON.magenta}, ${NEON.violet}, ${NEON.cyan})`;
+const GRADIENT = `linear-gradient(90deg, transparent, ${NEON.violet}, ${NEON.cyan}, transparent)`;
+// İkincil aktif durum (gün/gün-sayısı sekmeleri, özellik çipleri, hızlı
+// ekle butonu) — cam efekti + ince violet kenarlık + yumuşak çift-renk glow.
 const GLOW_ACTIVE_STYLE = {
-  background: GRADIENT,
+  background: `linear-gradient(135deg, rgba(139,92,246,0.2), rgba(0,243,255,0.14))`,
+  color: "#ECE7FF",
+  border: `1px solid rgba(139,92,246,0.5)`,
+  boxShadow: `0 0 18px -6px rgba(139,92,246,0.55), 0 0 10px -4px rgba(0,243,255,0.35)`,
+  backdropFilter: "blur(6px)",
+  WebkitBackdropFilter: "blur(6px)",
+};
+// Birincil aksiyon (Planı Kaydet, Görevlere Geç) — aynı ailenin biraz daha
+// dolgun/parlak hali, tıklama hissiyatı için daha güçlü gölge.
+const PRIMARY_BUTTON_STYLE = {
+  background: `linear-gradient(135deg, rgba(139,92,246,0.34), rgba(0,243,255,0.22))`,
   color: "#fff",
-  boxShadow: `0 0 16px rgba(255,0,127,0.32), 0 0 16px rgba(0,243,255,0.24)`,
+  border: `1px solid rgba(139,92,246,0.62)`,
+  boxShadow: `0 10px 30px -12px rgba(139,92,246,0.6), 0 0 18px -4px rgba(0,243,255,0.4)`,
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
 };
 
 // Dinamik Görev Özellik Seçici — hangi alanların Hızlı Ekle formunda ve
@@ -70,7 +94,7 @@ function newLocalId() {
 }
 
 function emptyExtras() {
-  return { pomodoroCount: null, timeOfDay: "", goalMetric: "", energyLevel: null };
+  return { pomodoroCount: null, timeOfDay: "", goalMetric: "", energyLevel: null, mapQuery: "" };
 }
 
 // tasks.detail zaten serbest-metin bir sütun (TaskCard.jsx detay
@@ -113,9 +137,20 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [mobileStep, setMobileStep] = useState(1); // yalnızca <lg ekranlarda anlamlı
-  const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
   const fileInputRef = useRef(null);
+  const [routinesText, setRoutinesText] = useState("");
+
+  // Evrensel Görev Panosu (Task Clipboard) — "her senaryoya özel fonksiyon"
+  // yerine tek genel mekanizma: seç -> panoya kopyala -> istediğin güne/
+  // günlere yapıştır. Eski "Günü Kopyala" (tüm günü ÜZERİNE yazan) menüsünün
+  // yerini alır — panoya kopyalanan görevler hedef güne EKLENİR (üzerine
+  // yazmaz), bu yüzden aynı görevleri birden çok güne biriktirerek de
+  // ekleyebilirsin.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [clipboard, setClipboard] = useState([]); // task şablonları (localId hariç)
+  const [pasteMenuOpen, setPasteMenuOpen] = useState(false);
 
   // Dinamik Görev Özellik Seçici — hangi alanlar görünür. Gezi kategorisinde
   // bütçe/konum, VARSAYILAN olarak açık (eski davranışla tutarlı UX), diğer
@@ -174,6 +209,7 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
         duration_min: pomodoroDuration ?? (hasAttr("duration") && quickDuration ? Number(quickDuration) : null),
         priority: quickPriority,
         estimated_cost: hasAttr("budget") && quickCost.trim() ? quickCost.trim() : null,
+        map_search_query: hasAttr("location") && quickExtras.mapQuery.trim() ? quickExtras.mapQuery.trim() : null,
         detail: composeDetail(null, quickExtras),
       },
     ]);
@@ -208,28 +244,56 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
     setDragIndex(null);
   };
 
-  // --- Günler Arası Kopyala & Şablonla ---
-  const cloneTasksFor = (tasks) => tasks.map((t) => ({ ...t, localId: newLocalId() }));
-  const copyActiveDayTo = (targetDays) => {
-    const source = daysData[activeDay] || [];
-    if (source.length === 0) return;
+  // --- Evrensel Görev Panosu: Seç -> Kopyala -> Yapıştır ---
+  const toggleSelectMode = () => {
+    setSelectMode((v) => !v);
+    setSelectedIds(new Set());
+  };
+  const toggleSelectTask = (localId) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(localId) ? next.delete(localId) : next.add(localId);
+      return next;
+    });
+  };
+  const copySelectedToClipboard = () => {
+    const selected = activeTasks.filter((t) => selectedIds.has(t.localId));
+    if (selected.length === 0) return;
+    // localId BİLEREK atılır — panodan yapıştırılan her kopya, yapıştırıldığı
+    // anda taze bir localId alır (bkz. pasteClipboardTo), aksi halde aynı
+    // görevi birden çok güne yapıştırınca React key çakışması olurdu.
+    setClipboard(selected.map(({ localId, ...rest }) => rest));
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+  const deleteSelected = () => {
+    setDayTasks(activeDay, (list) => list.filter((t) => !selectedIds.has(t.localId)));
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  };
+  const pasteClipboardTo = (targetDays) => {
+    if (clipboard.length === 0) return;
     setDaysData((prev) => {
       const next = { ...prev };
       for (const d of targetDays) {
-        if (d === activeDay) continue;
-        next[d] = cloneTasksFor(source);
+        const cloned = clipboard.map((t) => ({ ...t, localId: newLocalId() }));
+        next[d] = [...(next[d] || []), ...cloned]; // ÜZERİNE YAZMAZ, mevcut görevlere EKLER
       }
       return next;
     });
-    setCopyMenuOpen(false);
+    setPasteMenuOpen(false);
   };
-  const copyToNextDay = () => copyActiveDayTo([activeDay + 1].filter((d) => d <= totalDays));
-  const copyToAllDays = () => copyActiveDayTo(dayNumbers);
-  const copyToWeekdays = () => copyActiveDayTo(dayNumbers.filter((d) => (d - 1) % 7 < 5)); // her 7 günlük blokta 1-5. günler
+  const pasteToActiveDay = () => pasteClipboardTo([activeDay]);
+  const pasteToAllDays = () => pasteClipboardTo(dayNumbers);
+  const pasteToWeekdays = () => pasteClipboardTo(dayNumbers.filter((d) => (d - 1) % 7 < 5)); // her 7 günlük blokta 1-5. günler
+  const clearClipboard = () => {
+    setClipboard([]);
+    setPasteMenuOpen(false);
+  };
 
   // --- Şablon Dışa/İçe Aktar (JSON) ---
   const exportJson = () => {
-    const payload = { routinixManualPlan: true, version: 1, title, totalDays, category, days: daysData };
+    const payload = { routinixManualPlan: true, version: 1, title, totalDays, category, days: daysData, routines: routinesText };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -261,6 +325,7 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
           fresh[day] = (Array.isArray(tasks) ? tasks : []).map((t) => ({ ...t, localId: newLocalId() }));
         }
         setDaysData(fresh);
+        setRoutinesText(typeof parsed.routines === "string" ? parsed.routines : "");
         setError("");
       } catch {
         setError("Dosya okunamadı — geçerli bir Routinix plan dosyası (.json) seçtiğinden emin ol.");
@@ -280,9 +345,13 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
         .map(([day, tasks]) => [day, tasks.filter((t) => t.title.trim())])
         .filter(([, tasks]) => tasks.length > 0)
     );
+    const routines = routinesText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
     setSaving(true);
     try {
-      await onSave({ title: title.trim() || "Kendi Planım", totalDays, days: cleanedDays, category });
+      await onSave({ title: title.trim() || "Kendi Planım", totalDays, days: cleanedDays, category, routines });
     } catch (err) {
       setError(err?.message || "Plan kaydedilirken bir sorun oluştu. Tekrar dener misin?");
       setSaving(false);
@@ -297,23 +366,35 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
         className="fixed inset-x-0 bottom-0 z-[110] max-h-[90vh] rounded-t-3xl flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_ease] lg:inset-0 lg:max-h-none lg:rounded-none lg:animate-[fullScreenIn_0.25s_ease]"
         style={{ background: "var(--bg-app)" }}
       >
-        {/* Çoklu neon aurora — bkz. önceki tur notu, KURULU .bg-blob tekniği. */}
+        {/* Aurora Mesh — dört rengin radial-gradient'leri TEK katmanda üst
+            üste bindirilir (tarayıcı otomatik harmanlar), önceki turun 4
+            ayrı/net-sınırlı dairesi yerine akıcı, derinlik katan tek bir
+            ortam ışığı verir. Tema-duyarlı yoğunluk index.css'teki
+            --blob-opacity'den gelir (dark 0.32 / light 0.18) — hem Dark hem
+            Light Mode'da gözü yormayan, premium bir zemin. */}
         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
-          <div className="bg-blob" style={{ width: 460, height: 460, top: "-10%", left: "-6%", background: `radial-gradient(circle, ${NEON.magenta} 0%, transparent 70%)`, animation: "blobFloatA 26s ease-in-out infinite" }} />
-          <div className="bg-blob" style={{ width: 420, height: 420, top: "-4%", right: "-8%", background: `radial-gradient(circle, ${NEON.cyan} 0%, transparent 70%)`, animation: "blobFloatB 32s ease-in-out infinite" }} />
-          <div className="bg-blob" style={{ width: 480, height: 480, bottom: "-14%", left: "18%", background: `radial-gradient(circle, ${NEON.violet} 0%, transparent 70%)`, animation: "blobFloatA 29s ease-in-out infinite", animationDelay: "-9s" }} />
-          <div className="bg-blob" style={{ width: 380, height: 380, bottom: "-8%", right: "10%", background: `radial-gradient(circle, ${NEON.emerald} 0%, transparent 70%)`, animation: "blobFloatB 35s ease-in-out infinite", animationDelay: "-14s" }} />
+          <div
+            className="absolute -inset-[15%] motion-safe:animate-[auroraDrift_38s_ease-in-out_infinite]"
+            style={{
+              opacity: "var(--blob-opacity)",
+              filter: "blur(110px)",
+              background: `radial-gradient(38% 32% at 15% 18%, ${NEON.magenta}, transparent 70%),
+                radial-gradient(36% 34% at 88% 12%, ${NEON.cyan}, transparent 70%),
+                radial-gradient(40% 38% at 22% 92%, ${NEON.violet}, transparent 70%),
+                radial-gradient(34% 32% at 90% 88%, ${NEON.emerald}, transparent 70%)`,
+            }}
+          />
         </div>
 
         <div className="relative z-10 shrink-0 pt-2.5 pb-1 flex justify-center lg:hidden">
           <div className="w-10 h-1.5 rounded-full" style={{ background: "var(--border-strong)" }} />
         </div>
-        <div className="relative z-10 h-[3px] shrink-0 hidden lg:block" style={{ background: GRADIENT }} />
+        <div className="relative z-10 h-[3px] shrink-0 hidden lg:block" style={{ background: GRADIENT, boxShadow: `0 0 12px -2px ${NEON.violet}88` }} />
 
         {/* Başlık */}
         <div className="relative z-10 shrink-0 px-4 md:px-8 lg:px-10 pt-2 lg:pt-5 pb-4 flex items-center justify-between gap-3 border-b" style={{ borderColor: "var(--border-default)" }}>
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 text-lg" style={{ background: "linear-gradient(135deg, rgba(255,0,127,0.18), rgba(0,243,255,0.18))" }}>
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 text-lg" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(0,243,255,0.16))" }}>
               {cat.emoji}
             </div>
             <div className="min-w-0">
@@ -371,7 +452,7 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                           key={n}
                           onClick={() => handleDayCountPick(n)}
                           className="min-h-[48px] lg:min-h-0 rounded-full px-4 lg:py-2 text-[13px] font-semibold transition-all duration-200 border"
-                          style={active ? { ...GLOW_ACTIVE_STYLE, borderColor: "transparent" } : { borderColor: "var(--border-default)", background: "var(--bg-input)", color: "var(--text-secondary)" }}
+                          style={active ? GLOW_ACTIVE_STYLE : { borderColor: "var(--border-default)", background: "var(--bg-input)", color: "var(--text-secondary)" }}
                         >
                           {n} Gün
                         </button>
@@ -384,7 +465,7 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                           setCustomVal(String(totalDays));
                         }}
                         className="min-h-[48px] lg:min-h-0 rounded-full px-4 lg:py-2 text-[13px] font-semibold border transition-all duration-200"
-                        style={!DAY_COUNT_CHOICES.includes(totalDays) ? { ...GLOW_ACTIVE_STYLE, borderColor: "transparent" } : { borderColor: "var(--border-default)", background: "var(--bg-input)", color: "var(--text-secondary)" }}
+                        style={!DAY_COUNT_CHOICES.includes(totalDays) ? GLOW_ACTIVE_STYLE : { borderColor: "var(--border-default)", background: "var(--bg-input)", color: "var(--text-secondary)" }}
                       >
                         {!DAY_COUNT_CHOICES.includes(totalDays) ? `${totalDays} Gün (Özel)` : "Özel"}
                       </button>
@@ -439,12 +520,36 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                     Açtığın özellikler Hızlı Ekle formunda ve görev kartlarında görünür.
                   </p>
                 </div>
+
+                {/* Genel Rutinler — günlük dinamik görevlerden AYRI, tek
+                    seferde yazılan tekrarlı alışkanlıklar. Kaydedince
+                    routines tablosuna gerçek satırlar olarak yazılır (bkz.
+                    planService.saveManualPlanToSupabase) — AI akışının
+                    "Genel Rutinler" panosuyla birebir aynı yapı, PlanBoard
+                    bu planın elle mi AI'lı mı kurulduğunu bilmeden aynen
+                    gösterir. */}
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)] mb-2" style={{ fontFamily: MONO_FONT }}>
+                    Genel Rutinler
+                  </label>
+                  <textarea
+                    value={routinesText}
+                    onChange={(e) => setRoutinesText(e.target.value)}
+                    placeholder={"Her satıra bir rutin yaz, ör:\nHer sabah 1 bardak su iç\nHer akşam 10 dk esne"}
+                    rows={3}
+                    className="input-glow w-full rounded-2xl px-4 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)] outline-none border resize-none"
+                    style={{ background: "var(--bg-input)", borderColor: "var(--border-default)" }}
+                  />
+                  <p className="mt-2 text-[10.5px] text-[var(--text-faint)] leading-relaxed">
+                    Günlere bağlı değildir, plan boyunca her gün geçerli genel alışkanlıklardır.
+                  </p>
+                </div>
               </div>
 
               <button
                 onClick={() => setMobileStep(2)}
                 className="lg:hidden mt-5 w-full min-h-[48px] flex items-center justify-center gap-2 rounded-2xl text-[14px] font-bold"
-                style={GLOW_ACTIVE_STYLE}
+                style={PRIMARY_BUTTON_STYLE}
               >
                 Görevlere Geç <ChevronRight className="w-4 h-4" />
               </button>
@@ -465,8 +570,8 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                 </span>
               </div>
 
-              {/* Gün sekmeleri + Günü Kopyala menüsü — aynı satır */}
-              <div className="flex items-center gap-2 mb-4">
+              {/* Gün sekmeleri + Seç modu + Pano (Clipboard) menüsü — aynı satır */}
+              <div className="flex items-center gap-2 mb-3">
                 <div className="edge-fade-x -mx-4 md:mx-0 px-4 md:px-0 flex-1 min-w-0 flex gap-1.5 overflow-x-auto no-scrollbar">
                   {dayNumbers.map((d) => {
                     const active = d === activeDay;
@@ -476,7 +581,8 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                         key={d}
                         onClick={() => {
                           setActiveDay(d);
-                          setCopyMenuOpen(false);
+                          setSelectedIds(new Set());
+                          setPasteMenuOpen(false);
                         }}
                         className="shrink-0 min-h-[48px] lg:min-h-0 flex items-center gap-1.5 rounded-xl px-3.5 lg:py-2 text-[12.5px] font-semibold transition-all duration-200"
                         style={active ? GLOW_ACTIVE_STYLE : { background: "rgba(var(--overlay-rgb),0.05)", color: "var(--text-secondary)" }}
@@ -492,39 +598,68 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                   })}
                 </div>
 
-                {/* Günü Kopyala / Çoğalt — açılır menü */}
-                <div className="relative shrink-0">
-                  <button
-                    onClick={() => setCopyMenuOpen((v) => !v)}
-                    disabled={activeTasks.length === 0}
-                    className="min-h-[48px] lg:min-h-0 lg:h-9 flex items-center gap-1.5 rounded-xl px-3 text-[12px] font-semibold transition-colors disabled:opacity-35"
-                    style={{ background: "rgba(var(--overlay-rgb),0.06)", color: "var(--text-secondary)" }}
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Günü Kopyala</span>
-                    <ChevronDown className="w-3 h-3" />
-                  </button>
-                  {copyMenuOpen && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setCopyMenuOpen(false)} />
-                      <div
-                        className="absolute right-0 top-full mt-2 z-20 w-64 rounded-2xl p-1.5 glass"
-                        style={{ boxShadow: "0 20px 50px -16px rgba(0,0,0,0.4)" }}
-                      >
-                        <button onClick={copyToNextDay} disabled={activeDay >= totalDays} className="w-full text-left px-3 py-2.5 rounded-xl text-[12.5px] font-medium text-[var(--text-secondary)] hover:bg-[rgba(var(--overlay-rgb),0.06)] transition-colors disabled:opacity-35">
-                          {activeDay}. Günü {activeDay + 1}. Güne Kopyala
-                        </button>
-                        <button onClick={copyToWeekdays} className="w-full text-left px-3 py-2.5 rounded-xl text-[12.5px] font-medium text-[var(--text-secondary)] hover:bg-[rgba(var(--overlay-rgb),0.06)] transition-colors">
-                          Hafta İçi Günlerine Kopyala
-                        </button>
-                        <button onClick={copyToAllDays} className="w-full text-left px-3 py-2.5 rounded-xl text-[12.5px] font-medium text-[var(--text-secondary)] hover:bg-[rgba(var(--overlay-rgb),0.06)] transition-colors">
-                          Tüm Günlere Uygula ({totalDays} gün)
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
+                {/* Seç modu — Görev Seç / Toplu İşlemler'in giriş kapısı */}
+                <button
+                  onClick={toggleSelectMode}
+                  disabled={activeTasks.length === 0 && !selectMode}
+                  className="shrink-0 min-h-[48px] lg:min-h-0 lg:h-9 flex items-center gap-1.5 rounded-xl px-3 text-[12px] font-semibold transition-colors disabled:opacity-35"
+                  style={selectMode ? GLOW_ACTIVE_STYLE : { background: "rgba(var(--overlay-rgb),0.06)", color: "var(--text-secondary)" }}
+                >
+                  <ListChecks className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{selectMode ? "İptal" : "Görev Seç"}</span>
+                </button>
+
+                {/* Pano — panoda görev varsa görünür, aktif güne/tüm günlere/hafta içine yapıştırma sunar */}
+                {clipboard.length > 0 && (
+                  <div className="relative shrink-0">
+                    <button
+                      onClick={() => setPasteMenuOpen((v) => !v)}
+                      className="min-h-[48px] lg:min-h-0 lg:h-9 flex items-center gap-1.5 rounded-xl px-3 text-[12px] font-semibold transition-colors"
+                      style={{ background: `${NEON.violet}1c`, border: `1px solid ${NEON.violet}55`, color: "#C9B8FF" }}
+                    >
+                      <ClipboardPaste className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Pano ({clipboard.length})</span>
+                      <span className="sm:hidden">{clipboard.length}</span>
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                    {pasteMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setPasteMenuOpen(false)} />
+                        <div className="absolute right-0 top-full mt-2 z-20 w-72 rounded-2xl p-1.5 glass" style={{ boxShadow: "0 20px 50px -16px rgba(0,0,0,0.4)" }}>
+                          <button onClick={pasteToActiveDay} className="w-full text-left px-3 py-2.5 rounded-xl text-[12.5px] font-medium text-[var(--text-secondary)] hover:bg-[rgba(var(--overlay-rgb),0.06)] transition-colors">
+                            📋 Kopyalananları Buraya Yapıştır ({activeDay}. gün)
+                          </button>
+                          <button onClick={pasteToWeekdays} className="w-full text-left px-3 py-2.5 rounded-xl text-[12.5px] font-medium text-[var(--text-secondary)] hover:bg-[rgba(var(--overlay-rgb),0.06)] transition-colors">
+                            Hafta İçi Günlerine Yapıştır
+                          </button>
+                          <button onClick={pasteToAllDays} className="w-full text-left px-3 py-2.5 rounded-xl text-[12.5px] font-medium text-[var(--text-secondary)] hover:bg-[rgba(var(--overlay-rgb),0.06)] transition-colors">
+                            Tüm Günlere Çoğalt ({totalDays} gün)
+                          </button>
+                          <div className="my-1 h-px" style={{ background: "var(--border-default)" }} />
+                          <button onClick={clearClipboard} className="w-full text-left px-3 py-2.5 rounded-xl text-[12.5px] font-medium flex items-center gap-2 transition-colors hover:bg-[rgba(var(--overlay-rgb),0.06)]" style={{ color: "#FF6E92" }}>
+                            <ClipboardX className="w-3.5 h-3.5" /> Panoyu Temizle
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* Seçim aksiyon çubuğu — yalnızca Seç modunda VE en az 1 görev işaretliyken */}
+              {selectMode && (
+                <div className="flex items-center gap-2 mb-3 rounded-2xl px-3.5 py-2.5" style={{ background: `${NEON.violet}12`, border: `1px solid ${NEON.violet}40` }}>
+                  <span className="text-[12px] font-semibold flex-1" style={{ color: "#C9B8FF" }}>
+                    {selectedIds.size > 0 ? `${selectedIds.size} görev seçildi` : "Panoya kopyalamak veya silmek istediğin görevleri işaretle"}
+                  </span>
+                  <button onClick={copySelectedToClipboard} disabled={selectedIds.size === 0} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors disabled:opacity-35" style={{ background: "rgba(var(--overlay-rgb),0.08)", color: "var(--text-secondary)" }}>
+                    <Copy className="w-3.5 h-3.5" /> Panoya Kopyala
+                  </button>
+                  <button onClick={deleteSelected} disabled={selectedIds.size === 0} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors disabled:opacity-35" style={{ background: "rgba(244,64,107,0.12)", color: "#FF6E92" }}>
+                    <Trash2 className="w-3.5 h-3.5" /> Sil
+                  </button>
+                </div>
+              )}
 
               {/* Akıllı Mola Önerisi — yalnızca Süre alanı açıkken ve gün
                   toplamı 4 saati geçtiğinde, aynı öneri zaten uygulanmadıysa. */}
@@ -606,6 +741,24 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                       })}
                   </div>
                 )}
+
+                {/* Konum — "hemen altına şık bir input alanı açılsın" isteği
+                    doğrultusunda kendi geniş satırında, mini-alan sırasının
+                    HEMEN ALTINDA açılır. map_search_query GERÇEK bir sütun
+                    (bkz. planService.js/TaskCard.jsx'in ZATEN var olan 📍
+                    harita butonu) — burada yazılan değer doğrudan oraya gider. */}
+                {hasAttr("location") && (
+                  <div className="flex items-center gap-1.5 rounded-xl px-3 min-h-[48px] sm:min-h-0 sm:py-2" style={{ background: "var(--bg-input)" }}>
+                    <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-faint)" }} />
+                    <input
+                      type="text"
+                      value={quickExtras.mapQuery}
+                      onChange={(e) => setQuickExtras((p) => ({ ...p, mapQuery: e.target.value }))}
+                      placeholder="Konum / Google Maps URL (ör. Kadıköy Sahil ya da harita linki)"
+                      className="flex-1 min-w-0 bg-transparent outline-none text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)]"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Aktif günün görev listesi — sürükle-bırak sıralanabilir */}
@@ -615,22 +768,29 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                     <p className="text-[12.5px] text-[var(--text-faint)]">{activeDay}. gün için henüz görev yok — yukarıdaki hızlı ekle formunu kullan.</p>
                   </div>
                 )}
-                {activeTasks.map((t, index) => (
+                {activeTasks.map((t, index) => {
+                  const checked = selectedIds.has(t.localId);
+                  return (
                   <div
                     key={t.localId}
-                    draggable
+                    draggable={!selectMode}
                     onDragStart={() => setDragIndex(index)}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => handleDrop(index)}
                     onDragEnd={() => setDragIndex(null)}
                     className="glass rounded-2xl p-3 flex flex-col gap-2.5 transition-opacity"
-                    style={{ opacity: dragIndex === index ? 0.4 : 1 }}
+                    style={{ opacity: dragIndex === index ? 0.4 : 1, ...(checked ? { outline: `1px solid ${NEON.violet}70`, background: `${NEON.violet}0d` } : {}) }}
                   >
                     <div className="flex items-center gap-2">
-                      {/* Sürükleme tutamacı */}
-                      <span className="shrink-0 cursor-grab active:cursor-grabbing text-[var(--text-faint)] hidden sm:flex" aria-hidden="true" title="Sürükleyerek sırala">
-                        <GripVertical className="w-4 h-4" />
-                      </span>
+                      {selectMode ? (
+                        <button onClick={() => toggleSelectTask(t.localId)} aria-label={checked ? "Seçimi kaldır" : "Görevi seç"} className="shrink-0 flex items-center justify-center w-6 h-6" style={{ color: checked ? NEON.violet : "var(--text-faint)" }}>
+                          {checked ? <CheckSquare className="w-[18px] h-[18px]" /> : <Square className="w-[18px] h-[18px]" />}
+                        </button>
+                      ) : (
+                        <span className="shrink-0 cursor-grab active:cursor-grabbing text-[var(--text-faint)] hidden sm:flex" aria-hidden="true" title="Sürükleyerek sırala">
+                          <GripVertical className="w-4 h-4" />
+                        </span>
+                      )}
                       <input
                         type="text"
                         value={t.title}
@@ -643,7 +803,13 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                       </button>
                     </div>
 
-                    {t.detail && <p className="text-[11.5px] text-[var(--text-faint)] pl-0 sm:pl-6">{t.detail}</p>}
+                    <input
+                      type="text"
+                      value={t.detail ?? ""}
+                      onChange={(e) => updateTask(t.localId, { detail: e.target.value || null })}
+                      placeholder="Not / açıklama ekle..."
+                      className="bg-transparent outline-none text-[11.5px] text-[var(--text-faint)] placeholder:text-[var(--placeholder)] pl-0 sm:pl-6"
+                    />
 
                     <div className="flex flex-wrap items-center gap-2 pl-0 sm:pl-6">
                       {hasAttr("duration") && (
@@ -651,6 +817,9 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                       )}
                       {hasAttr("budget") && (
                         <MiniField icon="🏷️" placeholder="Bütçe" value={t.estimated_cost ?? ""} onChange={(v) => updateTask(t.localId, { estimated_cost: v || null })} width="w-24" dense />
+                      )}
+                      {hasAttr("location") && (
+                        <MiniField icon="📍" placeholder="Konum / Maps URL" value={t.map_search_query ?? ""} onChange={(v) => updateTask(t.localId, { map_search_query: v || null })} width="w-40" dense />
                       )}
                       <div className="flex items-center gap-1">
                         {PRIORITIES.map((p) => {
@@ -665,7 +834,8 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           </div>
@@ -698,7 +868,7 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
             onClick={handleSave}
             disabled={saving}
             className="shrink-0 flex items-center gap-2 rounded-2xl px-6 min-h-[48px] lg:py-3 text-[14px] font-bold transition-all disabled:opacity-60"
-            style={{ ...GLOW_ACTIVE_STYLE, boxShadow: "0 8px 28px -10px rgba(255,0,127,0.6), 0 0 16px rgba(0,243,255,0.24)" }}
+            style={PRIMARY_BUTTON_STYLE}
           >
             {saving ? (
               <>
@@ -752,5 +922,14 @@ function MiniField({ icon, placeholder, value, onChange, type = "text", width = 
 //   ile GÖRÜNÜR, düzenlenebilir bir açıklama metnine dönüştürülür (sessizce
 //   kaybolmaz, TaskCard'ın detay çekmecesinde okunur) — gerçek bir
 //   zamanlayıcı/bildirim sistemi DEĞİLDİR, bunu iddia etmiyoruz.
-// - "Günü Kopyala" ve içe/dışa aktarma tamamen istemci tarafında —
-//   kaydedilene kadar hiçbir sunucu isteği YAPILMAZ.
+// - Konum (📍) GERÇEK bir sütuna yazılır: tasks.map_search_query — hem
+//   Hızlı Ekle'de hem her görev kartında aynı alan, TaskCard.jsx'in ZATEN
+//   var olan harita butonuyla otomatik uyumlu (yeni gösterim kodu gerekmedi).
+// - Genel Rutinler de GERÇEK: routines tablosuna, AI akışının
+//   savePlanToSupabase'i ile AYNI insert deseniyle yazılır (yalnızca
+//   frequency varsayılanı farklı — elle girilen rutinler "daily").
+// - Pano (Task Clipboard) ve içe/dışa aktarma tamamen istemci tarafında —
+//   kaydedilene kadar hiçbir sunucu isteği YAPILMAZ. Panoya kopyalanan
+//   görevler yapıştırıldığı günün MEVCUT görevlerine EKLENİR, üzerine
+//   yazmaz — bu yüzden aynı görev grubunu birden çok kez farklı günlere
+//   biriktirerek yapıştırabilirsin.

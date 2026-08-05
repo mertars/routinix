@@ -173,12 +173,11 @@ export async function savePlanToSupabase(aiOutput, userId, mode) {
 // mantığının hiçbir anlamı kalmıyor.
 //
 // builder: { title, totalDays, days: { [dayNumber]: [{ title, duration_min,
-//   priority, estimated_cost }] }, category } — ManualPlanBuilder.jsx'in
-//   yerel state'i, kaydetmeden hemen önce boş başlıklı satırlar zaten
-//   filtrelenmiş olarak gelir.
-// Döner: { plan, tasks } — routines yok (manuel akışta rutin girişi
-// istenmedi; ileride eklenmek istenirse savePlanToSupabase'deki desenin
-// AYNISI kullanılabilir).
+//   priority, estimated_cost, map_search_query }] }, category, routines:
+//   string[] } — ManualPlanBuilder.jsx'in yerel state'i, kaydetmeden hemen
+//   önce boş başlıklı satırlar zaten filtrelenmiş olarak gelir.
+// Döner: { plan, routines, tasks } — routines, savePlanToSupabase'deki
+// AYNI desenle (frequency/content NOT NULL, güvenli varsayılanlarla) yazılır.
 export async function saveManualPlanToSupabase(builder, userId) {
   if (!userId) throw new Error("Plan kaydı için oturum (userId) gerekli.");
 
@@ -195,6 +194,31 @@ export async function saveManualPlanToSupabase(builder, userId) {
   if (planErr) {
     logger.error("SUPABASE", "Manuel plan kaydedilemedi", { table: "plans", action: "insert", error: planErr });
     throw planErr;
+  }
+
+  // Rutinler (varsa) — kullanıcının Studio Builder'da tek seferde yazdığı,
+  // satır satır ayrılmış serbest metin. savePlanToSupabase ile AYNI insert
+  // deseni: frequency/content NOT NULL kolonlar, güvenli varsayılanla
+  // doldurulur. Elle girilen rutinler günlük tekrar niyetiyle yazıldığı için
+  // (AI akışının "weekly" varsayılanının aksine) burada "daily" varsayılan.
+  let routines = [];
+  if (Array.isArray(builder.routines) && builder.routines.length > 0) {
+    const routineRows = builder.routines
+      .map((content) => ({
+        plan_id: plan.id,
+        user_id: userId,
+        frequency: "daily",
+        content: String(content ?? "").trim(),
+      }))
+      .filter((row) => row.content);
+    if (routineRows.length > 0) {
+      const { data, error } = await supabase.from("routines").insert(routineRows).select();
+      if (error) {
+        logger.error("SUPABASE", "Manuel plan rutinleri kaydedilemedi", { table: "routines", action: "insert", planId: plan.id, error });
+        throw error;
+      }
+      routines = data || [];
+    }
   }
 
   // Gün bazlı satırları düz bir insert payload'ına çevir — flattenWeek ile
@@ -217,6 +241,7 @@ export async function saveManualPlanToSupabase(builder, userId) {
         duration_min: t.duration_min ?? null,
         priority: t.priority ?? null,
         estimated_cost: t.estimated_cost ?? null,
+        map_search_query: t.map_search_query ?? null,
         is_completed: false,
         // Builder'daki sürükle-bırak sırası — array index'i BİREBİR yazılır
         // (bkz. supabase/task_sort_order.sql + fetchPlanDetail/
@@ -248,7 +273,7 @@ export async function saveManualPlanToSupabase(builder, userId) {
     tasks = data || [];
   }
 
-  return { plan, tasks };
+  return { plan, routines, tasks };
 }
 
 // Sonraki bir haftanın görevlerini kaydeder (lazy-load devamı). Döner: task satırları.

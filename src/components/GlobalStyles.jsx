@@ -438,6 +438,13 @@ export default function GlobalStyles() {
         0%, 100% { transform: translate(0, 0) scale(1); }
         50% { transform: translate(-5%, -4%) scale(1.1); }
       }
+      /* Manuel Plan Studio'nun tek-katmanlı Aurora Mesh arka planı için —
+         çok yavaş, çok hafif bir drift; "yumuşak geçişli, gözü yormayan
+         premium ortam ışığı" hedefiyle blobFloatA/B'den daha sakin. */
+      @keyframes auroraDrift {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        50% { transform: translate(-2.5%, 2%) scale(1.05); }
+      }
       .bg-blob {
         position: absolute;
         border-radius: 9999px;
