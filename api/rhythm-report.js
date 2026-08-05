@@ -16,6 +16,17 @@ function todayDate() {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC) — user_quotas ile aynı yaklaşım
 }
 
+// KRİTİK: findTodayDay (aiCoachService.js, coach-action.js ile PAYLAŞILIR)
+// `weeks.flatMap((w) => w.days)` yapar — yani bir "hafta" dizisi (her biri
+// `.days` alanlı) bekler, düz bir gün dizisi DEĞİL. Bu fonksiyon önceden
+// düz bir gün dizisi ([{dayNumber, tasks}, ...]) döndürüyordu — bu yüzden
+// `w.days` her zaman `undefined` oluyor, `findTodayDay`'in `.sort((a,b) =>
+// a.dayNumber - ...)` satırı `undefined.dayNumber`'a erişmeye çalışıp
+// TypeError fırlatıyordu. Kullanıcının EN AZ 1 görevi olduğu HER durumda
+// (yani pratikte her zaman) hem "generate" (günlük rapor) hem "endDay"
+// action'ını çökertiyordu — dıştaki try/catch bunu yakalayıp classifyGeminiError
+// üzerinden genel "Beklenmedik bir hata oluştu." mesajına çeviriyordu.
+// Doğru/çalışan şekil coach-action.js'teki aynı isimli fonksiyondan.
 function toWeeksShape(planTasks) {
   const days = new Map();
   for (const t of planTasks || []) {
@@ -23,7 +34,8 @@ function toWeeksShape(planTasks) {
     if (!days.has(d)) days.set(d, []);
     days.get(d).push(t);
   }
-  return [...days.entries()].sort((a, b) => a[0] - b[0]).map(([dayNumber, tasks]) => ({ dayNumber, tasks }));
+  const dayList = [...days.entries()].sort((a, b) => a[0] - b[0]).map(([dayNumber, tasks]) => ({ dayNumber, tasks }));
+  return [{ weekNumber: 1, days: dayList }];
 }
 
 async function fetchPlansWithTasks(admin, userId) {
