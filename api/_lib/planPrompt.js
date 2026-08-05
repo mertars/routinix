@@ -1,5 +1,6 @@
 import { wrapGeminiError } from "./aiErrors.js";
 import { getRoutedModel } from "./geminiRouter.js";
+import { hydratePlanTemplate, hydrateWeekTemplate } from "./planHydration.js";
 
 // AI plan üretim pipeline'ının SUNUCU TARAFI portu. Eskiden bu dosyanın
 // içeriği src/services/aiPipelineService.js'te idi ve VITE_GEMINI_API_KEY ile
@@ -35,17 +36,29 @@ function personaFor(category) {
 
 // Kategoriye göre bir görevin (task) hangi ekstra alanları taşıması gerektiğini
 // tarif eden ortak yönerge — hem ilk hafta hem sonraki haftalarda kullanılır.
+//
+// TEMPLATE HYDRATION (çıktı token tasarrufu): Her task artık bir JSON NESNESİ
+// DEĞİL, SABİT SIRALI bir dizi ("tuple") olarak isteniyor — bkz. planHydration.js
+// TASK_SHAPE (buradaki alan sırasıyla BİREBİR eşleşmeli). Tekrarlayan anahtar
+// isimleri ("title":, "description":, "duration_min": ...) her görevde YENİDEN
+// yazılmak yerine bir kez, şemada tarif edilir. Ayrıca ÖNCEDEN "sets"/"reps"/
+// "rpe" (fitness) ve "focus" (software) AYRI JSON alanları olarak isteniyordu
+// ama planService.js'in flattenWeek()'i bunları HİÇBİR ZAMAN okumuyordu —
+// model bu alanları üretiyor, Gemini bunun için ücret alıyor, backend
+// SESSİZCE ÇÖPE ATIYORDU (UI'da da hiç gösterilmiyordu, bkz. TaskCard.jsx).
+// Artık bu bilgi description'ın İÇİNE gömülüyor — hem israf kalkıyor hem
+// kullanıcı bu bilgiyi GERÇEKTEN görüyor (önceden hiç görmüyordu).
 function taskFieldGuide(category) {
   if (category === "vacation") {
-    return `Her task nesnesi şu alanları içermeli: "title" (aktivite/mekan adı), "description" (kısa açıklama), "map_search_query" (Google Maps sorgusu), "estimated_cost" (örn. "250 TL" ya da "Ücretsiz"), "duration_min" (tahmini süre, dakika).`;
+    return `Token tasarrufu için her günün "tasks" alanı NESNE DİZİSİ DEĞİL, tam olarak şu SIRADA 5 elemanlı bir dizi-içinde-dizi olmalı: [title, description, duration_min, estimated_cost, map_search_query]. title: aktivite/mekan adı. description: kısa açıklama. duration_min: tahmini süre (dakika). estimated_cost: örn. "250 TL" ya da "Ücretsiz". map_search_query: Google Maps'te aratıldığında doğru sonucu verecek somut bir sorgu (mekan adı + şehir).`;
   }
   if (category === "fitness") {
-    return `Her task nesnesi şu alanları içermeli: "title" (egzersiz/aktivite adı), "description" (kısa form/biyomekanik ipucu), "sets" (set sayısı, dinlenme gününde 0), "reps" (tekrar aralığı, örn. "8-12"), "rpe" (hedef RPE/RIR, örn. "RPE 8 / 2 RIR"), "duration_min" (tahmini süre, dakika).`;
+    return `Token tasarrufu için her günün "tasks" alanı NESNE DİZİSİ DEĞİL, tam olarak şu SIRADA 4 elemanlı bir dizi-içinde-dizi olmalı: [title, description, duration_min, priority]. title: egzersiz/aktivite adı. description: kısa form/biyomekanik ipucu — set sayısını, tekrar aralığını (örn. "8-12") VE hedef RPE/RIR'ı (örn. "RPE 8") DOĞAL bir cümleye göm, ayrı alan AÇMA (örn. "3x10, RPE 8 - dirsekleri sabit tut, kontrollü indir"). duration_min: tahmini süre (dakika). priority: "Yüksek"|"Orta"|"Düşük" (egzersizin programdaki önemine göre).`;
   }
   if (category === "software") {
-    return `Her task nesnesi şu alanları içermeli: "title" (görev başlığı), "description" (hangi prensip/desen/kavram pekiştiriliyor), "focus" (örn. "SOLID - SRP", "Async", "Memory") , "duration_min" (tahmini süre, dakika), "priority" ("Yüksek" | "Orta" | "Düşük").`;
+    return `Token tasarrufu için her günün "tasks" alanı NESNE DİZİSİ DEĞİL, tam olarak şu SIRADA 4 elemanlı bir dizi-içinde-dizi olmalı: [title, description, duration_min, priority]. title: görev başlığı. description: hangi prensip/desen/kavramın (SOLID/Async/Memory vb.) pekiştirildiğini DOĞAL bir cümle içinde belirt, ayrı alan AÇMA (örn. "Repository pattern ile SOLID - SRP prensibini pekiştirir"). duration_min: tahmini süre (dakika). priority: "Yüksek"|"Orta"|"Düşük".`;
   }
-  return `Her task nesnesi şu alanları içermeli: "title" (görev başlığı), "description" (kısa açıklama), "duration_min" (tahmini süre, dakika), "priority" ("Yüksek" | "Orta" | "Düşük").`;
+  return `Token tasarrufu için her günün "tasks" alanı NESNE DİZİSİ DEĞİL, tam olarak şu SIRADA 4 elemanlı bir dizi-içinde-dizi olmalı: [title, description, duration_min, priority]. title: görev başlığı. description: kısa açıklama. duration_min: tahmini süre (dakika). priority: "Yüksek"|"Orta"|"Düşük".`;
 }
 
 // Verilen system instruction ile modeli çalıştırıp katı JSON'ı parse eder.
@@ -149,17 +162,23 @@ Yanıtın SADECE ve KESİNLİKLE aşağıdaki JSON yapısında olmalı, şema d�
   "week_topics": ["1. hafta konu başlığı", "2. hafta konu başlığı", "..."],
   "routines": ["genel rutin/prensip 1", "..."],
   "first_week_tasks": [
-    { "day": 1, "title": "günün teması", "tasks": [ { } ] }
+    { "day": 1, "title": "günün teması", "tasks": [ ["...", "...", 30, "Orta"] ] }
   ]
 }
-first_week_tasks, total_days 7'den küçükse tam olarak total_days kadar gün; değilse tam olarak 7 gün (day 1..7) içermeli. Dinlenme günleri de bir gündür (fitness'ta boş bırakma, "dinlenme" görevi ver). week_topics dizisinin eleman sayısı, total_days'ten hesapladığın toplam hafta sayısına eşit olmalı.`;
+"tasks" dizisindeki her elemanın SIRASI/uzunluğu için yukarıdaki task şeması geçerli (nesne DEĞİL, dizi). first_week_tasks, total_days 7'den küçükse tam olarak total_days kadar gün; değilse tam olarak 7 gün (day 1..7) içermeli. Dinlenme günleri de bir gündür (fitness'ta boş bırakma, "dinlenme" görevi ver). week_topics dizisinin eleman sayısı, total_days'ten hesapladığın toplam hafta sayısına eşit olmalı.`;
 
   const userPrompt = `${describeUserInput(userInput)}\n\nYukarıdaki bilgilere göre planın toplam süresini (total_days), tüm planın haftalık iskeletini (week_topics), genel rutinlerini ve 1. haftasının detayını üret.`;
 
-  const parsed = await runJson("plan.create", systemInstruction, userPrompt, "Plan oluşturma");
-  if (!parsed?.plan_title || !Array.isArray(parsed?.first_week_tasks)) {
+  const rawParsed = await runJson("plan.create", systemInstruction, userPrompt, "Plan oluşturma");
+  if (!rawParsed?.plan_title || !Array.isArray(rawParsed?.first_week_tasks)) {
     throw new Error("Yapay zeka yanıtında beklenen plan alanları eksik.");
   }
+  // Template Hydration: task'lar modelden kompakt tuple olarak geldi
+  // (bkz. taskFieldGuide) — flattenWeek/savePlanToSupabase'in beklediği
+  // {title, description, duration_min, priority/estimated_cost/...} nesne
+  // şekline burada geri çevrilir. Bu satırdan SONRASI (validasyon, return)
+  // ESKİDEN OLDUĞU GİBİ nesne şekliyle çalışır — çağıran kod hiç değişmedi.
+  const parsed = hydratePlanTemplate(rawParsed, category);
   // week_topics OPSİYONEL kabul edilir (model bazen atlayabilir) — eksikse
   // sessizce boş dizi bırakılır, YENİ akış BOZULMAZ: fetchNextWeekTasks zaten
   // week_topics'i "varsa kullan" mantığıyla ele alıyor (bkz. aşağısı).
@@ -200,18 +219,20 @@ Yanıtın SADECE ve KESİNLİKLE şu JSON yapısında olmalı, şema dışına h
 {
   "week_number": ${week},
   "week_tasks": [
-    { "day": ${startDay}, "title": "günün teması", "tasks": [ { } ] }
+    { "day": ${startDay}, "title": "günün teması", "tasks": [ ["...", "...", 30, "Orta"] ] }
   ]
 }
-week_tasks tam olarak 7 gün (day ${startDay}..${endDay}) içermeli.`;
+"tasks" dizisindeki her elemanın SIRASI/uzunluğu için yukarıdaki task şeması geçerli (nesne DEĞİL, dizi). week_tasks tam olarak 7 gün (day ${startDay}..${endDay}) içermeli.`;
 
   const userPrompt = `Plan başlığı: "${planTitle || ""}"
 Plan özeti / genel strateji: "${planSummary || ""}"
 Üretilecek hafta: ${week}. hafta (gün ${startDay}-${endDay}).`;
 
-  const parsed = await runJson("plan.next_week", systemInstruction, userPrompt, `${week}. hafta üretimi`);
-  if (!Array.isArray(parsed?.week_tasks) || parsed.week_tasks.length === 0) {
+  const rawParsed = await runJson("plan.next_week", systemInstruction, userPrompt, `${week}. hafta üretimi`);
+  if (!Array.isArray(rawParsed?.week_tasks) || rawParsed.week_tasks.length === 0) {
     throw new Error("Yapay zeka yanıtında beklenen hafta görevleri eksik.");
   }
+  // Template Hydration — bkz. createEnrichedPlan'daki aynı yorum.
+  const parsed = hydrateWeekTemplate(rawParsed, category);
   return parsed;
 }

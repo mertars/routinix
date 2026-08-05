@@ -3,6 +3,8 @@ import { getRemaining, consumeOne, TRIAL_LIMIT } from "./_lib/quota.js";
 import { isAdminUser } from "./_lib/adminAccess.js";
 import { runCoachIntent } from "./_lib/coachPrompt.js";
 import { classifyGeminiError } from "./_lib/aiErrors.js";
+import { matchDeterministicIntent } from "./_lib/ruleEngine.js";
+import { applyPlanDelta } from "./_lib/planDelta.js";
 import { lightenTasks, intensifyTasks, postponeDayTasks, findTodayDay, analyzeProgress } from "../src/services/aiCoachService.js";
 
 // AI Koç'un TEK sunucu tarafı giriş noktası. Eskiden client (anon key) hem
@@ -136,59 +138,9 @@ function toWeeksShape(plansSubset) {
   return [{ weekNumber: 1, days: dayList }];
 }
 
-async function applyPatches(admin, patches) {
-  if (!patches.length) return [];
-  return Promise.all(
-    patches.map(async ({ id, fields }) => {
-      const { data, error } = await admin.from("tasks").update(fields).eq("id", id).select().single();
-      if (error) throw error;
-      return data;
-    })
-  );
-}
-
-async function insertNewTasks(admin, planId, userId, rows) {
-  if (!rows?.length) return [];
-  const payload = rows.map((r) => {
-    const dayNumber = Math.max(1, Number(r.day_number) || 1);
-    return {
-      plan_id: planId,
-      user_id: userId,
-      week_number: Math.max(1, Math.ceil(dayNumber / 7)),
-      day_number: dayNumber,
-      title: (r.title ?? "").toString().trim() || "İsimsiz görev",
-      detail: r.detail ?? null,
-      duration_min: r.duration_min ?? null,
-      priority: r.priority ?? null,
-      estimated_cost: r.estimated_cost ?? null,
-      map_search_query: r.map_search_query ?? null,
-      is_completed: false,
-    };
-  });
-  const { data, error } = await admin.from("tasks").insert(payload).select();
-  if (error) throw error;
-  return data || [];
-}
-
-// AI'ın "kaldır/sil/gereksiz" olarak işaretlediği görevler — id'ler dispatch()
-// içinde ÖNCEDEN plan.tasks'a ait olduğu doğrulanmış olmalı (validIds).
-// `.select("id")` ile silinen satırların id'lerini geri döner, client bunları
-// local `weeks` state'inden anında çıkarabilsin diye.
-async function deleteTasks(admin, ids) {
-  if (!ids?.length) return [];
-  const { data, error } = await admin.from("tasks").delete().in("id", ids).select("id");
-  if (error) throw error;
-  return data || [];
-}
-
-// "Planı N güne indir/uzat" — plans.total_days'i günceller (görev
-// day_number'larının yeniden dağıtımı zaten ayrı mutations ile yapılır, bu
-// yalnızca planın "N Gün" rozetini/PlanBoard ızgara boyutunu günceller).
-async function updatePlanTotalDays(admin, planId, totalDays) {
-  const { data, error } = await admin.from("plans").update({ total_days: totalDays }).eq("id", planId).select().single();
-  if (error) throw error;
-  return data;
-}
+// applyPatches/insertNewTasks/deleteTasks/updatePlanTotalDays artık BURADA
+// DEĞİL — planDelta.js'in applyPlanDelta()'sına toparlandı (Delta Update
+// Engine, bkz. o dosyanın başındaki yorum).
 
 async function dispatch(action, { message, targetPlanId, allPlans, userId, admin }) {
   if (action === "analyze") {
@@ -197,6 +149,19 @@ async function dispatch(action, { message, targetPlanId, allPlans, userId, admin
   }
 
   if (action === "freeText") {
+    // Zero-AI Rule Engine: mesaj zaten var olan bir hazır aksiyonla (lighten/
+    // intensify/postponeToday/analyze) BİREBİR eşleşiyorsa Gemini'ye HİÇ
+    // gitmeden, o aksiyonu (aşağıdaki, ZATEN deterministik dala) devreder —
+    // 0 TL maliyet, ağ round-trip'i yok. Quick-action butonlarıyla TUTARLILIK
+    // için (onlar da zaten deterministik ama YİNE DE trial hakkı düşürüyor)
+    // consumed davranışı aynı kalır — kullanıcı deneyimi açısından "AI Koç'a
+    // yazdım, işlemi yaptı" ile "butona bastım, işlemi yaptı" arasında fark
+    // yaratmamak bilinçli bir tercih (bkz. ruleEngine.js dosya başı yorumu).
+    const ruleMatch = matchDeterministicIntent(message);
+    if (ruleMatch) {
+      return dispatch(ruleMatch, { targetPlanId, allPlans, userId, admin });
+    }
+
     // targetPlanId: widget'ın "Konuştuğun Plan" seçicisinden gelen, İSTEMCİNİN
     // ZATEN BİLDİĞİ hedef — AI'a bir tahmin olarak DEĞİL, doğrudan bağlam
     // olarak verilir (bkz. coachPrompt.js). Önceden buraya hiç geçmiyordu,
@@ -217,64 +182,44 @@ async function dispatch(action, { message, targetPlanId, allPlans, userId, admin
       return { ok: true, consumed: false, message: aiResult.reply || "Hangi planı kastettiğini anlayamadım — plan seçiciden birini seçer misin?" };
     }
 
-    // Güvenlik: AI'ın ürettiği task_id'lerin GERÇEKTEN bu plana ait olduğunu
-    // doğrula (halüsinasyon/başka kullanıcı id'si sızıntısına karşı).
-    const validIds = new Set(plan.tasks.map((t) => t.id));
-    const patches = aiResult.mutations
-      .filter((m) => m?.task_id && m?.fields && validIds.has(m.task_id))
-      .map((m) => ({ id: m.task_id, fields: m.fields }));
-    const deleteIds = aiResult.deletedTaskIds.filter((id) => validIds.has(id));
+    // Delta Update Engine: AI'ın döndürdüğü delta (mutations/newTasks/
+    // deletedTaskIds/planTotalDays) tek bir yerde, id doğrulamasıyla
+    // birlikte uygulanır (bkz. planDelta.js).
+    const delta = await applyPlanDelta(admin, plan, userId, aiResult);
 
-    const mutatedTasks = await applyPatches(admin, patches);
-    const newTasks = await insertNewTasks(admin, plan.id, userId, aiResult.newTasks);
-    const deletedTasks = await deleteTasks(admin, deleteIds);
-
-    let updatedPlan = null;
-    if (aiResult.planTotalDays && aiResult.planTotalDays !== plan.total_days) {
-      updatedPlan = await updatePlanTotalDays(admin, plan.id, aiResult.planTotalDays);
-    }
-
-    return {
-      ok: true,
-      consumed: true,
-      message: aiResult.reply,
-      targetPlanId: plan.id,
-      mutatedTasks,
-      newTasks,
-      deletedTaskIds: deletedTasks.map((t) => t.id),
-      updatedPlan,
-    };
+    return { ok: true, consumed: true, message: aiResult.reply, targetPlanId: plan.id, ...delta };
   }
 
   // Hazır aksiyonlar (lighten/intensify/postponeToday) — client'ın ekranda
-  // açık olan planını hedefler, bu yüzden targetPlanId zorunludur.
+  // açık olan planını hedefler, bu yüzden targetPlanId zorunludur. Rule
+  // Engine eşleşmeleri de (yukarıdaki freeText dalı) BURAYA yönlenir.
   const plan = allPlans.find((p) => p.id === targetPlanId);
   if (!plan) return { ok: false, consumed: false, message: "Plan bulunamadı." };
 
-  let patches = [];
+  let mutations = [];
   let successMessage = "";
 
   if (action === "lighten") {
-    patches = lightenTasks(plan.tasks);
+    mutations = lightenTasks(plan.tasks).map(({ id, fields }) => ({ task_id: id, fields }));
     successMessage = "Anlaşıldı! Bugünkü görev yükünü %30 hafifletip süreleri güncelledim 🌿";
   } else if (action === "intensify") {
-    patches = intensifyTasks(plan.tasks);
+    mutations = intensifyTasks(plan.tasks).map(({ id, fields }) => ({ task_id: id, fields }));
     successMessage = "Tempoyu sıkılaştırdım — görev süreleri kısaldı, öncelikler yükseldi. Hadi bakalım 🔥";
   } else if (action === "postponeToday") {
     const todayDay = findTodayDay(toWeeksShape([plan]));
     if (!todayDay || !todayDay.tasks.some((t) => !t.is_completed)) {
       return { ok: true, consumed: true, message: "Bugün için bekleyen görevin yok, harika gidiyorsun! ✅" };
     }
-    patches = postponeDayTasks(todayDay);
+    mutations = postponeDayTasks(todayDay).map(({ id, fields }) => ({ task_id: id, fields }));
     successMessage = "Bugünün kalan görevlerini yarına kaydırdım — kendine iyi bak, yarın devam ederiz ☕";
   } else {
     return { ok: false, consumed: false, message: `Bilinmeyen aksiyon: ${action}` };
   }
 
-  if (patches.length === 0) {
+  if (mutations.length === 0) {
     return { ok: true, consumed: true, message: "Şu an güncellenecek aktif bir görev bulamadım — plan zaten tamamlanmış görünüyor 🎉" };
   }
 
-  const mutatedTasks = await applyPatches(admin, patches);
+  const { mutatedTasks } = await applyPlanDelta(admin, plan, userId, { mutations });
   return { ok: true, consumed: true, message: successMessage, targetPlanId: plan.id, mutatedTasks };
 }
