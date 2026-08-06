@@ -22,6 +22,7 @@ import {
   deletePlan as deletePlanSvc,
 } from "./services/planService";
 import { callCoachAction } from "./services/coachActionService";
+import { updateManualPlanInSupabase } from "./services/planEditService";
 import { setHapticsEnabled } from "./lib/haptics";
 import logger from "./utils/logger";
 import { runWhenIdle } from "./utils/idle";
@@ -86,6 +87,13 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   // "Kendi Planını Hazırla" (ManualPlanBuilder.jsx) — CategoryIntro'daki
   // merkez neon buton bunu açar. AI boru hattından TAMAMEN bağımsız.
   const [manualBuilderOpen, setManualBuilderOpen] = useState(false);
+  // Plan Studio & Editor Engine — "Planı Düzenle" ile açıldığında dolu,
+  // "Kendi Planını Hazırla" ile açıldığında null. `editLoading`, planId
+  // verilip builder açılana kadarki kısa fetchPlanDetail penceresini kapsar
+  // (bkz. openManualBuilder) — builder HER ZAMAN ya boş ya da TAM dolu
+  // veriyle mount edilir, ara/eksik bir durumla asla mount edilmez.
+  const [editingPlanPayload, setEditingPlanPayload] = useState(null);
+  const [editLoading, setEditLoading] = useState(false);
 
   const mode = categoryOf(category);
 
@@ -239,33 +247,68 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   // AYNI oturum kapısı: anonim/misafir oturumlar giriş yapmaya yönlendirilir
   // — bu bir AI maliyeti koruması DEĞİL (manuel akış zaten Gemini'ye hiç
   // gitmiyor), kalıcı bir hesaba BAĞLI plan saklama tutarlılığı içindir.
-  const openManualBuilder = useCallback(() => {
-    if (!user || user.is_anonymous) {
-      onRequireAuth?.();
-      return;
-    }
-    setManualBuilderOpen(true);
-  }, [user, onRequireAuth]);
+  // planId verilmezse: yeni plan modunda açılır (eskisiyle AYNI davranış).
+  // planId verilirse: Plan Studio & Editor Engine "Planı Düzenle" — fetchPlanDetail
+  // planId'ye ait TÜM görevleri/rutinleri (herhangi bir "yalnızca yüklü
+  // haftalar" kısıtı OLMADAN) çeker, bu yüzden PlanBoard'da henüz lazy-load
+  // edilmemiş sonraki haftalar bile düzenleme sırasında KAYBOLMAZ — çağıran
+  // taraf (PlanBoard/MyPlansHub) kendi elindeki KISMİ `weeks`/`tasks`
+  // state'ini DEĞİL, her zaman bir planId'yi geçer.
+  const openManualBuilder = useCallback(
+    async (planId) => {
+      if (!user || user.is_anonymous) {
+        onRequireAuth?.();
+        return;
+      }
+      if (!planId) {
+        setEditingPlanPayload(null);
+        setManualBuilderOpen(true);
+        return;
+      }
+      setEditLoading(true);
+      try {
+        const { plan, routines: routineRows, tasks } = await fetchPlanDetail(planId);
+        setEditingPlanPayload({ plan, tasks, routines: routineRows });
+        setManualBuilderOpen(true);
+      } catch (err) {
+        logger.error("PLAN_EDIT", "Düzenlenecek plan getirilemedi", { planId, error: err?.message });
+      } finally {
+        setEditLoading(false);
+      }
+    },
+    [user, onRequireAuth]
+  );
 
-  const closeManualBuilder = useCallback(() => setManualBuilderOpen(false), []);
+  const closeManualBuilder = useCallback(() => {
+    setManualBuilderOpen(false);
+    setEditingPlanPayload(null);
+  }, []);
 
   // builder: ManualPlanBuilder.jsx'in yerel state'i (bkz. o dosyadaki JSDoc).
+  // builder.editingPlanId doluysa (Plan Studio "Değişiklikleri Kaydet")
+  // updateManualPlanInSupabase (sunucu, service_role — tasks satırlarını
+  // TOPTAN değiştirebilmek için) çağrılır; boşsa (yeni plan) eskisi gibi
+  // doğrudan Supabase insert. İkisi de AYNI {plan, routines, tasks} şeklini
+  // döndürdüğü için sonrasındaki state güncellemesi TEK bir kod yolu.
   // Başarılı kayıttan sonra AYNI finalizeAndGenerate deseniyle doğrudan
-  // STAGE_PLAN'a geçilir — kullanıcı "Kaydet"e bastığı anda yeni planını
-  // GÖRÜR, ayrıca "Planlarım"dan açması gerekmez.
+  // STAGE_PLAN'a geçilir — kullanıcı "Kaydet"e bastığı anda planını GÖRÜR,
+  // ayrıca "Planlarım"dan açması gerekmez.
   const saveManualPlan = useCallback(
     async (builder) => {
       if (!user || user.is_anonymous) {
         onRequireAuth?.();
         throw new Error("Devam etmek için giriş yapmalısın.");
       }
-      const { plan, routines, tasks } = await saveManualPlanToSupabase(builder, user.id);
+      const { plan, routines, tasks } = builder.editingPlanId
+        ? await updateManualPlanInSupabase(builder.editingPlanId, builder, user.id)
+        : await saveManualPlanToSupabase(builder, user.id);
       setDbPlan(plan);
       setRoutines(routines || []);
       setWeeks(groupTasksToWeeks(tasks));
       setCategory(plan.mode || "general");
       setStage(STAGE_PLAN);
       setManualBuilderOpen(false);
+      setEditingPlanPayload(null);
       refreshSavedPlans();
     },
     [user, onRequireAuth, refreshSavedPlans]
@@ -469,7 +512,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     category, mode, goal, extraNote, stage, errorMsg, menuOpen, savedPlans,
     remindersOn, hapticsOn,
     goalTrimmed, goalTooShort, canStart,
-    manualBuilderOpen,
+    manualBuilderOpen, editingPlanPayload, editLoading,
     // onboarding wizard
     questions, answers, wizardStep, currentAnswer,
     // aktif plan

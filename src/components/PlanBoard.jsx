@@ -110,6 +110,7 @@ export default function PlanBoard({
   onLoadNextWeek,
   onStartPomodoro,
   onPrint,
+  onEditPlan,
   onBack,
 }) {
   const [activeDay, setActiveDay] = useState(null);
@@ -196,13 +197,24 @@ export default function PlanBoard({
           <button onClick={onBack} className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
             ‹ Ana Sayfa
           </button>
-          <button
-            onClick={onPrint}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 h-8 text-[11.5px] font-semibold transition-colors"
-            style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}44` }}
-          >
-            🖨️ PDF / Yazdır
-          </button>
+          <div className="flex items-center gap-1.5">
+            {onEditPlan && (
+              <button
+                onClick={() => onEditPlan(plan.id)}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 h-8 text-[11.5px] font-semibold transition-colors"
+                style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}44` }}
+              >
+                ✏️ Düzenle
+              </button>
+            )}
+            <button
+              onClick={onPrint}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 h-8 text-[11.5px] font-semibold transition-colors"
+              style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}44` }}
+            >
+              🖨️ PDF / Yazdır
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-2 mb-1">
           <span className="text-base md:text-lg">{cat.emoji}</span>

@@ -412,6 +412,7 @@ export default function App() {
                 onLoadNextWeek={ps.loadNextWeek}
                 onStartPomodoro={startPomodoroForTask}
                 onPrint={() => setPrintOpen(true)}
+                onEditPlan={ps.openManualBuilder}
                 onBack={ps.resetToIntro}
               />
             )}
@@ -483,12 +484,19 @@ export default function App() {
             <ManualPlanBuilder
               open={ps.manualBuilderOpen}
               category={ps.category}
+              editingPlan={ps.editingPlanPayload}
               onClose={ps.closeManualBuilder}
               onSave={ps.saveManualPlan}
             />
           </Suspense>
         </ScopedErrorBoundary>
       )}
+
+      {/* "Planı Düzenle" ile açılan Plan Studio, fetchPlanDetail'in TAMAMEN
+          dönmesini bekler (bkz. usePlanStudio.openManualBuilder) — builder
+          hiçbir zaman eksik/kısmi veriyle mount edilmesin diye bu kısa
+          pencerede ayrı bir yükleniyor katmanı gösterilir. */}
+      {ps.editLoading && <OverlayFallback z={110} />}
 
       {/* Şablon Keşfet — hazır rota kütüphanesi. Koşullu mount. */}
       {hubOpen && (
@@ -504,6 +512,7 @@ export default function App() {
             open={plansOpen}
             userId={auth.user?.id}
             onOpenPlan={ps.openSavedPlan}
+            onEditPlan={ps.openManualBuilder}
             onClose={() => setPlansOpen(false)}
           />
         </Suspense>

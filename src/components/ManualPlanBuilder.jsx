@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, lazy, Suspense } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   Plus,
@@ -26,6 +27,13 @@ import {
   ClipboardX,
 } from "lucide-react";
 import { categoryOf, MONO_FONT } from "../constants";
+import { parseTextualPlan, parseCsvPlan } from "../utils/planImportParsers";
+import { extractTextFromPdf } from "../utils/pdfTextExtract";
+import { buildIcsCalendar, downloadIcsFile } from "../utils/icsExport";
+import ImportFormatModal from "./ImportFormatModal";
+import ExportFormatModal from "./ExportFormatModal";
+
+const PrintablePlan = lazy(() => import("./PrintablePlan"));
 
 const DAY_COUNT_CHOICES = [3, 5, 7, 14, 30];
 
@@ -87,6 +95,22 @@ const ATTRIBUTE_TOGGLES = [
   { key: "energy", label: "Enerji Etiketi", icon: Zap },
 ];
 
+// Rutin Kartları'ndaki sıklık seçenekleri — routineText.js'in FREQUENCY_META
+// sözlüğündeki GERÇEK anahtarlar (routines.frequency'ye AYNEN yazılır),
+// PlanBoard/RoutinesPopover'daki rutin rozetleri bunları zaten tanır.
+const ROUTINE_FREQUENCY_CHOICES = [
+  { key: "daily", label: "Her Gün" },
+  { key: "weekdays", label: "Hafta İçi" },
+];
+
+const IMPORT_ACCEPT = {
+  json: "application/json,.json",
+  markdown: ".md,text/markdown",
+  txt: ".txt,text/plain",
+  csv: ".csv,text/csv",
+  pdf: "application/pdf,.pdf",
+};
+
 let localIdCounter = 0;
 function newLocalId() {
   localIdCounter += 1;
@@ -120,26 +144,78 @@ function needsRestSuggestion(tasks) {
   return totalMin > 240 && !hasRest;
 }
 
-// "Kendi Planını Hazırla" — Gemini'ye HİÇ gitmeyen, tamamen elle plan
-// oluşturma akışı. Kaydedince aynı `plans`/`tasks` şemasına yazılır (bkz.
-// saveManualPlan -> planService.saveManualPlanToSupabase) — PlanBoard/PDF/
-// AI Koç dahil TÜM mevcut plan özellikleri, bu planın AI mi elle mi
-// oluşturulduğunu hiç bilmeden aynen çalışır.
-export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
-  const cat = categoryOf(category);
+// "Kendi Planını Hazırla" / Plan Studio & Editor Engine — Gemini'ye HİÇ
+// gitmeyen, tamamen elle plan oluşturma VE düzenleme akışı. Kaydedince aynı
+// `plans`/`tasks`/`routines` şemasına yazılır — PlanBoard/PDF/AI Koç dahil
+// TÜM mevcut plan özellikleri, bu planın AI mi elle mi oluşturulduğunu hiç
+// bilmeden aynen çalışır.
+//
+// editingPlan: null ise "yeni plan" modu (eski davranış). Doluysa —
+// { plan, tasks, routines } (bkz. planService.fetchPlanDetail'in dönüşü,
+// usePlanStudio.openManualBuilder tarafından TAM/eksiksiz çekilir) — Plan
+// Studio bu planın GÜNCEL haliyle önceden doldurulmuş açılır, "Kaydet"
+// butonu "Değişiklikleri Kaydet"e döner ve kayıt updateManualPlanInSupabase
+// (sunucu, service_role) üzerinden GİDER (bkz. usePlanStudio.saveManualPlan).
+export default function ManualPlanBuilder({ open, category, editingPlan, onClose, onSave }) {
+  const isEditMode = !!editingPlan;
+  const cat = categoryOf(editingPlan?.plan?.mode || category);
 
-  const [title, setTitle] = useState("");
-  const [totalDays, setTotalDays] = useState(7);
+  const [title, setTitle] = useState(() => editingPlan?.plan?.title || "");
+  const [totalDays, setTotalDays] = useState(() => {
+    if (!editingPlan) return 7;
+    const fromTasks = editingPlan.tasks.reduce((m, t) => Math.max(m, Number(t.day_number) || 1), 1);
+    return Math.max(Number(editingPlan.plan.total_days) || 1, fromTasks);
+  });
   const [customOpen, setCustomOpen] = useState(false);
   const [customVal, setCustomVal] = useState("");
   const [activeDay, setActiveDay] = useState(1);
-  const [daysData, setDaysData] = useState({}); // { [dayNumber]: task[] }
+  // { [dayNumber]: task[] } — düzenleme modunda editingPlan.tasks'tan (id
+  // OLMADAN, yalnızca yerel state'in beklediği alanlarla) önceden doldurulur.
+  // is_completed BİLEREK taşınır (görüntülenmez/düzenlenmez ama korunur) —
+  // bkz. api/_lib/planReplace.js'teki "kullanıcının ilerlemesi KORUNUR" notu.
+  const [daysData, setDaysData] = useState(() => {
+    if (!editingPlan) return {};
+    const grouped = {};
+    const sorted = [...editingPlan.tasks].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    for (const t of sorted) {
+      const d = Math.max(1, Number(t.day_number) || 1);
+      if (!grouped[d]) grouped[d] = [];
+      grouped[d].push({
+        localId: newLocalId(),
+        title: t.title || "",
+        detail: t.detail ?? null,
+        duration_min: t.duration_min ?? null,
+        priority: t.priority ?? null,
+        estimated_cost: t.estimated_cost ?? null,
+        map_search_query: t.map_search_query ?? null,
+        is_completed: t.is_completed ?? false,
+      });
+    }
+    return grouped;
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [importing, setImporting] = useState(false);
   const [mobileStep, setMobileStep] = useState(1); // yalnızca <lg ekranlarda anlamlı
   const [dragIndex, setDragIndex] = useState(null);
   const fileInputRef = useRef(null);
-  const [routinesText, setRoutinesText] = useState("");
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [pendingImportFormat, setPendingImportFormat] = useState(null);
+
+  // Rutin Kartları — Modüler Rutinler Bölümü. Serbest metin kutusu YERİNE
+  // her rutin ayrı, silinebilir/sürüklenebilir/sıklık-seçilebilir bir kart.
+  // Kaydedince GERÇEK routines tablosuna yazılır (bkz. planService.js +
+  // api/_lib/planReplace.js) — sort_order kart sırasını, frequency
+  // "Her Gün"/"Hafta İçi" seçimini taşır.
+  const [routineItems, setRoutineItems] = useState(() => {
+    if (!editingPlan) return [];
+    return [...editingPlan.routines]
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((r) => ({ localId: newLocalId(), content: r.content || "", frequency: r.frequency || "daily" }));
+  });
+  const [routineInput, setRoutineInput] = useState("");
+  const [routineDragIndex, setRoutineDragIndex] = useState(null);
 
   // Evrensel Görev Panosu (Task Clipboard) — "her senaryoya özel fonksiyon"
   // yerine tek genel mekanizma: seç -> panoya kopyala -> istediğin güne/
@@ -154,10 +230,18 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
 
   // Dinamik Görev Özellik Seçici — hangi alanlar görünür. Gezi kategorisinde
   // bütçe/konum, VARSAYILAN olarak açık (eski davranışla tutarlı UX), diğer
-  // kategorilerde kullanıcı isterse kendisi açar.
-  const [enabledAttrs, setEnabledAttrs] = useState(
-    () => new Set(category === "vacation" ? ["duration", "budget", "location"] : ["duration"])
-  );
+  // kategorilerde kullanıcı isterse kendisi açar. Düzenleme modunda mevcut
+  // görevlerde GERÇEKTEN kullanılan alanlar otomatik açılır — kullanıcı
+  // "bütçe girmiştim ama alan görünmüyor" şaşkınlığı yaşamasın diye.
+  const [enabledAttrs, setEnabledAttrs] = useState(() => {
+    if (editingPlan) {
+      const s = new Set(["duration"]);
+      if (editingPlan.tasks.some((t) => t.estimated_cost != null && String(t.estimated_cost).trim() !== "")) s.add("budget");
+      if (editingPlan.tasks.some((t) => t.map_search_query)) s.add("location");
+      return s;
+    }
+    return new Set(category === "vacation" ? ["duration", "budget", "location"] : ["duration"]);
+  });
   const hasAttr = (key) => enabledAttrs.has(key);
   const toggleAttr = (key) => {
     setEnabledAttrs((prev) => {
@@ -179,6 +263,30 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
   const totalTaskCount = useMemo(() => Object.values(daysData).reduce((n, arr) => n + (arr?.length || 0), 0), [daysData]);
   const showRestSuggestion = hasAttr("duration") && needsRestSuggestion(activeTasks);
 
+  // Studio Builder'ın YEREL (henüz kaydedilmemiş olabilir) durumunu
+  // PrintablePlan'ın beklediği {plan, routines, weeks} şekline çevirir —
+  // "Şık PDF Çıktısı" bu sayede plan HENÜZ kaydedilmeden de üretilebilir.
+  // Hook olduğu için (useMemo) `if (!open) return null` SATIRINDAN ÖNCE
+  // tanımlı olmak ZORUNDA (bkz. PlanBoard.jsx'teki AYNI kısıt notu).
+  const printShape = useMemo(
+    () => ({
+      plan: { title: title.trim() || "Kendi Planım", total_days: totalDays, summary: null },
+      routines: routineItems.map((r) => ({ id: r.localId, content: r.content, frequency: r.frequency })),
+      weeks: [
+        {
+          weekNumber: 1,
+          days: Object.entries(daysData)
+            .map(([day, tasks]) => ({
+              dayNumber: Number(day),
+              tasks: tasks.filter((t) => t.title.trim()).map((t) => ({ ...t, id: t.localId })),
+            }))
+            .sort((a, b) => a.dayNumber - b.dayNumber),
+        },
+      ],
+    }),
+    [title, totalDays, routineItems, daysData]
+  );
+
   if (!open) return null;
 
   const setDayTasks = (dayNumber, updater) => {
@@ -194,7 +302,7 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
   };
 
   const addRestBreak = () => {
-    setDayTasks(activeDay, (list) => [...list, { localId: newLocalId(), title: "☕ Mola", duration_min: 15, priority: null, estimated_cost: null, detail: null }]);
+    setDayTasks(activeDay, (list) => [...list, { localId: newLocalId(), title: "☕ Mola", duration_min: 15, priority: null, estimated_cost: null, detail: null, is_completed: false }]);
   };
 
   const submitQuickAdd = () => {
@@ -211,6 +319,7 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
         estimated_cost: hasAttr("budget") && quickCost.trim() ? quickCost.trim() : null,
         map_search_query: hasAttr("location") && quickExtras.mapQuery.trim() ? quickExtras.mapQuery.trim() : null,
         detail: composeDetail(null, quickExtras),
+        is_completed: false,
       },
     ]);
     setQuickTitle("");
@@ -276,7 +385,10 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
     setDaysData((prev) => {
       const next = { ...prev };
       for (const d of targetDays) {
-        const cloned = clipboard.map((t) => ({ ...t, localId: newLocalId() }));
+        // is_completed HER ZAMAN false'a döner: yapıştırılan bir kopya, o
+        // günün YENİ bir örneğidir — kaynak görev tamamlanmış olsa bile
+        // kopyası "henüz yapılmadı" olarak başlar.
+        const cloned = clipboard.map((t) => ({ ...t, localId: newLocalId(), is_completed: false }));
         next[d] = [...(next[d] || []), ...cloned]; // ÜZERİNE YAZMAZ, mevcut görevlere EKLER
       }
       return next;
@@ -291,9 +403,41 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
     setPasteMenuOpen(false);
   };
 
-  // --- Şablon Dışa/İçe Aktar (JSON) ---
+  // --- Rutin Kartları: ekle / güncelle / sil / sürükle-sırala ---
+  const addRoutine = () => {
+    const trimmed = routineInput.trim();
+    if (!trimmed) return;
+    setRoutineItems((prev) => [...prev, { localId: newLocalId(), content: trimmed, frequency: "daily" }]);
+    setRoutineInput("");
+  };
+  const updateRoutine = (localId, patch) => {
+    setRoutineItems((prev) => prev.map((r) => (r.localId === localId ? { ...r, ...patch } : r)));
+  };
+  const removeRoutine = (localId) => {
+    setRoutineItems((prev) => prev.filter((r) => r.localId !== localId));
+  };
+  const handleRoutineDrop = (dropIndex) => {
+    if (routineDragIndex === null || routineDragIndex === dropIndex) return;
+    setRoutineItems((prev) => {
+      const next = prev.slice();
+      const [moved] = next.splice(routineDragIndex, 1);
+      next.splice(dropIndex, 0, moved);
+      return next;
+    });
+    setRoutineDragIndex(null);
+  };
+
+  // --- Şablon Dışa Aktar: JSON / .ics Takvim / Şık PDF ---
   const exportJson = () => {
-    const payload = { routinixManualPlan: true, version: 1, title, totalDays, category, days: daysData, routines: routinesText };
+    const payload = {
+      routinixManualPlan: true,
+      version: 2, // v2: routines artık {content,frequency}[] (v1: düz metin) — handleImportFile ikisini de okur.
+      title,
+      totalDays,
+      category,
+      days: daysData,
+      routines: routineItems.map((r) => ({ content: r.content, frequency: r.frequency })),
+    };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -305,33 +449,102 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
     URL.revokeObjectURL(url);
   };
 
-  const triggerImport = () => fileInputRef.current?.click();
-  const handleImportFile = (e) => {
+  const handleExportFormatPicked = (format) => {
+    setExportModalOpen(false);
+    if (format === "json") {
+      exportJson();
+    } else if (format === "ics") {
+      const ics = buildIcsCalendar({ title, days: daysData });
+      downloadIcsFile(title, ics);
+    } else if (format === "pdf") {
+      // PrintablePlan HER ZAMAN (aşağıda, portal ile) güncel builder
+      // verisiyle mount edilmiş durumda — app.jsx'teki "PDF/Yazdır" İLE
+      // AYNI desen: DOM'un güncel veriyle çizilmesi için kısa bir gecikme,
+      // sonra tarayıcının kendi yazdır/PDF-kaydet diyaloğu.
+      setTimeout(() => window.print(), 60);
+    }
+  };
+
+  // --- Şablon İçe Aktar: JSON / Markdown / TXT / CSV / PDF ---
+  // applyImportedData, TÜM formatların ORTAK sonuç şekli için tek giriş
+  // noktası — hangi formattan geldiğinden bağımsız olarak builder state'ini
+  // (title/totalDays/daysData/routineItems) günceller. Mevcut planın
+  // TAMAMININ yerini alır (eskisiyle AYNI davranış, yalnızca JSON'a özel
+  // değil artık).
+  const applyImportedData = ({ title: newTitle, totalDays: newTotalDays, days, routines: newRoutines }) => {
+    if (newTitle) setTitle(newTitle);
+    const dayNumbers = Object.keys(days || {}).map(Number).filter((n) => Number.isFinite(n) && n > 0);
+    const maxDay = dayNumbers.length ? Math.max(...dayNumbers) : totalDays;
+    setTotalDays(Math.max(1, Math.min(365, Number(newTotalDays) || maxDay)));
+    const fresh = {};
+    for (const [day, tasks] of Object.entries(days || {})) {
+      fresh[day] = (Array.isArray(tasks) ? tasks : []).map((t) => ({
+        localId: newLocalId(),
+        title: t.title || "",
+        detail: t.detail ?? null,
+        duration_min: t.duration_min ?? null,
+        priority: t.priority ?? null,
+        estimated_cost: t.estimated_cost ?? null,
+        map_search_query: t.map_search_query ?? null,
+        is_completed: false,
+      }));
+    }
+    setDaysData(fresh);
+    if (Array.isArray(newRoutines)) {
+      setRoutineItems(newRoutines.map((r) => ({ localId: newLocalId(), content: r.content, frequency: r.frequency || "daily" })));
+    }
+    setActiveDay(1);
+    setMobileStep(2);
+  };
+
+  const handleFormatPicked = (format) => {
+    setImportModalOpen(false);
+    setPendingImportFormat(format);
+    // input'un `accept`'i state'e bağlı — React DOM'a yansıtana kadar bir
+    // sonraki animasyon karesini bekleyip TIKLA, aksi halde eski `accept`
+    // ile açılabilir.
+    requestAnimationFrame(() => fileInputRef.current?.click());
+  };
+
+  const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = ""; // aynı dosyayı arka arkaya seçebilmek için input'u sıfırla
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed = JSON.parse(String(reader.result));
+    const format = pendingImportFormat;
+    if (!file || !format) return;
+    setError("");
+    setImporting(true);
+    try {
+      if (format === "json") {
+        const parsed = JSON.parse(await file.text());
         if (!parsed || typeof parsed !== "object" || !parsed.days) throw new Error("Geçersiz dosya");
-        setTitle(String(parsed.title || ""));
-        setTotalDays(Math.max(1, Math.min(365, Number(parsed.totalDays) || 7)));
-        // İçe aktarılan görevlere YENİ localId'ler ver — dosya birden fazla
-        // kez içe aktarılırsa (ya da bir başkasının dosyasıysa) id çakışması
-        // OLMAZ, her zaman taze bir yerel kimlik alır.
-        const fresh = {};
-        for (const [day, tasks] of Object.entries(parsed.days)) {
-          fresh[day] = (Array.isArray(tasks) ? tasks : []).map((t) => ({ ...t, localId: newLocalId() }));
-        }
-        setDaysData(fresh);
-        setRoutinesText(typeof parsed.routines === "string" ? parsed.routines : "");
-        setError("");
-      } catch {
-        setError("Dosya okunamadı — geçerli bir Routinix plan dosyası (.json) seçtiğinden emin ol.");
+        // v1 (routines: düz metin, satır satır) ve v2 (routines: {content,
+        // frequency}[]) dışa aktarımlarının İKİSİ de okunabilir.
+        const normalizedRoutines = Array.isArray(parsed.routines)
+          ? parsed.routines.map((r) => ({ content: String((typeof r === "object" ? r.content : r) ?? "").trim(), frequency: (typeof r === "object" && r.frequency) || "daily" })).filter((r) => r.content)
+          : typeof parsed.routines === "string"
+          ? parsed.routines.split("\n").map((l) => l.trim()).filter(Boolean).map((content) => ({ content, frequency: "daily" }))
+          : [];
+        applyImportedData({ title: parsed.title, totalDays: parsed.totalDays, days: parsed.days, routines: normalizedRoutines });
+      } else if (format === "markdown" || format === "txt") {
+        const text = await file.text();
+        const { title: parsedTitle, days, routines } = parseTextualPlan(text);
+        applyImportedData({ title: parsedTitle, days, routines });
+      } else if (format === "csv") {
+        const text = await file.text();
+        const { days } = parseCsvPlan(text);
+        if (Object.keys(days).length === 0) throw new Error("CSV ayrıştırılamadı");
+        applyImportedData({ days, routines: [] });
+      } else if (format === "pdf") {
+        const text = await extractTextFromPdf(file);
+        const { title: parsedTitle, days, routines } = parseTextualPlan(text);
+        applyImportedData({ title: parsedTitle, days, routines });
       }
-    };
-    reader.readAsText(file);
+    } catch {
+      setError("Dosya okunamadı/ayrıştırılamadı — dosyanın seçtiğin formata ve beklenen düzene uygun olduğundan emin ol.");
+    } finally {
+      setImporting(false);
+      setPendingImportFormat(null);
+    }
   };
 
   const handleSave = async () => {
@@ -345,13 +558,19 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
         .map(([day, tasks]) => [day, tasks.filter((t) => t.title.trim())])
         .filter(([, tasks]) => tasks.length > 0)
     );
-    const routines = routinesText
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
+    const routines = routineItems
+      .map((r) => ({ content: r.content.trim(), frequency: r.frequency || "daily" }))
+      .filter((r) => r.content);
     setSaving(true);
     try {
-      await onSave({ title: title.trim() || "Kendi Planım", totalDays, days: cleanedDays, category, routines });
+      await onSave({
+        title: title.trim() || "Kendi Planım",
+        totalDays,
+        days: cleanedDays,
+        category,
+        routines,
+        editingPlanId: editingPlan?.plan?.id || null,
+      });
     } catch (err) {
       setError(err?.message || "Plan kaydedilirken bir sorun oluştu. Tekrar dener misin?");
       setSaving(false);
@@ -398,7 +617,7 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
               {cat.emoji}
             </div>
             <div className="min-w-0">
-              <h1 className="text-[16px] md:text-[19px] font-bold text-[var(--text-primary)] leading-tight truncate">Kendi Planını Hazırla</h1>
+              <h1 className="text-[16px] md:text-[19px] font-bold text-[var(--text-primary)] leading-tight truncate">{isEditMode ? "Planı Düzenle" : "Kendi Planını Hazırla"}</h1>
               <p className="text-[11px] md:text-[12.5px] text-[var(--text-faint)]">
                 {cat.label} · <span className="lg:hidden">{mobileStep === 1 ? "1/2 · Süre" : "2/2 · Görevler"}</span>
                 <span className="hidden lg:inline">elle oluşturulan plan, yapay zeka kullanılmaz</span>
@@ -406,12 +625,13 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Şablon Dışa/İçe Aktar — küçük, ikon-yalnız, başlığın yanında */}
-            <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleImportFile} />
-            <button onClick={triggerImport} aria-label="Plan dosyası içe aktar" title="İçe Aktar (.json)" className="hidden sm:flex w-9 h-9 rounded-xl items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" style={{ background: "rgba(var(--overlay-rgb), 0.06)" }}>
+            {/* Akıllı İçe/Dışa Aktar — küçük, ikon-yalnız, başlığın yanında;
+                format seçimi ImportFormatModal/ExportFormatModal'da yapılır. */}
+            <input ref={fileInputRef} type="file" accept={IMPORT_ACCEPT[pendingImportFormat] || "*"} className="hidden" onChange={handleImportFile} />
+            <button onClick={() => setImportModalOpen(true)} aria-label="Plan dosyası içe aktar" title="İçe Aktar" className="hidden sm:flex w-9 h-9 rounded-xl items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" style={{ background: "rgba(var(--overlay-rgb), 0.06)" }}>
               <Upload className="w-4 h-4" />
             </button>
-            <button onClick={exportJson} aria-label="Planı dışa aktar" title="Dışa Aktar (.json)" className="hidden sm:flex w-9 h-9 rounded-xl items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" style={{ background: "rgba(var(--overlay-rgb), 0.06)" }}>
+            <button onClick={() => setExportModalOpen(true)} aria-label="Planı dışa aktar" title="Dışa Aktar" className="hidden sm:flex w-9 h-9 rounded-xl items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" style={{ background: "rgba(var(--overlay-rgb), 0.06)" }}>
               <Download className="w-4 h-4" />
             </button>
             <button onClick={onClose} aria-label="Kapat" className="w-11 h-11 md:w-9 md:h-9 rounded-xl flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" style={{ background: "rgba(var(--overlay-rgb), 0.06)" }}>
@@ -521,9 +741,11 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                   </p>
                 </div>
 
-                {/* Genel Rutinler — günlük dinamik görevlerden AYRI, tek
-                    seferde yazılan tekrarlı alışkanlıklar. Kaydedince
-                    routines tablosuna gerçek satırlar olarak yazılır (bkz.
+                {/* Rutin Kartları — günlük dinamik görevlerden AYRI, tek
+                    seferde eklenen tekrarlı alışkanlıklar. Serbest metin
+                    kutusu YERİNE her rutin kendi silinebilir/sürüklenebilir/
+                    sıklık-seçilebilir kartı. Kaydedince routines tablosuna
+                    gerçek satırlar olarak yazılır (bkz.
                     planService.saveManualPlanToSupabase) — AI akışının
                     "Genel Rutinler" panosuyla birebir aynı yapı, PlanBoard
                     bu planın elle mi AI'lı mı kurulduğunu bilmeden aynen
@@ -532,17 +754,75 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
                   <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)] mb-2" style={{ fontFamily: MONO_FONT }}>
                     Genel Rutinler
                   </label>
-                  <textarea
-                    value={routinesText}
-                    onChange={(e) => setRoutinesText(e.target.value)}
-                    placeholder={"Her satıra bir rutin yaz, ör:\nHer sabah 1 bardak su iç\nHer akşam 10 dk esne"}
-                    rows={3}
-                    className="input-glow w-full rounded-2xl px-4 py-3 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)] outline-none border resize-none"
-                    style={{ background: "var(--bg-input)", borderColor: "var(--border-default)" }}
-                  />
-                  <p className="mt-2 text-[10.5px] text-[var(--text-faint)] leading-relaxed">
-                    Günlere bağlı değildir, plan boyunca her gün geçerli genel alışkanlıklardır.
-                  </p>
+                  <div className="flex items-center gap-1.5 mb-2.5">
+                    <input
+                      type="text"
+                      value={routineInput}
+                      onChange={(e) => setRoutineInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addRoutine()}
+                      placeholder="Rutin adı yaz... (ör. Her sabah su iç)"
+                      className="flex-1 min-w-0 min-h-[44px] rounded-xl px-3.5 outline-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)]"
+                      style={{ background: "var(--bg-input)" }}
+                    />
+                    <button
+                      onClick={addRoutine}
+                      disabled={!routineInput.trim()}
+                      aria-label="Rutin ekle"
+                      className="shrink-0 w-11 h-11 flex items-center justify-center rounded-xl font-bold transition-all disabled:opacity-40"
+                      style={GLOW_ACTIVE_STYLE}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {routineItems.length === 0 ? (
+                    <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
+                      Günlere bağlı değildir — plan boyunca her gün geçerli genel alışkanlıklar (ör. su içmek, esnemek).
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      {routineItems.map((r, index) => (
+                        <div
+                          key={r.localId}
+                          draggable
+                          onDragStart={() => setRoutineDragIndex(index)}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => handleRoutineDrop(index)}
+                          onDragEnd={() => setRoutineDragIndex(null)}
+                          className="rounded-xl px-2.5 py-2 flex items-center gap-2 transition-opacity"
+                          style={{ background: "var(--bg-input)", opacity: routineDragIndex === index ? 0.4 : 1 }}
+                        >
+                          <span className="shrink-0 cursor-grab active:cursor-grabbing text-[var(--text-faint)]" aria-hidden="true" title="Sürükleyerek sırala">
+                            <GripVertical className="w-3.5 h-3.5" />
+                          </span>
+                          <input
+                            type="text"
+                            value={r.content}
+                            onChange={(e) => updateRoutine(r.localId, { content: e.target.value })}
+                            className="flex-1 min-w-0 bg-transparent outline-none text-[12.5px] text-[var(--text-primary)]"
+                          />
+                          <div className="flex items-center gap-1 shrink-0">
+                            {ROUTINE_FREQUENCY_CHOICES.map((f) => {
+                              const active = r.frequency === f.key;
+                              return (
+                                <button
+                                  key={f.key}
+                                  onClick={() => updateRoutine(r.localId, { frequency: f.key })}
+                                  className="text-[10px] font-semibold px-2 py-1 rounded-full transition-colors whitespace-nowrap"
+                                  style={active ? { background: `${NEON.violet}22`, color: NEON.violet } : { background: "rgba(var(--overlay-rgb),0.06)", color: "var(--text-faint)" }}
+                                >
+                                  {f.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <button onClick={() => removeRoutine(r.localId)} aria-label="Rutini sil" className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-[#FF6E92] transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -853,13 +1133,17 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
           }}
         >
           <div className="min-w-0 flex items-center gap-3">
-            {error && <p className="text-[12px] font-medium truncate" style={{ color: "#FF6E92" }}>{error}</p>}
+            {(error || importing) && (
+              <p className="text-[12px] font-medium truncate" style={{ color: importing ? "var(--text-muted)" : "#FF6E92" }}>
+                {importing ? "Dosya işleniyor..." : error}
+              </p>
+            )}
             {/* Mobilde İçe/Dışa Aktar (başlıkta gizliydi, sm:hidden) buraya taşınır. */}
             <div className="flex sm:hidden items-center gap-1.5">
-              <button onClick={triggerImport} aria-label="İçe aktar" className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "rgba(var(--overlay-rgb), 0.06)", color: "var(--text-muted)" }}>
+              <button onClick={() => setImportModalOpen(true)} aria-label="İçe aktar" className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "rgba(var(--overlay-rgb), 0.06)", color: "var(--text-muted)" }}>
                 <Upload className="w-4 h-4" />
               </button>
-              <button onClick={exportJson} aria-label="Dışa aktar" className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "rgba(var(--overlay-rgb), 0.06)", color: "var(--text-muted)" }}>
+              <button onClick={() => setExportModalOpen(true)} aria-label="Dışa aktar" className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "rgba(var(--overlay-rgb), 0.06)", color: "var(--text-muted)" }}>
                 <Download className="w-4 h-4" />
               </button>
             </div>
@@ -878,12 +1162,30 @@ export default function ManualPlanBuilder({ open, category, onClose, onSave }) {
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                Planı Kaydet ve Başlat
+                {isEditMode ? "Değişiklikleri Kaydet" : "Planı Kaydet ve Başlat"}
               </>
             )}
           </button>
         </div>
       </div>
+
+      <ImportFormatModal open={importModalOpen} onPick={handleFormatPicked} onClose={() => setImportModalOpen(false)} />
+      <ExportFormatModal open={exportModalOpen} onPick={handleExportFormatPicked} onClose={() => setExportModalOpen(false)} />
+
+      {/* "Şık PDF Çıktısı" — app.jsx'teki (kaydedilmiş plan) PDF akışıyla AYNI
+          .print-root/@media print tekniği, ama Studio Builder'ın YEREL
+          (henüz kaydedilmemiş olabilir) durumundan üretilir (bkz.
+          printShape). React Portal İLE document.body'ye taşınır — bu modal
+          `position:fixed` + `overflow:hidden` bir kapsayıcının İÇİNDE
+          olduğundan, .print-root'u DOĞRUDAN burada bırakmak bazı
+          tarayıcılarda baskı çıktısını kırpabilirdi; portal bu riski
+          tamamen ortadan kaldırır (app.jsx'teki köke-yakın konumla AYNI). */}
+      {createPortal(
+        <Suspense fallback={null}>
+          <PrintablePlan plan={printShape.plan} routines={printShape.routines} weeks={printShape.weeks} />
+        </Suspense>,
+        document.body
+      )}
     </>
   );
 }
@@ -928,8 +1230,26 @@ function MiniField({ icon, placeholder, value, onChange, type = "text", width = 
 // - Genel Rutinler de GERÇEK: routines tablosuna, AI akışının
 //   savePlanToSupabase'i ile AYNI insert deseniyle yazılır (yalnızca
 //   frequency varsayılanı farklı — elle girilen rutinler "daily").
-// - Pano (Task Clipboard) ve içe/dışa aktarma tamamen istemci tarafında —
-//   kaydedilene kadar hiçbir sunucu isteği YAPILMAZ. Panoya kopyalanan
-//   görevler yapıştırıldığı günün MEVCUT görevlerine EKLENİR, üzerine
-//   yazmaz — bu yüzden aynı görev grubunu birden çok kez farklı günlere
-//   biriktirerek yapıştırabilirsin.
+// - Pano (Task Clipboard) tamamen istemci tarafında — kaydedilene kadar
+//   hiçbir sunucu isteği YAPILMAZ. Panoya kopyalanan görevler yapıştırıldığı
+//   günün MEVCUT görevlerine EKLENİR, üzerine yazmaz — bu yüzden aynı görev
+//   grubunu birden çok kez farklı günlere biriktirerek yapıştırabilirsin.
+// - Planı Düzenle (editingPlan dolu): kayıt api/plan-edit.js üzerinden
+//   GİDER (client anon key tasks satırlarını silemediği için, bkz. o
+//   dosyanın yorumları) ve TÜM görevler/rutinler silinip builder'ın GÜNCEL
+//   haliyle yeniden yazılır (kısmi diff değil). Kullanıcının is_completed
+//   ilerlemesi KORUNUR: her görev editingPlan'dan yüklenirken bunu yolcu
+//   olarak taşır, yalnızca panodan yapıştırılan/yeni eklenen görevler
+//   false'la başlar.
+// - Akıllı İçe Aktarma (JSON/Markdown/TXT/CSV/PDF): JSON en güvenilir
+//   yoldur (Routinix'in kendi şeması). Markdown/TXT/PDF AYNI sezgisel
+//   ayrıştırıcıyı (utils/planImportParsers.js) paylaşır — PDF önce
+//   pdfjs-dist ile düz metne çevrilir. CSV yalnızca GÖREVLERİ içe aktarır
+//   (rutinler CSV'nin satır/gün modeline uymadığından bilinçli olarak
+//   dahil edilmez). Hiçbiri %100 doğruluk iddia etmez — kullanıcı sonucu
+//   HER ZAMAN Builder'da görüp kaydetmeden önce düzeltebilir.
+// - Dışa Aktarma: JSON (tam yedek) + .ics (utils/icsExport.js — Gün 1
+//   bugüne bağlanır, saat notu yoksa 09:00 varsayılır, gerçek bir
+//   zamanlayıcı DEĞİLDİR) + PDF (mevcut PrintablePlan/print altyapısının
+//   builder'ın YEREL state'iyle yeniden kullanılması, plan kaydedilmeden
+//   de çalışır).

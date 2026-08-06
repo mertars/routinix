@@ -34,6 +34,7 @@ export function routineMicroLabel(text) {
 // FREQUENCY_META olarak tekrarlanıyordu, artık tek doğruluk kaynağı burada).
 const FREQUENCY_META = {
   daily: { icon: "🔆", label: "Günlük" },
+  weekdays: { icon: "📅", label: "Hafta İçi" },
   weekly: { icon: "🔁", label: "Haftalık" },
   biweekly: { icon: "🔁", label: "2 Haftada Bir" },
   monthly: { icon: "🗓️", label: "Aylık" },

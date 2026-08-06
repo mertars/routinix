@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Pencil } from "lucide-react";
 import { categoryOf } from "../constants";
 import { fetchDashboardData } from "../services/planService";
 import logger from "../utils/logger";
@@ -6,7 +7,10 @@ import logger from "../utils/logger";
 // "📂 Planlarım" — kullanıcının tüm kayıtlı planlarını ilerleme durumuyla
 // listeleyen tam ekran glassmorphism hub. Karta tıklayınca modal kapanır ve
 // ilgili planın board'u açılır (onOpenPlan → usePlanStudio.openSavedPlan).
-export default function MyPlansHub({ open, userId, onOpenPlan, onClose }) {
+// Kart üzerindeki ✏️ ikonu Plan Studio & Editor Engine'i düzenleme modunda
+// açar (onEditPlan → usePlanStudio.openManualBuilder(planId)) — stopPropagation
+// ile kartın kendi tıklamasını (onOpenPlan) TETİKLEMEZ.
+export default function MyPlansHub({ open, userId, onOpenPlan, onEditPlan, onClose }) {
   const [plans, setPlans] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -79,14 +83,41 @@ export default function MyPlansHub({ open, userId, onOpenPlan, onClose }) {
                         <span className="text-[20px] shrink-0">{cat.emoji}</span>
                         <h3 className="text-[14px] font-semibold text-slate-900 dark:text-slate-100 leading-snug truncate">{p.title || "Plan"}</h3>
                       </div>
-                      {p.total_days ? (
-                        <span
-                          className="shrink-0 text-[10.5px] font-bold px-2 py-1 rounded-full"
-                          style={{ background: cat.accentSoft, color: cat.accent }}
-                        >
-                          {p.total_days} Gün
-                        </span>
-                      ) : null}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {p.total_days ? (
+                          <span
+                            className="text-[10.5px] font-bold px-2 py-1 rounded-full"
+                            style={{ background: cat.accentSoft, color: cat.accent }}
+                          >
+                            {p.total_days} Gün
+                          </span>
+                        ) : null}
+                        {onEditPlan && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditPlan(p.id);
+                              onClose();
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onEditPlan(p.id);
+                                onClose();
+                              }
+                            }}
+                            aria-label="Planı düzenle"
+                            title="Planı Düzenle"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                            style={{ background: "rgba(var(--overlay-rgb),0.06)" }}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div>

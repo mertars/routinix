@@ -196,23 +196,32 @@ export async function saveManualPlanToSupabase(builder, userId) {
     throw planErr;
   }
 
-  // Rutinler (varsa) — kullanıcının Studio Builder'da tek seferde yazdığı,
-  // satır satır ayrılmış serbest metin. savePlanToSupabase ile AYNI insert
-  // deseni: frequency/content NOT NULL kolonlar, güvenli varsayılanla
-  // doldurulur. Elle girilen rutinler günlük tekrar niyetiyle yazıldığı için
-  // (AI akışının "weekly" varsayılanının aksine) burada "daily" varsayılan.
+  // Rutinler (varsa) — Studio Builder'ın Rutin Kartları'ndan gelir:
+  // {content, frequency}[], kart sırası array index'i olarak sort_order'a
+  // yazılır (görevlerle AYNI ilke, bkz. aşağıdaki taskRows). Elle girilen
+  // rutinler günlük tekrar niyetiyle yazıldığı için (AI akışının "weekly"
+  // varsayılanının aksine) burada "daily" varsayılan.
   let routines = [];
   if (Array.isArray(builder.routines) && builder.routines.length > 0) {
     const routineRows = builder.routines
-      .map((content) => ({
+      .map((r, idx) => ({
         plan_id: plan.id,
         user_id: userId,
-        frequency: "daily",
-        content: String(content ?? "").trim(),
+        frequency: (typeof r === "object" ? r.frequency : null) || "daily",
+        content: String((typeof r === "object" ? r.content : r) ?? "").trim(),
+        sort_order: idx,
       }))
       .filter((row) => row.content);
     if (routineRows.length > 0) {
-      const { data, error } = await supabase.from("routines").insert(routineRows).select();
+      let { data, error } = await supabase.from("routines").insert(routineRows).select();
+      // routines.sort_order (bkz. supabase/routine_sort_order.sql) HENÜZ
+      // çalıştırılmamış bir migration olabilir — tasks.sort_order İLE AYNI
+      // fail-open ilkesi.
+      if (error?.code === "PGRST204") {
+        logger.warn("SUPABASE", "routines.sort_order sütunu henüz yok (migration çalıştırılmamış) — sort_order'sız kaydediliyor", { error: error.message });
+        const withoutSortOrder = routineRows.map(({ sort_order, ...rest }) => rest);
+        ({ data, error } = await supabase.from("routines").insert(withoutSortOrder).select());
+      }
       if (error) {
         logger.error("SUPABASE", "Manuel plan rutinleri kaydedilemedi", { table: "routines", action: "insert", planId: plan.id, error });
         throw error;
@@ -335,13 +344,29 @@ async function selectTasksOrdered(queryFactory) {
   return withSort;
 }
 
+// routines.sort_order İÇİN AYNI fail-open ilkesi (bkz. selectTasksOrdered) —
+// Rutin Kartları'nın sürükle-bırak sırası routine_sort_order.sql
+// ÇALIŞTIRILMAMIŞ olsa bile Rutinler'in çekilmesini ASLA engellemez.
+// created_at İKİNCİL sıralama olarak KALIR: sort_order eşit/null olan
+// (ör. eski, migration öncesi) satırlar arasında yine tutarlı bir sıra verir.
+async function selectRoutinesOrdered(queryFactory) {
+  const withSort = await queryFactory()
+    .order("sort_order", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true });
+  if (withSort.error?.code === "42703") {
+    logger.warn("SUPABASE", "routines.sort_order sütunu henüz yok (migration çalıştırılmamış) — sıralamasız devam ediliyor", { error: withSort.error.message });
+    return queryFactory().order("created_at", { ascending: true });
+  }
+  return withSort;
+}
+
 // "Bugünün Görevleri" popover'ı için: kullanıcının TÜM planlarını + tüm
 // rutinlerini + tüm görevlerini 3 sorguda çekip plana göre gruplar.
 // Döner: [{ ...plan, routines: [...], tasks: [...] }]
 export async function fetchDashboardData(userId) {
   const [plansRes, routinesRes, tasksRes] = await Promise.all([
     supabase.from("plans").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-    supabase.from("routines").select("*").eq("user_id", userId),
+    selectRoutinesOrdered(() => supabase.from("routines").select("*").eq("user_id", userId)),
     selectTasksOrdered(() => supabase.from("tasks").select("*").eq("user_id", userId).order("week_number", { ascending: true })),
   ]);
   if (plansRes.error) {
@@ -403,7 +428,7 @@ export async function fetchUserPlans(userId) {
 export async function fetchPlanDetail(planId) {
   const [{ data: plan, error: pErr }, routinesRes, tasksRes] = await Promise.all([
     supabase.from("plans").select("*").eq("id", planId).single(),
-    supabase.from("routines").select("*").eq("plan_id", planId).order("created_at", { ascending: true }),
+    selectRoutinesOrdered(() => supabase.from("routines").select("*").eq("plan_id", planId)),
     selectTasksOrdered(() => supabase.from("tasks").select("*").eq("plan_id", planId).order("week_number", { ascending: true })),
   ]);
   if (pErr) {
