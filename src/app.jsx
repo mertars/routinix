@@ -477,10 +477,15 @@ export default function App() {
         message="Hesabından çıkış yapılacak. Kaydedilmiş planların hesabında güvende kalır."
         confirmLabel="Evet, Çıkış Yap"
         cancelLabel="Vazgeç"
-        onConfirm={() => {
+        onConfirm={async () => {
           setLogoutConfirmOpen(false);
-          auth.signOut();
-          ps.startNewPlan();
+          // ps.startNewPlan() (yerel sihirbaz state'ini sıfırlayıp giriş
+          // ekranına döner) YALNIZCA signOut GERÇEKTEN başarılıysa çalışır —
+          // aksi halde (ör. ağ hatası) oturum sunucuda hâlâ dururken arayüz
+          // "çıkış yapıldı" YALANI söylememiş olur (bkz. useAuth.js'teki
+          // signOut'un artık hatayı DÖNMESİNİN gerekçesi).
+          const { error } = await auth.signOut();
+          if (!error) ps.startNewPlan();
         }}
         onCancel={() => setLogoutConfirmOpen(false)}
       />

@@ -44,7 +44,27 @@ export default function useAuth() {
 
   const signIn = (email, password) => supabase.auth.signInWithPassword({ email, password });
   const signUp = (email, password) => supabase.auth.signUp({ email, password });
-  const signOut = () => supabase.auth.signOut();
+
+  // Async + hatayı DÖNER (önceden fire-and-forget'ti): supabase.auth.signOut()
+  // ağ hatasıyla reddederse çağıran taraf (app.jsx'teki çıkış onayı) bunu
+  // BİLMELİYDİ — aksi halde "başarılı çıkış" varsayıp yerel UI'ı (plan
+  // sihirbazı state'i) sıfırlıyordu, oysa oturum GERÇEKTE hâlâ sunucuda
+  // duruyor olabilirdi. onAuthStateChange zaten `session`i doğru şekilde
+  // günceller (başarılıysa null, başarısızsa değişmez) — buradaki değişiklik
+  // yalnızca çağıranın başarısızlığı FARK ETMESİNİ sağlar.
+  //
+  // NOT: Bu fonksiyon hiçbir koşulda signInAnonymously() ÇAĞIRMAZ — anonim/
+  // misafir oturum YALNIZCA SharedTemplateView.jsx'in kendi akışında,
+  // paylaşılan bir şablon linkine (/t/[id]) gelindiğinde başlatılır (bkz. o
+  // dosyadaki AYNI notun tekrarı). Çıkış akışı bu ikisini birbirine ASLA
+  // karıştırmaz.
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      logger.error("AUTH", "Çıkış yapılamadı", { error: error.message });
+    }
+    return { error };
+  };
 
   // Sessizce, GİRİŞ EKRANI GÖSTERMEDEN bir anonim oturum başlatır — Nexus'ta
   // paylaşılan bir şablon linkine (bkz. SharedTemplateView.jsx) tıklayan,
