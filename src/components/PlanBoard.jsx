@@ -192,7 +192,7 @@ export default function PlanBoard({
     <div className="w-full animate-[fadeIn_0.4s_ease]">
       {/* Başlık + genel ilerleme — tam genişlik, grid'in üstünde (RhythmStudio'nun
           tarih şeridiyle aynı desen: gezinme/özet üstte, çalışma alanı altta grid). */}
-      <div className="glass rounded-2xl p-4 md:p-5 mb-6" style={{ borderColor: `${accent}33` }}>
+      <div data-tour-id="tour-plan-area" className="glass rounded-2xl p-4 md:p-5 mb-6" style={{ borderColor: `${accent}33` }}>
         <div className="flex items-center justify-between mb-3">
           <button onClick={onBack} className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
             ‹ Ana Sayfa
@@ -282,7 +282,7 @@ export default function PlanBoard({
               )}
             </div>
             {/* Tam olarak targetDays kadar kutucuk: yüklü günler dolu, kalanlar kilitli. */}
-            <div className="edge-fade-x flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 md:-mx-5 md:px-5" style={{ scrollSnapType: "x proximity" }}>
+            <div data-tour-id="tour-day-tabs" className="edge-fade-x flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 md:-mx-5 md:px-5" style={{ scrollSnapType: "x proximity" }}>
               {calendar.map((cell) =>
                 cell.locked ? (
                   <button
@@ -361,7 +361,7 @@ export default function PlanBoard({
                   varsayılan gizli, karta dokununca Drawer/Bottom Sheet ile açılır
                   (bkz. TaskCard.jsx). Her satır memoized — dokunulmayan görevler
                   bir tık sırasında hiç render edilmez (bkz. usePlanStudio.toggleTask). */}
-              <div className="task-grid flex flex-col gap-2.5">
+              <div data-tour-id="tour-task-cards" className="task-grid flex flex-col gap-2.5">
                 {activeDayObj.tasks.map((t) => (
                   <TaskCard
                     key={t.id}

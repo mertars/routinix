@@ -14,7 +14,13 @@ import { createPortal } from "react-dom";
 // Hedef DOM'da yoksa (ör. mobilde gizli bir masaüstü-only nav düğmesi,
 // ya da kullanıcı henüz o ekrana gitmemiş) SESSİZCE BOŞ EKRAN göstermek
 // yerine dürüst bir "bu özellik şu an görünmüyor" mesajı gösterir.
-export default function SpotlightOverlay({ targetId, title, description, accent, onDone, notFoundMessage }) {
+// stepLabel/isLastStep: SpotlightMenu.jsx birden fazla adımlı bir özelliği
+// (ör. "Aktif Plan Ekranı" — plan alanı → gün sekmeleri → görev kartları)
+// TEK SpotlightOverlay örneğini targetId/title/description'ı değiştirerek
+// YENİDEN KULLANIR (bkz. o dosyadaki stepIndex state'i) — bu component
+// KENDİSİ bir dizi bilmez, yalnızca "kaçıncı adımdayım" rozetini ve son
+// adımda buton metnini ("Sonraki →" yerine "Anladım") gösterir.
+export default function SpotlightOverlay({ targetId, title, description, accent, onDone, notFoundMessage, stepLabel, isLastStep = true }) {
   const [rect, setRect] = useState(null);
   const [notFound, setNotFound] = useState(false);
 
@@ -160,14 +166,21 @@ export default function SpotlightOverlay({ targetId, title, description, accent,
               ...(placeAbove ? { borderTop: `7px solid ${accent}` } : { borderBottom: `7px solid ${accent}` }),
             }}
           />
-          <h3 className="text-[13px] font-bold mb-1.5" style={{ color: accent }}>
-            {title}
-          </h3>
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <h3 className="text-[13px] font-bold" style={{ color: accent }}>
+              {title}
+            </h3>
+            {stepLabel && (
+              <span className="shrink-0 text-[9.5px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${accent}22`, color: accent }}>
+                {stepLabel}
+              </span>
+            )}
+          </div>
           <p className="text-[12px] leading-relaxed mb-3" style={{ color: "var(--text-secondary)" }}>
             {description}
           </p>
           <button onClick={onDone} className="w-full rounded-lg py-2 text-[12px] font-bold text-white transition-transform active:scale-95" style={{ background: accent }}>
-            Anladım
+            {isLastStep ? "Anladım" : "Sonraki →"}
           </button>
         </div>
       </div>

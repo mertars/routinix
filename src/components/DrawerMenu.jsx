@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { X, Plus, Trash2, LogOut, Repeat2, Compass, ListChecks, Users2, BarChart3, Timer, FolderOpen, HelpCircle } from "lucide-react";
+import { FEATURE_FLAGS } from "../constants";
 
 // 2 sütunlu bento tuşu — "Orta Grid Menü Tuşları" bölümü için. "Siyah Cam"
 // (Black Glassmorphism): düz opak `var(--bg-card)` yerine ince, saydam
@@ -65,14 +66,16 @@ function DrawerMenu({
 
   const navItems = [
     { key: "routines", icon: <Repeat2 className="w-4 h-4" strokeWidth={2.25} />, color: "#2ED9A3", label: "Rutinlerim", onClick: onOpenRoutines, always: false },
-    { key: "hub", icon: <Compass className="w-4 h-4" strokeWidth={2.25} />, color: "#F0B37E", label: "Keşfet / Şablonlar", onClick: onOpenHub, always: true },
+    // FEATURE_FLAGS.SHOW_TEMPLATES=false iken gizli (bkz. constants.js +
+    // Header.jsx'teki AYNI bayrak) — kod SİLİNMEDİ.
+    { key: "hub", icon: <Compass className="w-4 h-4" strokeWidth={2.25} />, color: "#F0B37E", label: "Keşfet / Şablonlar", onClick: onOpenHub, always: true, hidden: !FEATURE_FLAGS.SHOW_TEMPLATES },
     { key: "tasks", icon: <ListChecks className="w-4 h-4" strokeWidth={2.25} />, color: "#00C2D6", label: "Görevler", onClick: onOpenTasks, always: false },
     { key: "community", icon: <Users2 className="w-4 h-4" strokeWidth={2.25} />, color: "#8B5CF6", label: "Routinix Nexus", onClick: onOpenCommunity, always: true },
     { key: "rhythm", icon: <BarChart3 className="w-4 h-4" strokeWidth={2.25} />, color: "#8B5CF6", label: "Ritim & Gün Sonu", onClick: onOpenRhythm, always: false },
     { key: "pomodoro", icon: <Timer className="w-4 h-4" strokeWidth={2.25} />, color: "#F0827A", label: "Pomodoro & Focus", onClick: onOpenPomodoro, always: true },
     { key: "plans", icon: <FolderOpen className="w-4 h-4" strokeWidth={2.25} />, color: "#64748B", label: "Planlarım", onClick: onOpenPlans, always: false },
     { key: "tour", icon: <HelpCircle className="w-4 h-4" strokeWidth={2.25} />, color: "#10B981", label: "Nasıl Kullanılır?", onClick: onOpenTour, always: true },
-  ].filter((t) => (t.always || user) && (t.key !== "plans" || savedPlansCount > 0));
+  ].filter((t) => !t.hidden && (t.always || user) && (t.key !== "plans" || savedPlansCount > 0));
 
   return (
     <>

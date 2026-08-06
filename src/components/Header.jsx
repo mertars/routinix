@@ -1,6 +1,7 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Timer, BarChart3, Users2, Menu, X, HelpCircle, Target } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { FEATURE_FLAGS } from "../constants";
 import SpotlightMenu from "./onboarding/SpotlightMenu";
 
 // Standart hamburger tetikleyici — her ekran boyutunda görünür (mobil/
@@ -70,7 +71,7 @@ function TourTrigger({ onClick }) {
 // tur) BİLEREK AYRI: bu buton belirli bir özelliği SEÇİP doğrudan o gerçek
 // arayüz elemanının üzerinde karartma+ok ile gösterir, tur baştan sona
 // izletmez. `relative` sarmalayıcı ZORUNLU — açılır menü buna göre konumlanır.
-function SpotlightTrigger({ open, onToggle, onClose, onNavigateIntro }) {
+function SpotlightTrigger({ open, onToggle, onClose, onNavigateIntro, savedPlansCount, onEnsurePlanOpen }) {
   return (
     <div className="relative">
       <button
@@ -82,7 +83,64 @@ function SpotlightTrigger({ open, onToggle, onClose, onNavigateIntro }) {
       >
         <Target className="w-[18px] h-[18px]" strokeWidth={2} />
       </button>
-      <SpotlightMenu open={open} onClose={onClose} onNavigateIntro={onNavigateIntro} />
+      <SpotlightMenu open={open} onClose={onClose} onNavigateIntro={onNavigateIntro} savedPlansCount={savedPlansCount} onEnsurePlanOpen={onEnsurePlanOpen} />
+    </div>
+  );
+}
+
+// 📋🗓️🔄 Birleşik Görev Yönetimi — üç ayrı "Görevler ve Planlar" / "Planlarım" /
+// "Rutinler" düğmesi TEK, ikon-only bir düğmede toplandı (masaüstü üst bar
+// kalabalığını/taşmasını azaltmak için). Tıklanınca 3 seçenekli bir
+// Glassmorphism dropdown açar; her seçenek MEVCUT toggle fonksiyonlarını
+// (onTasksClick/onPlansClick/onRoutinesClick — app.jsx'teki closeAllPanels
+// dahil TÜM davranış) BİREBİR çağırır — yalnızca giriş noktası birleşti,
+// sayfa/yönlendirme mantığında hiçbir şey değişmedi.
+function TaskManagementDropdown({ tasksActive, onTasksClick, plansActive, onPlansClick, routinesActive, onRoutinesClick }) {
+  const [open, setOpen] = useState(false);
+  const anyActive = tasksActive || plansActive || routinesActive;
+  const items = [
+    { key: "tasks", icon: "📋", label: "Görevlerim", active: tasksActive, onClick: onTasksClick },
+    { key: "plans", icon: "🗓️", label: "Planlarım", active: plansActive, onClick: onPlansClick },
+    { key: "routines", icon: "🔄", label: "Rutinlerim", active: routinesActive, onClick: onRoutinesClick },
+  ];
+  return (
+    <div className="relative">
+      <button
+        data-tour-id="tour-header-tasks"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Görevler, Planlar ve Rutinler"
+        title="Görevler, Planlar ve Rutinler"
+        className="flex items-center gap-1 rounded-lg px-2.5 h-9 transition-all"
+        style={{
+          background: anyActive ? "rgba(0,242,254,0.18)" : "rgba(0,242,254,0.10)",
+          border: "1px solid rgba(0,242,254,0.40)",
+          boxShadow: anyActive ? "0 0 14px -4px rgba(0,242,254,0.65)" : "0 0 10px -5px rgba(0,242,254,0.5)",
+        }}
+      >
+        <span className="text-[13px] leading-none">📋</span>
+        <span className="text-[13px] leading-none">🗓️</span>
+        <span className="text-[13px] leading-none">🔄</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-[95]" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-2 z-[96] w-52 rounded-2xl p-1.5 glass" style={{ boxShadow: "0 20px 50px -16px rgba(0,0,0,0.4)" }}>
+            {items.map((it) => (
+              <button
+                key={it.key}
+                onClick={() => {
+                  it.onClick();
+                  setOpen(false);
+                }}
+                className="w-full text-left px-3 py-2.5 rounded-xl text-[12.5px] font-semibold flex items-center gap-2.5 transition-colors"
+                style={it.active ? { background: "rgba(0,242,254,0.14)", color: "#00C2D6" } : { color: "var(--text-secondary)" }}
+              >
+                <span className="text-[14px]">{it.icon}</span> {it.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -118,6 +176,8 @@ function Header({
   onSpotlightToggle,
   onSpotlightClose,
   onNavigateIntro,
+  spotlightSavedPlansCount,
+  onSpotlightEnsurePlanOpen,
   menuOpen,
   onMenuToggle,
 }) {
@@ -131,7 +191,7 @@ function Header({
       className="sticky top-0 z-20 backdrop-blur-md"
       style={{ background: "rgba(var(--glass-rgb), var(--alpha-chrome))", borderBottom: "1px solid var(--border-header)" }}
     >
-      <header className="flex items-center justify-between gap-3 px-4 md:px-6 py-3.5 max-w-7xl mx-auto w-full">
+      <header className="flex flex-nowrap items-center justify-between gap-3 px-4 md:px-6 py-3.5 max-w-7xl mx-auto w-full">
         {/* Logo + marka yazısı: Ana Sayfa'ya döner, basılınca hafifçe küçülür */}
         <button
           onClick={onLogoClick}
@@ -165,65 +225,39 @@ function Header({
         <div className="flex items-center gap-1.5 md:gap-2">
           {/* Aksiyon butonları — mobilde hamburger menü (Hızlı Erişim) arkasında,
               masaüstünde navbar'da yatay sıralı. */}
-          <div className="hidden md:flex items-center gap-2">
-            {/* Şablon Keşfet — herkese açık (oturum gerektirmez, sadece "Kullan" gerektirir) */}
-            <button
-              onClick={onHubClick}
-              className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
-              style={{
-                background: hubActive ? "rgba(240,179,126,0.20)" : "rgba(240,179,126,0.10)",
-                color: "var(--amber-accent)",
-                border: "1px solid rgba(240,179,126,0.40)",
-                boxShadow: hubActive ? "0 0 16px -4px rgba(240,179,126,0.7)" : "0 0 10px -5px rgba(240,179,126,0.6)",
-              }}
-            >
-              <span className="text-[13px] leading-none">✨</span>
-              Şablon Keşfet
-            </button>
+          <div className="hidden md:flex items-center gap-2 min-w-0">
+            {/* Şablon Keşfet — FEATURE_FLAGS.SHOW_TEMPLATES=false iken gizli
+                (bkz. constants.js) — kod SİLİNMEDİ, yalnızca üst bar
+                kalabalığını azaltmak için görünürlükten çıkarıldı. */}
+            {FEATURE_FLAGS.SHOW_TEMPLATES && (
+              <button
+                onClick={onHubClick}
+                className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
+                style={{
+                  background: hubActive ? "rgba(240,179,126,0.20)" : "rgba(240,179,126,0.10)",
+                  color: "var(--amber-accent)",
+                  border: "1px solid rgba(240,179,126,0.40)",
+                  boxShadow: hubActive ? "0 0 16px -4px rgba(240,179,126,0.7)" : "0 0 10px -5px rgba(240,179,126,0.6)",
+                }}
+              >
+                <span className="text-[13px] leading-none">✨</span>
+                Şablon Keşfet
+              </button>
+            )}
 
-            {/* Görevler ve Planlar + Rutinler + Planlarım (oturum açıkken) */}
+            {/* Görevlerim/Planlarım/Rutinlerim — TEK birleşik ikon-only
+                dropdown'da (bkz. TaskManagementDropdown) + Ritim & Gün Sonu
+                (oturum açıkken) */}
             {user && (
               <>
-                <button
-                  data-tour-id="tour-header-tasks"
-                  onClick={onTasksClick}
-                  className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
-                  style={{
-                    background: tasksActive ? "rgba(0,242,254,0.20)" : "rgba(0,242,254,0.10)",
-                    color: "#00F2FE",
-                    border: "1px solid rgba(0,242,254,0.40)",
-                    boxShadow: tasksActive ? "0 0 16px -4px rgba(0,242,254,0.7)" : "0 0 10px -5px rgba(0,242,254,0.6)",
-                  }}
-                >
-                  <span className="text-[13px] leading-none">📋</span>
-                  Görevler ve Planlar
-                </button>
-                <button
-                  onClick={onRoutinesClick}
-                  className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
-                  style={{
-                    background: routinesActive ? "rgba(46,217,163,0.18)" : "rgba(46,217,163,0.09)",
-                    color: "#7DE9C3",
-                    border: "1px solid rgba(46,217,163,0.38)",
-                    boxShadow: routinesActive ? "0 0 16px -4px rgba(46,217,163,0.65)" : "0 0 10px -5px rgba(46,217,163,0.55)",
-                  }}
-                >
-                  <span className="text-[13px] leading-none">🔁</span>
-                  Rutinler
-                </button>
-                <button
-                  onClick={onPlansClick}
-                  className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
-                  style={{
-                    background: plansActive ? "rgba(143,160,255,0.20)" : "rgba(143,160,255,0.10)",
-                    color: "#8FA0FF",
-                    border: "1px solid rgba(143,160,255,0.40)",
-                    boxShadow: plansActive ? "0 0 16px -4px rgba(143,160,255,0.7)" : "0 0 10px -5px rgba(143,160,255,0.6)",
-                  }}
-                >
-                  <span className="text-[13px] leading-none">📂</span>
-                  Planlarım
-                </button>
+                <TaskManagementDropdown
+                  tasksActive={tasksActive}
+                  onTasksClick={onTasksClick}
+                  plansActive={plansActive}
+                  onPlansClick={onPlansClick}
+                  routinesActive={routinesActive}
+                  onRoutinesClick={onRoutinesClick}
+                />
                 <button
                   onClick={onRhythmClick}
                   className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
@@ -301,7 +335,14 @@ function Header({
             </button>
           )}
           <TourTrigger onClick={onTourClick} />
-          <SpotlightTrigger open={spotlightOpen} onToggle={onSpotlightToggle} onClose={onSpotlightClose} onNavigateIntro={onNavigateIntro} />
+          <SpotlightTrigger
+            open={spotlightOpen}
+            onToggle={onSpotlightToggle}
+            onClose={onSpotlightClose}
+            onNavigateIntro={onNavigateIntro}
+            savedPlansCount={spotlightSavedPlansCount}
+            onEnsurePlanOpen={onSpotlightEnsurePlanOpen}
+          />
           <ThemeToggle />
           <MenuTrigger open={menuOpen} onToggle={onMenuToggle} />
         </div>

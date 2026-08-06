@@ -744,7 +744,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
             <section className={`${mobileStep === 1 ? "block" : "hidden"} lg:block lg:sticky lg:top-0`}>
               <div className="glass rounded-3xl p-5 lg:p-6 flex flex-col gap-5">
                 <div>
-                  <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)] mb-2" style={{ fontFamily: MONO_FONT }}>
+                  <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)] mb-2" style={{ fontFamily: MONO_FONT }}>
                     Plan Başlığı
                   </label>
                   <input
@@ -758,7 +758,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)] mb-2" style={{ fontFamily: MONO_FONT }}>
+                  <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)] mb-2" style={{ fontFamily: MONO_FONT }}>
                     Gün Sayısı
                   </label>
                   <div className="flex flex-wrap items-center gap-2">
@@ -814,7 +814,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                     olası alanın HEPSİNİ her zaman göstermek yerine kullanıcı
                     yalnızca bu plan için gerçekten gereken alanları seçer. */}
                 <div>
-                  <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)] mb-2" style={{ fontFamily: MONO_FONT }}>
+                  <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)] mb-2" style={{ fontFamily: MONO_FONT }}>
                     Görev Özellikleri
                   </label>
                   <div className="flex flex-wrap gap-1.5">
@@ -824,8 +824,8 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                         <button
                           key={key}
                           onClick={() => toggleAttr(key)}
-                          className="flex items-center gap-1.5 rounded-full pl-2.5 pr-3 min-h-[40px] lg:min-h-0 lg:py-1.5 text-[11.5px] font-semibold transition-all duration-200"
-                          style={active ? GLOW_ACTIVE_STYLE : { background: "var(--bg-input)", color: "var(--text-faint)" }}
+                          className="flex items-center gap-1.5 rounded-full pl-2.5 pr-3 min-h-[40px] lg:min-h-0 lg:py-1.5 text-[11.5px] font-semibold transition-all duration-200 border"
+                          style={active ? GLOW_ACTIVE_STYLE : { background: "var(--bg-input)", color: "var(--text-secondary)", borderColor: "var(--border-default)" }}
                         >
                           <Icon className="w-3.5 h-3.5" />
                           {label}
@@ -833,7 +833,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                       );
                     })}
                   </div>
-                  <p className="mt-2 text-[10.5px] text-[var(--text-faint)] leading-relaxed">
+                  <p className="mt-2 text-[10.5px] text-[var(--text-muted)] leading-relaxed">
                     Açtığın özellikler Hızlı Ekle formunda ve görev kartlarında görünür.
                   </p>
                 </div>
@@ -873,7 +873,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                   </div>
 
                   {routineItems.length === 0 ? (
-                    <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
+                    <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
                       Günlere bağlı değildir — plan boyunca her gün geçerli genel alışkanlıklar (ör. su içmek, esnemek).
                     </p>
                   ) : (
@@ -1101,7 +1101,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                       const selected = quickPriority === p;
                       const st = PRIORITY_STYLE[p];
                       return (
-                        <button key={p} onClick={() => setQuickPriority(selected ? null : p)} className="min-h-[40px] sm:min-h-0 text-[11px] font-semibold px-2.5 sm:py-1.5 rounded-full transition-colors" style={{ background: selected ? st.bg : "var(--bg-input)", color: selected ? st.color : "var(--text-faint)" }}>
+                        <button key={p} onClick={() => setQuickPriority(selected ? null : p)} className="min-h-[40px] sm:min-h-0 text-[11px] font-semibold px-2.5 sm:py-1.5 rounded-full transition-colors" style={{ background: selected ? st.bg : "var(--bg-input)", color: selected ? st.color : "var(--text-secondary)", border: selected ? "1px solid transparent" : "1px solid var(--border-default)" }}>
                           {p}
                         </button>
                       );
@@ -1111,7 +1111,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                         const selected = quickExtras.energyLevel === lvl;
                         const st = ENERGY_STYLE[lvl];
                         return (
-                          <button key={lvl} onClick={() => setQuickExtras((p) => ({ ...p, energyLevel: selected ? null : lvl }))} className="min-h-[40px] sm:min-h-0 text-[11px] font-semibold px-2.5 sm:py-1.5 rounded-full transition-colors" style={{ background: selected ? st.bg : "var(--bg-input)", color: selected ? st.color : "var(--text-faint)" }}>
+                          <button key={lvl} onClick={() => setQuickExtras((p) => ({ ...p, energyLevel: selected ? null : lvl }))} className="min-h-[40px] sm:min-h-0 text-[11px] font-semibold px-2.5 sm:py-1.5 rounded-full transition-colors" style={{ background: selected ? st.bg : "var(--bg-input)", color: selected ? st.color : "var(--text-secondary)", border: selected ? "1px solid transparent" : "1px solid var(--border-default)" }}>
                             {st.icon} {lvl}
                           </button>
                         );
@@ -1207,7 +1207,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                           const selected = t.priority === p;
                           const st = PRIORITY_STYLE[p];
                           return (
-                            <button key={p} onClick={() => updateTask(t.localId, { priority: selected ? null : p })} className="min-h-[40px] md:min-h-0 text-[10.5px] font-semibold px-2.5 md:px-2 md:py-1 rounded-full transition-colors" style={{ background: selected ? st.bg : "var(--bg-input)", color: selected ? st.color : "var(--text-faint)" }}>
+                            <button key={p} onClick={() => updateTask(t.localId, { priority: selected ? null : p })} className="min-h-[40px] md:min-h-0 text-[10.5px] font-semibold px-2.5 md:px-2 md:py-1 rounded-full transition-colors" style={{ background: selected ? st.bg : "var(--bg-input)", color: selected ? st.color : "var(--text-secondary)", border: selected ? "1px solid transparent" : "1px solid var(--border-default)" }}>
                               {p}
                             </button>
                           );

@@ -5,6 +5,16 @@
 
 export const MONO_FONT = "ui-monospace, SFMono-Regular, Menlo, monospace";
 
+// Basit özellik bayrakları — kod SİLİNMEDEN, yalnızca render'dan çıkarılır.
+// SHOW_TEMPLATES: false iken Header'daki "Şablon Keşfet" düğmesi ve
+// DrawerMenu'deki "Keşfet / Şablonlar" satırı GİZLENİR (TemplateHub.jsx'in
+// kendisi, `hub`/`t/` deep-link akışı vb. HİÇBİR ŞEY silinmedi) — yalnızca
+// üst bar kalabalığını azaltmak için geçici bir görünürlük anahtarı.
+// true yapılınca HİÇBİR başka değişiklik gerekmeden anında geri döner.
+export const FEATURE_FLAGS = {
+  SHOW_TEMPLATES: false,
+};
+
 export const CATEGORIES = {
   software: {
     key: "software",

@@ -88,10 +88,19 @@ export default function App() {
   const [tourOpen, setTourOpen] = useState(false);
   const [spotlightOpen, setSpotlightOpen] = useState(false);
 
-  // İlk ziyarette otomatik Onboarding Turu — yalnızca mount'ta BİR KEZ
-  // kontrol edilir (bağımlılık dizisi boş). localStorage okunamazsa (gizli
-  // tarama/quota) tur SESSİZCE gösterilmez — uygulama asla bu yüzden çökmez.
+  // İlk ziyarette otomatik Onboarding Turu — SADECE giriş yapmamış/misafir
+  // (anonim) kullanıcılara. Gerçek bir hesapla (isAuthenticated) giren
+  // kullanıcıya BU EFEKT bir daha ASLA otomatik açılmaz — `auth.authReady`
+  // false iken (oturum henüz Supabase'den yüklenmedi) KESİNLİKLE karar
+  // VERİLMEZ; aksi halde gerçek hesabı olan bir kullanıcı, oturumu henüz
+  // gelmeden önceki kısa pencerede "misafirmiş gibi" turu görüp hemen
+  // ardından kapanışını izlerdi (rahatsız edici bir yanıp-sönme). Bağımlılık
+  // dizisi bu yüzden auth durumuna bağlı — yalnızca mount'ta değil, oturum
+  // GERÇEKTEN çözüldüğü an bir kez değerlendirilir.
   useEffect(() => {
+    if (!auth.authReady) return;
+    const isAuthenticated = !!auth.user && !auth.isAnonymous;
+    if (isAuthenticated) return;
     try {
       if (localStorage.getItem(ONBOARDING_STORAGE_KEY) !== "true") {
         setTourOpen(true);
@@ -99,7 +108,7 @@ export default function App() {
     } catch (err) {
       logger.warn("ONBOARDING", "localStorage okunamadı, tur atlanıyor", { error: err?.message });
     }
-  }, []);
+  }, [auth.authReady, auth.user, auth.isAnonymous]);
   // Tek, paylaşılan "auth iste" tetikleyicisi — hem düz "Giriş Yap" tıklamaları
   // (mesajsız, `requireAuth()`) hem de AI kilidi (mesajlı, `requireAuth(AI_GATE_MESSAGE)`)
   // BUNU kullanır; usePlanStudio'nun `onRequireAuth` prop'una GEÇİLEBİLMESİ için
@@ -217,6 +226,14 @@ export default function App() {
   // burada yalnızca açık/kapalı durumu tutulur.
   const toggleSpotlight = useCallback(() => setSpotlightOpen((v) => !v), []);
   const closeSpotlight = useCallback(() => setSpotlightOpen(false), []);
+  // "Aktif Plan Ekranı" Spotlight girişi — yalnızca CURRENTLY açık bir plan
+  // YOKSA (stage !== STAGE_PLAN) ilk kayıtlı planı açar; zaten bir plan
+  // açıksa dokunmaz (gereksiz yeniden-getirme/kısa titreşim olmasın).
+  const ensurePlanOpenForSpotlight = useCallback(() => {
+    if (stage !== STAGE_PLAN && ps.savedPlans.length > 0) {
+      ps.openSavedPlan(ps.savedPlans[0].id);
+    }
+  }, [stage, ps.savedPlans, ps.openSavedPlan]);
   // Görev kartındaki "Başlat" — Pomodoro Studio'yu bu görev seçiliyken açar
   // (bkz. PomodoroStudio.jsx `initialTask` prop'u). Tam görev objesi TaskCard'dan
   // geldiği için PomodoroStudio kendi başına ayrı bir plan/görev fetch'i
@@ -354,6 +371,8 @@ export default function App() {
           onSpotlightToggle={toggleSpotlight}
           onSpotlightClose={closeSpotlight}
           onNavigateIntro={ps.resetToIntro}
+          spotlightSavedPlansCount={ps.savedPlans.length}
+          onSpotlightEnsurePlanOpen={ensurePlanOpenForSpotlight}
           menuOpen={ps.menuOpen}
           onMenuToggle={toggleHamburger}
         />
