@@ -1,6 +1,7 @@
 import { memo } from "react";
-import { Timer, BarChart3, Users2, Menu, X, HelpCircle } from "lucide-react";
+import { Timer, BarChart3, Users2, Menu, X, HelpCircle, Target } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import SpotlightMenu from "./onboarding/SpotlightMenu";
 
 // Standart hamburger tetikleyici — her ekran boyutunda görünür (mobil/
 // masaüstü ayrımı YOK, klasik/tutarlı davranış). Açıkken ikon ≡'den X'e
@@ -64,6 +65,28 @@ function TourTrigger({ onClick }) {
   );
 }
 
+// 🎯 Hızlı Öğretici — Spotlight Interactive Guide Engine'in giriş kapısı
+// (bkz. onboarding/SpotlightMenu.jsx). ❓ Rehber'den (tam ekran, adım adım
+// tur) BİLEREK AYRI: bu buton belirli bir özelliği SEÇİP doğrudan o gerçek
+// arayüz elemanının üzerinde karartma+ok ile gösterir, tur baştan sona
+// izletmez. `relative` sarmalayıcı ZORUNLU — açılır menü buna göre konumlanır.
+function SpotlightTrigger({ open, onToggle, onClose, onNavigateIntro }) {
+  return (
+    <div className="relative">
+      <button
+        onClick={onToggle}
+        aria-label="Hızlı Öğretici"
+        title="Hızlı Öğretici"
+        className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+        style={open ? { color: "#F0B37E", background: "rgba(240,179,126,0.14)", border: "1px solid rgba(240,179,126,0.4)" } : { color: "var(--text-secondary)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}
+      >
+        <Target className="w-[18px] h-[18px]" strokeWidth={2} />
+      </button>
+      <SpotlightMenu open={open} onClose={onClose} onNavigateIntro={onNavigateIntro} />
+    </div>
+  );
+}
+
 // App'in kök state'inde (usePlanStudio) çoğu değişiklik (ör. "goal" alanına
 // her tuş vuruşu) Header'ın props'larını ETKİLEMEZ — App.jsx'teki tüm
 // callback'ler useCallback ile sarılı olduğundan, memo bu durumlarda Header'ın
@@ -91,6 +114,10 @@ function Header({
   onSignOut,
   onLogoClick,
   onTourClick,
+  spotlightOpen,
+  onSpotlightToggle,
+  onSpotlightClose,
+  onNavigateIntro,
   menuOpen,
   onMenuToggle,
 }) {
@@ -158,6 +185,7 @@ function Header({
             {user && (
               <>
                 <button
+                  data-tour-id="tour-header-tasks"
                   onClick={onTasksClick}
                   className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
                   style={{
@@ -217,6 +245,7 @@ function Header({
                 kullanıcı-adı akışıyla istenir). Cyan aksan — modülün kendi
                 mor/cyan neon-glass kimliğiyle eşleşir. */}
             <button
+              data-tour-id="tour-header-nexus"
               onClick={onCommunityClick}
               className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
               style={{
@@ -232,6 +261,7 @@ function Header({
 
             {/* Pomodoro & Focus Studio — herkese açık (Şablon Keşfet gibi, oturum gerektirmez) */}
             <button
+              data-tour-id="tour-header-pomodoro"
               onClick={onPomodoroClick}
               className="flex items-center gap-1.5 rounded-lg px-3 h-9 text-[12px] font-semibold transition-all"
               style={{
@@ -271,6 +301,7 @@ function Header({
             </button>
           )}
           <TourTrigger onClick={onTourClick} />
+          <SpotlightTrigger open={spotlightOpen} onToggle={onSpotlightToggle} onClose={onSpotlightClose} onNavigateIntro={onNavigateIntro} />
           <ThemeToggle />
           <MenuTrigger open={menuOpen} onToggle={onMenuToggle} />
         </div>

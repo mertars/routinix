@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CloudCheck, Wand2, FileDown, ClipboardPaste, Check, Music2, ListMusic, Search, Heart } from "lucide-react";
+import { CloudCheck, Wand2, FileDown, ClipboardPaste, Check, Music2, ListMusic, Search, Heart, HelpCircle, Moon, Menu } from "lucide-react";
 import { CATEGORIES, CATEGORY_KEYS } from "../../constants";
 
 // OnboardingTour'un 10 adımının mikro-UI vitrinleri — HİÇBİR PNG/JPG YOK,
@@ -210,26 +210,33 @@ export function PlanBoardDemo({ sub, accent }) {
 }
 
 // ---- 5. PDF Çıktı Motoru ----
-export function PdfDemo({ accent }) {
+export function PdfDemo({ accent, onPreview }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="w-full h-full flex items-center justify-center gap-6 px-4">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="shrink-0 flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-[11.5px] font-bold text-white transition-all"
-        style={{ background: accent, boxShadow: `0 0 16px -3px ${accent}` }}
-      >
-        <FileDown className="w-4 h-4" /> PDF İndir
-      </button>
-      <div
-        className="w-16 h-20 rounded-md bg-white shadow-lg flex flex-col gap-1.5 p-2.5 transition-all duration-500 shrink-0"
-        style={{ transform: open ? "translateX(0) rotate(0deg)" : "translateX(-16px) rotate(-8deg)", opacity: open ? 1 : 0.35 }}
-      >
-        <div className="h-1.5 w-8 rounded-full bg-slate-800" />
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-[3px] rounded-full bg-slate-300" style={{ width: `${74 - i * 9}%` }} />
-        ))}
+    <div className="w-full h-full flex flex-col items-center justify-center gap-3 px-4">
+      <div className="flex items-center justify-center gap-6">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="shrink-0 flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-[11.5px] font-bold text-white transition-all"
+          style={{ background: accent, boxShadow: `0 0 16px -3px ${accent}` }}
+        >
+          <FileDown className="w-4 h-4" /> PDF İndir
+        </button>
+        <div
+          className="w-16 h-20 rounded-md bg-white shadow-lg flex flex-col gap-1.5 p-2.5 transition-all duration-500 shrink-0"
+          style={{ transform: open ? "translateX(0) rotate(0deg)" : "translateX(-16px) rotate(-8deg)", opacity: open ? 1 : 0.35 }}
+        >
+          <div className="h-1.5 w-8 rounded-full bg-slate-800" />
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-[3px] rounded-full bg-slate-300" style={{ width: `${74 - i * 9}%` }} />
+          ))}
+        </div>
       </div>
+      {onPreview && (
+        <button onClick={onPreview} className="text-[11px] font-bold underline underline-offset-2 transition-opacity hover:opacity-75" style={{ color: accent }}>
+          Örnek Belgeyi Canlı Önizle →
+        </button>
+      )}
     </div>
   );
 }
@@ -502,6 +509,41 @@ export function ShareDemo({ accent }) {
       <span className="rounded-full px-3 py-1.5 text-[10px] font-bold" style={{ background: "rgba(46,217,163,0.14)", color: "#2ED9A3" }}>
         🔓 Hesapsız Misafir Erişimi
       </span>
+    </div>
+  );
+}
+
+// ---- 11. Rehbere Her An Erişim ----
+// [❓] [🌙] [☰] rozet grubunun GERÇEK Header.jsx sırasıyla (Rehber → Tema →
+// Menü) birebir aynı simülasyonu — hover/tıklamada neon vurgu.
+export function HeaderMenuDemo({ accent }) {
+  const [active, setActive] = useState("help");
+  const items = [
+    { key: "help", Icon: HelpCircle, label: "Rehber" },
+    { key: "theme", Icon: Moon, label: "Tema" },
+    { key: "menu", Icon: Menu, label: "Menü" },
+  ];
+  return (
+    <div className="w-full flex items-center justify-center gap-3">
+      {items.map(({ key, Icon, label }) => {
+        const on = active === key;
+        return (
+          <button
+            key={key}
+            onClick={() => setActive(key)}
+            className="relative w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300"
+            style={on ? { background: `${accent}22`, border: `1px solid ${accent}`, boxShadow: `0 0 16px -3px ${accent}` } : { background: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}
+          >
+            <Icon className="w-[18px] h-[18px]" style={{ color: on ? accent : "var(--text-secondary)" }} />
+            <span
+              className="absolute -bottom-5 text-[9px] font-bold whitespace-nowrap transition-opacity duration-200"
+              style={{ color: accent, opacity: on ? 1 : 0 }}
+            >
+              {label}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

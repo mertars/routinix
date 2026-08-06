@@ -86,6 +86,7 @@ export default function App() {
   const [printOpen, setPrintOpen] = useState(false);
   const [printRange, setPrintRange] = useState(Infinity);
   const [tourOpen, setTourOpen] = useState(false);
+  const [spotlightOpen, setSpotlightOpen] = useState(false);
 
   // İlk ziyarette otomatik Onboarding Turu — yalnızca mount'ta BİR KEZ
   // kontrol edilir (bağımlılık dizisi boş). localStorage okunamazsa (gizli
@@ -211,6 +212,11 @@ export default function App() {
     ps.setMenuOpen(false);
     setTourOpen(true);
   }, [ps.setMenuOpen]);
+  // Spotlight Interactive Guide Engine (Hızlı Öğretici) — açılır menünün
+  // kendisi Header'ın içinde yaşar (bkz. SpotlightTrigger/SpotlightMenu),
+  // burada yalnızca açık/kapalı durumu tutulur.
+  const toggleSpotlight = useCallback(() => setSpotlightOpen((v) => !v), []);
+  const closeSpotlight = useCallback(() => setSpotlightOpen(false), []);
   // Görev kartındaki "Başlat" — Pomodoro Studio'yu bu görev seçiliyken açar
   // (bkz. PomodoroStudio.jsx `initialTask` prop'u). Tam görev objesi TaskCard'dan
   // geldiği için PomodoroStudio kendi başına ayrı bir plan/görev fetch'i
@@ -344,6 +350,10 @@ export default function App() {
           onSignOut={requestSignOut}
           onLogoClick={onLogoClick}
           onTourClick={openTour}
+          spotlightOpen={spotlightOpen}
+          onSpotlightToggle={toggleSpotlight}
+          onSpotlightClose={closeSpotlight}
+          onNavigateIntro={ps.resetToIntro}
           menuOpen={ps.menuOpen}
           onMenuToggle={toggleHamburger}
         />

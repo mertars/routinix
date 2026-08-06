@@ -119,7 +119,7 @@ export default function CategoryIntro({
           konumlandırmak için gerekli — 4 kartın da eşit boyutta/simetrik
           olduğu bu grid'de o nokta görsel olarak gerçekten "ortadır". */}
       <div className="flex-1 min-h-0 flex items-center md:flex-none md:block py-3 md:py-0">
-        <div className="relative w-full grid grid-cols-2 gap-2.5 md:gap-5">
+        <div data-tour-id="tour-category-cards" className="relative w-full grid grid-cols-2 gap-2.5 md:gap-5">
           {CATEGORY_KEYS.map((key) => {
             const c = CATEGORIES[key];
             const active = key === category;
@@ -163,6 +163,7 @@ export default function CategoryIntro({
                   değerle çağırır — builder hiç açılmadan kısa bir yükleniyor
                   ekranından sonra sessizce başarısız olur. */}
               <button
+                data-tour-id="tour-manual-plan-button"
                 onClick={() => onOpenManualBuilder()}
                 aria-label="Kendi Planını Hazırla"
                 className="relative w-11 h-11 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95"

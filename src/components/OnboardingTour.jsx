@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { X, Check } from "lucide-react";
+import { X, Check, ChevronLeft } from "lucide-react";
 import { ONBOARDING_STORAGE_KEY } from "../constants";
 import logger from "../utils/logger";
 import {
@@ -13,7 +13,9 @@ import {
   PomodoroDemo,
   NexusDemo,
   ShareDemo,
+  HeaderMenuDemo,
 } from "./onboarding/microDemos";
+import SamplePdfModal from "./onboarding/SamplePdfModal";
 
 // İlk kez gelen kullanıcıya gösterilen 10 adımlı, %100 canlı-kodlanmış
 // (SIFIR PNG/JPG) mikro-UI vitrini. localStorage'da BİR KEZ görüldü
@@ -41,32 +43,35 @@ function markOnboardingSeen() {
 const STEPS = [
   {
     key: "sync",
-    badge: "1 / 10 · Giriş & Senkronizasyon",
+    badge: "1 / 11 · Giriş & Senkronizasyon",
     title: "Gücünü Hesabınla Birleştir",
-    description: "Sağ üstteki \"Giriş Yap\" ile profilini oluştur; tüm planların, rutinlerin ve ilerlemen her cihazında anında eşleşsin.",
+    description:
+      "1. Sağ üstteki \"Giriş Yap\" butonuna tıkla ➔ 2. Email/şifreni gir ya da Google ile devam et ➔ 3. Artık tüm planların, rutinlerin ve ilerlemen otomatik olarak bulutta saklanır, her cihazında seni bekler.",
     accent: "#00C2D6",
     Demo: SyncDemo,
     subSteps: null,
   },
   {
     key: "command-center",
-    badge: "2 / 10 · Komuta Merkezi",
+    badge: "2 / 11 · Komuta Merkezi",
     title: "4 Uzman Kadrosu, Tek Cümlelik Hedef",
-    description: "Seni anlayan 4 uzman persona eşliğinde hedefini yaz, sana özel plan anında hazırlansın. Dilersen ortadaki dairesel tuşla kendi planını tamamen elle de kurabilirsin.",
+    description:
+      "1. Üstteki 4 karttan (Yazılım/Fitness/Seyahat/Öğrenme) sana uygun uzmanı seç ➔ 2. Alttaki kutuya hedefini tek cümleyle yaz ➔ 3. \"Başla\" butonuna bas, birkaç yönlendirme sorusunu cevapla ➔ 4. Sana özel plan otomatik kurulsun. Yapay zeka olmadan kendi planını kurmak istersen ortadaki mor-pembe dairesel tuşa bas.",
     accent: "#B26BFF",
     Demo: CommandCenterDemo,
     subSteps: [
-      { key: "categories", label: "4 Uzman" },
-      { key: "goal", label: "Tek Cümleyle Başla" },
-      { key: "questions", label: "Yönlendirme" },
-      { key: "manual", label: "Manuel Plan" },
+      { key: "categories", label: "1. Uzmanı Seç" },
+      { key: "goal", label: "2. Hedefini Yaz" },
+      { key: "questions", label: "3. Soruları Cevapla" },
+      { key: "manual", label: "Ya da: Manuel Plan" },
     ],
   },
   {
     key: "task-modules",
-    badge: "3 / 10 · Modüler Görev Kartları",
+    badge: "3 / 11 · Modüler Görev Kartları",
     title: "Her Alan Kendi Diline Göre Konuşur",
-    description: "Aynı görev kartı, seçtiğin uzmana göre kendi rengine ve alanlarına bürünür — yazılımda pomodoro/süre, fitness'ta öncelik, seyahatte bütçe/konum, öğrenmede hedef metrik.",
+    description:
+      "Yukarıdaki 4 sekmeye tıkla, aynı görev kartının kategoriye göre nasıl şekil değiştirdiğini gör: yazılımda 🍅 pomodoro sayacı, fitness'ta öncelik rozeti, seyahatte 🏷️ bütçe ve 📍 konum, öğrenmede 🎯 hedef metrik alanı belirir.",
     accent: "#6E7BFF",
     Demo: TaskModulesDemo,
     subSteps: [
@@ -78,81 +83,98 @@ const STEPS = [
   },
   {
     key: "plan-board",
-    badge: "4 / 10 · Plan Panosu & İnce Ayar",
+    badge: "4 / 11 · Plan Panosu & İnce Ayar",
     title: "Planın Üzerinde %100 Hakimiyet",
-    description: "Günler ve haftalar arasında anında geçiş yap, görev başlıklarını yerinde düzenle, tikle ve günün rutin kartını takip et.",
+    description:
+      "1. Üstteki gün/hafta sekmelerine tıkla, aralarında anında geçiş yap ➔ 2. \"Tane Tane Düzenle\" sekmesinde bir görev başlığına dokun, yerinde düzenle ➔ 3. \"Tikle & Rutin\" sekmesinde kare kutuya tıklayarak görevi tamamlanmış işaretle, altındaki rutin kartını takip et.",
     accent: "#8B5CF6",
     Demo: PlanBoardDemo,
     subSteps: [
-      { key: "pills", label: "Gün/Hafta Geçişi" },
-      { key: "edit", label: "Tane Tane Düzenle" },
-      { key: "check", label: "Tikle & Rutin" },
+      { key: "pills", label: "1. Gün/Hafta Geçişi" },
+      { key: "edit", label: "2. Tane Tane Düzenle" },
+      { key: "check", label: "3. Tikle & Rutin" },
     ],
   },
   {
     key: "pdf",
-    badge: "5 / 10 · PDF Çıktı Motoru",
+    badge: "5 / 11 · PDF Çıktı Motoru",
     title: "Planların Sanat Eseri Gibi Elinde",
-    description: "Tek tıkla, çevrimdışı da okunabilecek şık, matbaa kalitesinde bir PDF çıktısı al.",
+    description:
+      "1. \"PDF İndir\" butonuna bas ➔ 2. Planın matbaa kalitesinde, A4 formatında bir belgeye dönüşsün ➔ 3. Nasıl göründüğünü merak ediyorsan aşağıdaki \"Örnek Belgeyi Canlı Önizle\" bağlantısına tıkla — gerçek çıktının birebir aynısını burada görebilirsin.",
     accent: "#F0B37E",
     Demo: PdfDemo,
     subSteps: null,
   },
   {
     key: "studio",
-    badge: "6 / 10 · Studio Builder",
+    badge: "6 / 11 · Studio Builder",
     title: "Dosyalarını Planına, Planını Takvimine Bağla",
-    description: ".ics ile Google/Apple Takvim'e aktar, JSON/PDF ile yedekle ya da dışarıdan dosya yükle. Görev paketlerini kopyala, istediğin güne yapıştır; her görevin süre/bütçe/konum gibi alanlarını istediğin gibi aç-kapa.",
+    description:
+      "1. \"İçe/Dışa Aktar\" sekmesinde bir format seç (.ics/JSON/PDF/Yükle) — planını takvimine bağla ya da yedekle ➔ 2. \"Kopyala-Yapıştır\" sekmesinde bir günün görevlerini seçip başka bir güne anında çoğalt ➔ 3. \"Parametre Ekle\" sekmesinde her görevin süre/bütçe/konum gibi alanlarını istediğin gibi aç ya da kapat.",
     accent: "#00C2FF",
     Demo: StudioOrchestrationDemo,
     subSteps: [
-      { key: "io", label: "İçe/Dışa Aktar" },
-      { key: "clipboard", label: "Kopyala-Yapıştır" },
-      { key: "params", label: "Parametre Ekle" },
+      { key: "io", label: "1. İçe/Dışa Aktar" },
+      { key: "clipboard", label: "2. Kopyala-Yapıştır" },
+      { key: "params", label: "3. Parametre Ekle" },
     ],
   },
   {
     key: "overview",
-    badge: "7 / 10 · Panoramik Kontrol Paneli",
+    badge: "7 / 11 · Panoramik Kontrol Paneli",
     title: "Odağını Asla Kaybetme",
-    description: "Rutinlerini, aktif görevlerini ve tüm planlarını tek bir panelden, ilerleme çubuklarıyla takip et.",
+    description:
+      "\"Görevler ve Planlar\" panelini açtığında rutinlerinin, aktif görevlerinin ve tüm planlarının ilerleme yüzdesini tek bakışta görürsün — hangi alanın geride kaldığını anında fark edersin.",
     accent: "#8FA0FF",
     Demo: OverviewDemo,
     subSteps: null,
   },
   {
     key: "pomodoro",
-    badge: "8 / 10 · Pomodoro & Derin Odak",
+    badge: "8 / 11 · Pomodoro & Derin Odak",
     title: "Müziğini Bağla, Odağa Geç",
-    description: "Süreni ayarla, görevini seç; Spotify ya da YouTube Music ile çalış. Odak Modu'nda gereksiz kontroller gözden kaybolsun, geriye yalnızca sayaç kalsın.",
+    description:
+      "1. \"Süre & Görev\" sekmesinde çalışma süreni ayarla, bağlı görevi seç ➔ 2. \"Müzik\" sekmesinde Spotify ya da YouTube Music'i başlat ➔ 3. \"Odak Modu\" sekmesine geç — gereksiz kontroller gözden kaybolsun, geriye yalnızca sayaç kalsın.",
     accent: "#FB7185",
     Demo: PomodoroDemo,
     subSteps: [
-      { key: "timer", label: "Süre & Görev" },
-      { key: "music", label: "Müzik" },
-      { key: "focus", label: "Odak Modu" },
+      { key: "timer", label: "1. Süre & Görev" },
+      { key: "music", label: "2. Müzik" },
+      { key: "focus", label: "3. Odak Modu" },
     ],
   },
   {
     key: "nexus",
-    badge: "9 / 10 · Nexus Sosyal Ekosistem",
+    badge: "9 / 11 · Nexus Sosyal Ekosistem",
     title: "Toplulukla Keşfet, Haftanı Kutla",
-    description: "Topluluğun şablonlarını incele, beğen, kendi planlarına ekle. Haftalık gelişimini Instagram Wrapped tarzı bir hikaye kartıyla paylaş.",
+    description:
+      "1. \"Keşfet & Beğen\" sekmesinde topluluğun paylaştığı planları incele, kalp ikonuyla beğen ➔ 2. \"Filtrele & Ara\" ile aradığın kategoriye/kelimeye anında ulaş ➔ 3. \"Haftalık Wrapped\" sekmesinde bu haftaki tamamlama oranını Instagram Story formatında gör ve paylaş.",
     accent: "#22D3EE",
     Demo: NexusDemo,
     subSteps: [
-      { key: "explore", label: "Keşfet & Beğen" },
-      { key: "filter", label: "Filtrele & Ara" },
-      { key: "wrapped", label: "Haftalık Wrapped" },
+      { key: "explore", label: "1. Keşfet & Beğen" },
+      { key: "filter", label: "2. Filtrele & Ara" },
+      { key: "wrapped", label: "3. Haftalık Wrapped" },
     ],
   },
   {
     key: "share",
-    badge: "10 / 10 · Canlı Paylaşım",
+    badge: "10 / 11 · Canlı Paylaşım",
     title: "Hesap Açma Şartı Yok",
-    description: "Planını canlı bir linkle paylaş; arkadaşların hiç hesap açmadan, misafir olarak anında görüntülesin.",
+    description:
+      "1. Bir planı Nexus'ta şablon olarak paylaştığında sana özel bir link üretilir ➔ 2. \"Kopyala\" butonuna bas, linki arkadaşınla paylaş ➔ 3. Arkadaşın hiç hesap açmadan, misafir olarak planı anında görüntüleyebilir.",
     accent: "#2ED9A3",
     Demo: ShareDemo,
+    subSteps: null,
+  },
+  {
+    key: "guide-access",
+    badge: "11 / 11 · Rehbere Her An Erişim",
+    title: "❓ İstediğin Zaman Tekrar Aç!",
+    description:
+      "Sağ üst menüdeki ❓ (Rehber) ikonuna dilediğin zaman basarak bu öğretici ekranlara yeniden ulaşabilirsin. Hemen yanındaki 🎯 (Hızlı Öğretici) ikonu ise belirli bir özelliği seçmene ve doğrudan o arayüz elemanının üzerinde ok+açıklamayla gösterilmesine yarar.",
+    accent: "#F0827A",
+    Demo: HeaderMenuDemo,
     subSteps: null,
   },
 ];
@@ -176,6 +198,7 @@ export default function OnboardingTour({ open, onClose }) {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [activeSub, setActiveSub] = useState(() => STEPS[0].subSteps?.[0]?.key ?? null);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
   const touchStartXRef = useRef(null);
 
   if (!open) return null;
@@ -245,14 +268,14 @@ export default function OnboardingTour({ open, onClose }) {
           <X className="w-4 h-4" />
         </button>
 
-        <div className="p-5 sm:p-6" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        <div className="p-5 sm:p-6 max-h-[85vh] overflow-y-auto no-scrollbar" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           {/* key ile hem adım hem alt-adım değişince YENİDEN MOUNT edilir —
               tour-step-in CSS animasyonu (yay-fizikli, cubic-bezier(0.34,
               1.56,0.64,1)) bu sayede her geçişte baştan oynar, ekstra JS
               animasyon state'i gerekmeden. --tour-dir yönü taşır. */}
           <div key={`${step}-${activeSub}`} className="tour-step-in" style={{ "--tour-dir": direction }}>
             <DemoFrame accent={current.accent}>
-              <Demo accent={current.accent} sub={activeSub} />
+              <Demo accent={current.accent} sub={activeSub} onPreview={current.key === "pdf" ? () => setShowPdfPreview(true) : undefined} />
             </DemoFrame>
 
             {current.subSteps && (
@@ -282,15 +305,20 @@ export default function OnboardingTour({ open, onClose }) {
             </div>
           </div>
 
-          {/* Alt navigasyon — Sol: Turu Atla · Orta: adım noktaları (tıklanabilir) · Sağ: İlerle/Keşfet */}
+          {/* Alt navigasyon — Sol: Geri + Turu Atla · Orta: adım noktaları (tıklanabilir) · Sağ: İlerle/Keşfet */}
           <div className="mt-5 flex items-center justify-between gap-3">
-            {!isLast ? (
-              <button onClick={finish} className="shrink-0 text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
-                Turu Atla
-              </button>
-            ) : (
-              <span />
-            )}
+            <div className="flex items-center gap-3 shrink-0">
+              {step > 0 && (
+                <button onClick={goPrev} className="flex items-center gap-1 text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                  <ChevronLeft className="w-3.5 h-3.5" /> Geri
+                </button>
+              )}
+              {!isLast && (
+                <button onClick={finish} className="text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                  Turu Atla
+                </button>
+              )}
+            </div>
 
             <div className="flex items-center gap-1 flex-wrap justify-center" role="tablist" aria-label="Tur adımları">
               {STEPS.map((s, i) => (
@@ -326,6 +354,11 @@ export default function OnboardingTour({ open, onClose }) {
           </div>
         </div>
       </div>
+
+      {/* 2. cam katman — Adım 5'teki "Örnek Belgeyi Canlı Önizle" ile açılır,
+          "Kapat"a basınca tura kaldığı yerden (aynı step/activeSub state'i
+          KORUNARAK — bu bileşen unmount OLMUYOR) devam eder. */}
+      {showPdfPreview && <SamplePdfModal onClose={() => setShowPdfPreview(false)} />}
     </div>
   );
 }
