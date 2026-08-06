@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, lazy, Suspense } from "react";
+import { useState, useMemo, useRef, useDeferredValue, startTransition, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -27,6 +27,7 @@ import {
   ClipboardX,
 } from "lucide-react";
 import { categoryOf, MONO_FONT } from "../constants";
+import usePerfMode from "../hooks/usePerfMode";
 import { parseTextualPlan, parseCsvPlan } from "../utils/planImportParsers";
 import { extractTextFromPdf } from "../utils/pdfTextExtract";
 import { buildIcsCalendar, downloadIcsFile } from "../utils/icsExport";
@@ -159,6 +160,11 @@ function needsRestSuggestion(tasks) {
 export default function ManualPlanBuilder({ open, category, editingPlan, onClose, onSave }) {
   const isEditMode = !!editingPlan;
   const cat = categoryOf(editingPlan?.plan?.mode || category);
+  // GPU/pil bütçesi kısıtlı senaryolarda (dar viewport, arka plandaki sekme,
+  // prefers-reduced-motion) Aurora Mesh'in maliyetini düşürür — bkz. aşağıdaki
+  // kullanım. BackgroundScene.jsx'teki AYNI, kanıtlanmış sinyallerin paylaşılan
+  // hali (usePerfMode.js).
+  const { lowPower } = usePerfMode();
 
   const [title, setTitle] = useState(() => editingPlan?.plan?.title || "");
   const [totalDays, setTotalDays] = useState(() => {
@@ -260,6 +266,16 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
 
   const dayNumbers = useMemo(() => Array.from({ length: totalDays }, (_, i) => i + 1), [totalDays]);
   const activeTasks = daysData[activeDay] || [];
+  // Büyük planlarda (çok gün × çok görev) Hızlı Ekle'ye her tuş vuruşu TÜM
+  // bileşeni yeniden render eder — bu da activeTasks listesinin (aşağıdaki
+  // draggable kart map'i) yeniden çizilmesini TETİKLER, ilgisiz bir alana
+  // yazarken bile. useDeferredValue, bu render'ı "acil olmayan" olarak
+  // işaretler: React önce yazma girdisini (acil) günceller, liste render'ı
+  // bir kare geriden gelir — input ASLA tıkanmaz. Küçük planlarda fark
+  // edilmez (React aynı tick'te bitirir), yalnızca gerçekten pahalı
+  // render'larda devreye girer.
+  const deferredActiveTasks = useDeferredValue(activeTasks);
+  const isTaskListStale = deferredActiveTasks !== activeTasks;
   const totalTaskCount = useMemo(() => Object.values(daysData).reduce((n, arr) => n + (arr?.length || 0), 0), [daysData]);
   const showRestSuggestion = hasAttr("duration") && needsRestSuggestion(activeTasks);
 
@@ -286,6 +302,22 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
     }),
     [title, totalDays, routineItems, daysData]
   );
+
+  // Mobil BottomSheet'i esnek (rubber-band) sürükle-bırak ile kapatma — tutamaç
+  // (aşağıdaki pill) daha önce SADECE görseldi, hiçbir dokunma etkileşimine
+  // bağlı DEĞİLDİ. Yukarı sürüklemede direnç uygulanır (sheet zaten en üstte,
+  // daha fazla yukarı gitmek doğal değil), aşağı sürüklemede 1:1 parmağı
+  // takip eder; bırakınca eşiği (120px) geçtiyse mevcut konumdan ekran
+  // dışına akıcıca devam edip kapanır, geçmediyse yay-fizikli bir geri
+  // dönüşle (aynı spring bezier, bkz. GlobalStyles.jsx .spring-lift) yerine
+  // oturur. `closing` durumu ayrıca X/backdrop ile kapatmayı da KULLANILMAYAN
+  // (dormant) slideDownSheet keyframe'ine bağlar — üç kapatma yolu da artık
+  // aynı tutarlı çıkış hissini paylaşır.
+  const DISMISS_THRESHOLD_PX = 120;
+  const [sheetDragY, setSheetDragY] = useState(0);
+  const [isDraggingSheet, setIsDraggingSheet] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const sheetDragStartRef = useRef(null);
 
   if (!open) return null;
 
@@ -344,11 +376,19 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
   // --- Sürükle-Bırak sıralama (native HTML5 DnD, ek bağımlılık YOK) ---
   const handleDrop = (dropIndex) => {
     if (dragIndex === null || dragIndex === dropIndex) return;
-    setDayTasks(activeDay, (list) => {
-      const next = list.slice();
-      const [moved] = next.splice(dragIndex, 1);
-      next.splice(dropIndex, 0, moved);
-      return next;
+    // Bırakma anındaki görsel geri bildirim (sürüklenen kartın eski
+    // konumdan ayrılması) ANINDA olsun diye dragIndex sıfırlama transition
+    // DIŞINDA kalır; asıl liste yeniden sıralaması (potansiyel olarak uzun
+    // bir günün TÜMÜNÜN yeniden render edilmesi) startTransition ile
+    // "acil olmayan" işaretlenir — parmak/imleç kalktığı an tıklama tepkisi
+    // beklemez.
+    startTransition(() => {
+      setDayTasks(activeDay, (list) => {
+        const next = list.slice();
+        const [moved] = next.splice(dragIndex, 1);
+        next.splice(dropIndex, 0, moved);
+        return next;
+      });
     });
     setDragIndex(null);
   };
@@ -382,16 +422,22 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
   };
   const pasteClipboardTo = (targetDays) => {
     if (clipboard.length === 0) return;
-    setDaysData((prev) => {
-      const next = { ...prev };
-      for (const d of targetDays) {
-        // is_completed HER ZAMAN false'a döner: yapıştırılan bir kopya, o
-        // günün YENİ bir örneğidir — kaynak görev tamamlanmış olsa bile
-        // kopyası "henüz yapılmadı" olarak başlar.
-        const cloned = clipboard.map((t) => ({ ...t, localId: newLocalId(), is_completed: false }));
-        next[d] = [...(next[d] || []), ...cloned]; // ÜZERİNE YAZMAZ, mevcut görevlere EKLER
-      }
-      return next;
+    // "Tüm Günlere Çoğalt" 100+ güne kadar TÜM daysData'yı tek seferde
+    // yeniden yazabilir — startTransition bu potansiyel olarak büyük
+    // güncellemeyi düşük öncelikli işaretler, menü kapanışı/tıklama tepkisi
+    // ANINDA kalır (aşağıdaki setPasteMenuOpen transition dışında).
+    startTransition(() => {
+      setDaysData((prev) => {
+        const next = { ...prev };
+        for (const d of targetDays) {
+          // is_completed HER ZAMAN false'a döner: yapıştırılan bir kopya, o
+          // günün YENİ bir örneğidir — kaynak görev tamamlanmış olsa bile
+          // kopyası "henüz yapılmadı" olarak başlar.
+          const cloned = clipboard.map((t) => ({ ...t, localId: newLocalId(), is_completed: false }));
+          next[d] = [...(next[d] || []), ...cloned]; // ÜZERİNE YAZMAZ, mevcut görevlere EKLER
+        }
+        return next;
+      });
     });
     setPasteMenuOpen(false);
   };
@@ -577,26 +623,72 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
     }
   };
 
+  const requestClose = () => {
+    if (closing) return;
+    setClosing(true);
+    setTimeout(onClose, 260);
+  };
+
+  const handleSheetTouchStart = (e) => {
+    if (closing) return;
+    sheetDragStartRef.current = e.touches[0].clientY;
+    setIsDraggingSheet(true);
+  };
+  const handleSheetTouchMove = (e) => {
+    if (sheetDragStartRef.current == null) return;
+    const delta = e.touches[0].clientY - sheetDragStartRef.current;
+    setSheetDragY(delta < 0 ? delta * 0.25 : delta);
+  };
+  const handleSheetTouchEnd = () => {
+    setIsDraggingSheet(false);
+    sheetDragStartRef.current = null;
+    if (sheetDragY > DISMISS_THRESHOLD_PX) {
+      setClosing(true);
+      setSheetDragY(typeof window !== "undefined" ? window.innerHeight : 800);
+      setTimeout(onClose, 300);
+    } else {
+      setSheetDragY(0);
+    }
+  };
+
+  const sheetAnimateClass = closing
+    ? sheetDragY === 0
+      ? "animate-[slideDownSheet_0.26s_ease_forwards]"
+      : ""
+    : "animate-[slideUpSheet_0.3s_ease] lg:animate-[fullScreenIn_0.25s_ease]";
+
   return (
     <>
-      <div className="fixed inset-0 z-[109] bg-black/60 backdrop-blur-sm lg:hidden" onClick={onClose} />
+      <div className="fixed inset-0 z-[109] bg-black/60 backdrop-blur-sm lg:hidden" onClick={requestClose} />
 
       <div
-        className="fixed inset-x-0 bottom-0 z-[110] max-h-[90vh] rounded-t-3xl flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_ease] lg:inset-0 lg:max-h-none lg:rounded-none lg:animate-[fullScreenIn_0.25s_ease]"
-        style={{ background: "var(--bg-app)" }}
+        className={`fixed inset-x-0 bottom-0 z-[110] max-h-[90vh] rounded-t-3xl flex flex-col overflow-hidden lg:inset-0 lg:max-h-none lg:rounded-none ${sheetAnimateClass}`}
+        style={{
+          background: "var(--bg-app)",
+          ...(sheetDragY !== 0
+            ? { transform: `translateY(${sheetDragY}px)`, transition: isDraggingSheet ? "none" : "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)" }
+            : {}),
+        }}
       >
         {/* Aurora Mesh — dört rengin radial-gradient'leri TEK katmanda üst
             üste bindirilir (tarayıcı otomatik harmanlar), önceki turun 4
             ayrı/net-sınırlı dairesi yerine akıcı, derinlik katan tek bir
             ortam ışığı verir. Tema-duyarlı yoğunluk index.css'teki
             --blob-opacity'den gelir (dark 0.32 / light 0.18) — hem Dark hem
-            Light Mode'da gözü yormayan, premium bir zemin. */}
+            Light Mode'da gözü yormayan, premium bir zemin.
+            GPU MALİYETİ: bu katmandaki asıl maliyet transform animasyonu
+            DEĞİL (o zaten compositor thread'inde, ucuz) — filter:blur()'un
+            KENDİSİ (büyük yarıçaplı blur, rasterizasyon gerektirir, mobil
+            GPU'larda ısınmanın asıl kaynağı budur). lowPower'da hem animasyon
+            duraklatılır hem blur yarıçapı düşürülür — "SVG shader"a geçmek
+            DEĞİL, gerçek maliyeti (blur radius × alan) küçültmek asıl çözüm. */}
         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
           <div
-            className="absolute -inset-[15%] motion-safe:animate-[auroraDrift_38s_ease-in-out_infinite]"
+            className={lowPower ? "absolute -inset-[15%]" : "absolute -inset-[15%] motion-safe:animate-[auroraDrift_38s_ease-in-out_infinite]"}
             style={{
               opacity: "var(--blob-opacity)",
-              filter: "blur(110px)",
+              filter: lowPower ? "blur(60px)" : "blur(110px)",
+              willChange: "transform",
               background: `radial-gradient(38% 32% at 15% 18%, ${NEON.magenta}, transparent 70%),
                 radial-gradient(36% 34% at 88% 12%, ${NEON.cyan}, transparent 70%),
                 radial-gradient(40% 38% at 22% 92%, ${NEON.violet}, transparent 70%),
@@ -605,7 +697,12 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
           />
         </div>
 
-        <div className="relative z-10 shrink-0 pt-2.5 pb-1 flex justify-center lg:hidden">
+        <div
+          className="relative z-10 shrink-0 pt-2.5 pb-3 flex justify-center lg:hidden touch-none"
+          onTouchStart={handleSheetTouchStart}
+          onTouchMove={handleSheetTouchMove}
+          onTouchEnd={handleSheetTouchEnd}
+        >
           <div className="w-10 h-1.5 rounded-full" style={{ background: "var(--border-strong)" }} />
         </div>
         <div className="relative z-10 h-[3px] shrink-0 hidden lg:block" style={{ background: GRADIENT, boxShadow: `0 0 12px -2px ${NEON.violet}88` }} />
@@ -634,7 +731,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
             <button onClick={() => setExportModalOpen(true)} aria-label="Planı dışa aktar" title="Dışa Aktar" className="hidden sm:flex w-9 h-9 rounded-xl items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" style={{ background: "rgba(var(--overlay-rgb), 0.06)" }}>
               <Download className="w-4 h-4" />
             </button>
-            <button onClick={onClose} aria-label="Kapat" className="w-11 h-11 md:w-9 md:h-9 rounded-xl flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" style={{ background: "rgba(var(--overlay-rgb), 0.06)" }}>
+            <button onClick={requestClose} aria-label="Kapat" className="w-11 h-11 md:w-9 md:h-9 rounded-xl flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" style={{ background: "rgba(var(--overlay-rgb), 0.06)" }}>
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -864,8 +961,8 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                           setSelectedIds(new Set());
                           setPasteMenuOpen(false);
                         }}
-                        className="shrink-0 min-h-[48px] lg:min-h-0 flex items-center gap-1.5 rounded-xl px-3.5 lg:py-2 text-[12.5px] font-semibold transition-all duration-200"
-                        style={active ? GLOW_ACTIVE_STYLE : { background: "rgba(var(--overlay-rgb),0.05)", color: "var(--text-secondary)" }}
+                        className={`spring-lift shrink-0 min-h-[48px] lg:min-h-0 flex items-center gap-1.5 rounded-xl px-3.5 lg:py-2 text-[12.5px] font-semibold ${totalDays > 30 ? "day-tab-cv" : ""}`}
+                        style={active ? { ...GLOW_ACTIVE_STYLE, "--spring-glow": `${NEON.violet}66` } : { background: "rgba(var(--overlay-rgb),0.05)", color: "var(--text-secondary)", "--spring-glow": "rgba(0,243,255,0.2)" }}
                       >
                         {d}. Gün
                         {count > 0 && (
@@ -1041,14 +1138,18 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                 )}
               </div>
 
-              {/* Aktif günün görev listesi — sürükle-bırak sıralanabilir */}
-              <div className="flex flex-col gap-2.5">
+              {/* Aktif günün görev listesi — sürükle-bırak sıralanabilir.
+                  deferredActiveTasks kullanır (bkz. yukarıdaki useDeferredValue
+                  notu) — yazma/tıklama girdisi asla bu listenin render
+                  maliyetine takılmaz; geciken karede hafif bir soluklaşma
+                  (isTaskListStale) durumu görsel olarak sinyaller. */}
+              <div className="flex flex-col gap-2.5 transition-opacity duration-150" style={{ opacity: isTaskListStale ? 0.6 : 1 }}>
                 {activeTasks.length === 0 && (
                   <div className="rounded-2xl border border-dashed p-6 text-center" style={{ borderColor: "var(--border-default)" }}>
                     <p className="text-[12.5px] text-[var(--text-faint)]">{activeDay}. gün için henüz görev yok — yukarıdaki hızlı ekle formunu kullan.</p>
                   </div>
                 )}
-                {activeTasks.map((t, index) => {
+                {deferredActiveTasks.map((t, index) => {
                   const checked = selectedIds.has(t.localId);
                   return (
                   <div
@@ -1058,8 +1159,8 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => handleDrop(index)}
                     onDragEnd={() => setDragIndex(null)}
-                    className="glass rounded-2xl p-3 flex flex-col gap-2.5 transition-opacity"
-                    style={{ opacity: dragIndex === index ? 0.4 : 1, ...(checked ? { outline: `1px solid ${NEON.violet}70`, background: `${NEON.violet}0d` } : {}) }}
+                    className="spring-lift glass rounded-2xl p-3 flex flex-col gap-2.5 transition-opacity"
+                    style={{ opacity: dragIndex === index ? 0.4 : 1, "--spring-glow": `${NEON.cyan}40`, ...(checked ? { outline: `1px solid ${NEON.violet}70`, background: `${NEON.violet}0d` } : {}) }}
                   >
                     <div className="flex items-center gap-2">
                       {selectMode ? (

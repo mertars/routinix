@@ -151,6 +151,20 @@ export default function GlobalStyles() {
       button { transition: transform 0.09s ease; }
       button:not(:disabled):active { transform: scale(0.97); }
 
+      /* --- Studio Builder gün sekmesi şeridi: 30'dan fazla gün seçildiğinde
+         (bkz. ManualPlanBuilder.jsx, "Özel" gün sayısı 365'e kadar
+         çıkabiliyor) ekran dışındaki sekmelerin layout/paint/stil
+         hesaplamasını tarayıcı ATLAR — content-visibility, gerçek DOM
+         boyutunu KORUR (react-window gibi bir sanallaştırma kütüphanesi
+         GEREKMEZ), yalnızca görünmeyen içeriğin render maliyetini erteler.
+         30 ve altı gün sayısında (varsayılan/yaygın durum) hiç
+         uygulanmaz — o ölçekte zaten önemsiz bir maliyet, gereksiz
+         karmaşıklık eklenmez. */
+      .day-tab-cv {
+        content-visibility: auto;
+        contain-intrinsic-size: 72px 48px;
+      }
+
       /* --- Takvim şeridi kenar solması (mask-gradient) --- */
       .edge-fade-x {
         -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 26px, #000 calc(100% - 26px), transparent 100%);
@@ -275,6 +289,35 @@ export default function GlobalStyles() {
       .card-glow:active {
         transform: translateZ(0) scale(0.985);
         box-shadow: 0 0 0 1px rgba(178,107,255,0.4), 0 8px 26px -8px rgba(244,64,107,0.45);
+      }
+
+      /* --- Yay-fizikli (spring) hover kaldırma + neon parıltı --- Studio
+         Builder'ın görev kartları/gün sekmeleri gibi bespoke yüzeylerinde
+         kullanılır (bkz. ManualPlanBuilder.jsx). transform overshoot'lu bir
+         cubic-bezier (0.34,1.56,0.64,1) ile "yaylanma" hissi verir; opacity/
+         box-shadow İSE düz ease'de kalır — overshoot'u renk/gölge gibi
+         süreksiz özelliklere uygulamak (transform DIŞINDA) titrek/amatör
+         görünürdü. @media (hover: hover) ile BİLEREK yalnızca gerçek fare
+         imleci olan cihazlarda aktif: dokunmatik cihazlarda "hover" bir
+         dokunuşla tetiklenip asla temiz şekilde kapanmadığından ("sticky
+         hover" hatası) mobilde kart kalıcı olarak kaldırılmış/parlak takılı
+         kalırdı. */
+      .spring-lift {
+        transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+        transform: translateZ(0);
+      }
+      @media (hover: hover) and (pointer: fine) {
+        .spring-lift:hover {
+          transform: translateZ(0) translateY(-4px);
+          box-shadow: 0 14px 32px -14px rgba(0,0,0,0.35), 0 0 22px -6px var(--spring-glow, rgba(0,243,255,0.28));
+        }
+      }
+      .spring-lift:active {
+        transition-duration: 0.1s;
+        transform: translateZ(0) translateY(0) scale(0.97);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .spring-lift, .spring-lift:hover, .spring-lift:active { transition: none !important; transform: none !important; }
       }
 
       /* --- Günün görev grid'i: kendi iç layout'unu (kartlar sarma/yükseklik
