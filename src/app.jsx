@@ -273,7 +273,7 @@ export default function App() {
         }}
         onSignIn={auth.signIn}
         onSignUp={auth.isAnonymous ? auth.upgradeAnonymousAccount : auth.signUp}
-        onGoogle={auth.isAnonymous ? auth.linkGoogleIdentity : auth.signInWithGoogle}
+        onGoogle={auth.signInWithGoogle}
         onSuccess={() => {
           setAuthOpen(false);
           setAuthContext(null);
@@ -320,7 +320,7 @@ export default function App() {
             sırasıyla, kendisi de sticky top-0 z-30: art arda gelen sticky
             elemanlar tarayıcıda üst üste istiflenir, Header'ın piksel
             yüksekliğini bilmeye gerek kalmaz (bkz. GuestBanner.jsx yorumu). */}
-        {auth.isAnonymous && <GuestBanner onUpgrade={openAuth} />}
+        {auth.isAnonymous && <GuestBanner onUpgrade={openAuth} onExitGuest={auth.signOut} />}
 
         <Header
           modeAccent={mode.accent}
@@ -477,15 +477,13 @@ export default function App() {
         message="Hesabından çıkış yapılacak. Kaydedilmiş planların hesabında güvende kalır."
         confirmLabel="Evet, Çıkış Yap"
         cancelLabel="Vazgeç"
-        onConfirm={async () => {
+        onConfirm={() => {
           setLogoutConfirmOpen(false);
-          // ps.startNewPlan() (yerel sihirbaz state'ini sıfırlayıp giriş
-          // ekranına döner) YALNIZCA signOut GERÇEKTEN başarılıysa çalışır —
-          // aksi halde (ör. ağ hatası) oturum sunucuda hâlâ dururken arayüz
-          // "çıkış yapıldı" YALANI söylememiş olur (bkz. useAuth.js'teki
-          // signOut'un artık hatayı DÖNMESİNİN gerekçesi).
-          const { error } = await auth.signOut();
-          if (!error) ps.startNewPlan();
+          // auth.signOut() artık sert bir çıkış: yedek localStorage temizliği
+          // + window.location.href = "/" ile TAM sayfa yeniden yüklemesi
+          // (bkz. useAuth.js) — bu yüzden ps.startNewPlan() gibi yerel state
+          // sıfırlamalarına gerek YOK, sayfa zaten baştan yüklenecek.
+          auth.signOut();
         }}
         onCancel={() => setLogoutConfirmOpen(false)}
       />

@@ -45,13 +45,20 @@ export default function useAuth() {
   const signIn = (email, password) => supabase.auth.signInWithPassword({ email, password });
   const signUp = (email, password) => supabase.auth.signUp({ email, password });
 
-  // Async + hatayı DÖNER (önceden fire-and-forget'ti): supabase.auth.signOut()
-  // ağ hatasıyla reddederse çağıran taraf (app.jsx'teki çıkış onayı) bunu
-  // BİLMELİYDİ — aksi halde "başarılı çıkış" varsayıp yerel UI'ı (plan
-  // sihirbazı state'i) sıfırlıyordu, oysa oturum GERÇEKTE hâlâ sunucuda
-  // duruyor olabilirdi. onAuthStateChange zaten `session`i doğru şekilde
-  // günceller (başarılıysa null, başarısızsa değişmez) — buradaki değişiklik
-  // yalnızca çağıranın başarısızlığı FARK ETMESİNİ sağlar.
+  // SERTLEŞTİRİLMİŞ çıkış — canlıda "çıkış yapamıyorum, misafir modunda
+  // sıkışıyorum" bildirimi üzerine: supabase.auth.signOut() ağ hatasıyla
+  // reddederse (ya da React state'i herhangi bir sebeple beklenen şekilde
+  // güncellenmezse) kullanıcı GÖRÜNMEZ bir şekilde eski oturumda kalabilirdi
+  // — hiçbir hata mesajı YOKTU, "hiçbir şey olmuyor" hissi tam olarak buydu.
+  // Artık: (1) supabase.auth.signOut() denenir, (2) SONUCU NE OLURSA OLSUN
+  // supabase-js'in kendi sakladığı oturum anahtarı (varsayılan biçim
+  // "sb-<proje-ref>-auth-token") localStorage'dan DOĞRUDAN silinir — bu,
+  // ağ isteği tamamen başarısız olsa bile tarayıcıyı GERÇEKTEN oturumsuz
+  // bırakan bir yedek katmandır, (3) sayfa "/"e SERT yönlendirilir
+  // (window.location.href) — herhangi bir bayat React state'i (bu hook'un
+  // KENDİSİ dahil) tam bir sayfa yüklemesiyle tamamen SIFIRLANIR, "eski
+  // oturum bir şekilde hafızada kalmaya devam ediyor" ihtimalini YAPISAL
+  // olarak ortadan kaldırır.
   //
   // NOT: Bu fonksiyon hiçbir koşulda signInAnonymously() ÇAĞIRMAZ — anonim/
   // misafir oturum YALNIZCA SharedTemplateView.jsx'in kendi akışında,
@@ -59,11 +66,20 @@ export default function useAuth() {
   // dosyadaki AYNI notun tekrarı). Çıkış akışı bu ikisini birbirine ASLA
   // karıştırmaz.
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      logger.error("AUTH", "Çıkış yapılamadı", { error: error.message });
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) logger.error("AUTH", "Çıkış yapılamadı (yedek temizlik yine de uygulanıyor)", { error: error.message });
+    } catch (err) {
+      logger.error("AUTH", "Çıkış isteği tamamen başarısız oldu (ağ hatası olabilir, yedek temizlik yine de uygulanıyor)", { error: err?.message });
     }
-    return { error };
+    try {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("sb-") && k.endsWith("-auth-token"))
+        .forEach((k) => localStorage.removeItem(k));
+    } catch (err) {
+      logger.warn("AUTH", "localStorage yedek temizliği yapılamadı (gizli tarama modu olabilir)", { error: err?.message });
+    }
+    window.location.href = "/";
   };
 
   // Sessizce, GİRİŞ EKRANI GÖSTERMEDEN bir anonim oturum başlatır — Nexus'ta
@@ -86,22 +102,24 @@ export default function useAuth() {
   // olarak bunun sayesinde sıfır ek kod ile sağlanır.
   const upgradeAnonymousAccount = (email, password) => supabase.auth.updateUser({ email, password });
 
-  // Google ile "hesap yükseltme" — DİKKAT: normal signInWithOAuth burada
-  // KULLANILAMAZ, çünkü o YENİ bir oturum/uid oluşturur ve mevcut anonim
-  // uid'e bağlı plans/routines/tasks'ı SESSİZCE YETİM bırakırdı.
-  // `linkIdentity`, AYNI anonim uid'e bir Google kimliği bağlar — upgradeAnonymousAccount
-  // (email/şifre) ile TAM AYNI "veri kaybı yok" garantisini Google için sağlar.
-  const linkGoogleIdentity = () =>
-    supabase.auth.linkIdentity({
-      provider: "google",
-      options: { redirectTo: window.location.origin },
-    });
-
   const isAnonymous = session?.user?.is_anonymous === true;
 
   // Google OAuth ile giriş — Supabase, kullanıcıyı Google onay ekranına
   // yönlendirir; dönüşte onAuthStateChange oturumu otomatik yakalar.
   // redirectTo, uygulamanın çalıştığı origin olsun ki callback doğru yere dönsün.
+  //
+  // ANONİMKEN DE (misafir "Giriş Yap" ya da "Hesabını Kaydet" fark etmeksizin)
+  // AYNI fonksiyon kullanılır — BİLEREK `supabase.auth.linkIdentity()`
+  // (anonim uid'e Google kimliği "bağlama", veri kaybı olmadan yükseltme)
+  // KULLANILMIYOR: bu API, Supabase Dashboard → Authentication → Settings
+  // → "Allow manual linking" AÇIK olmasını gerektiriyor ve bu projede KAPALI
+  // — canlıda tam olarak "Manual linking is disabled" hatasıyla doğrulandı.
+  // Kapalı bir sunucu ayarına bağımlı, sessizce başarısız olabilecek bir
+  // "akıllı" yol yerine, HER ZAMAN çalışan sade OAuth girişi tercih edildi —
+  // bedeli: anonimken Google ile "yükseltme" yapan kullanıcı YENİ bir hesaba
+  // geçer, o anki misafir oturumunun planları otomatik taşınmaz (email/şifre
+  // yükseltme yolu — upgradeAnonymousAccount — bu kısıtlamaya TABİ DEĞİL,
+  // farklı bir Supabase API'si kullanır, veri kaybı olmadan çalışmaya devam eder).
   const signInWithGoogle = () =>
     supabase.auth.signInWithOAuth({
       provider: "google",
@@ -119,6 +137,5 @@ export default function useAuth() {
     signInWithGoogle,
     signInAnonymously,
     upgradeAnonymousAccount,
-    linkGoogleIdentity,
   };
 }
