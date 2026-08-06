@@ -1,10 +1,11 @@
-import { FileText, FileJson, FileSpreadsheet, FileType, File } from "lucide-react";
+import { FileText, FileJson, FileSpreadsheet, FileType, File, Calendar } from "lucide-react";
 
 const NEON = { cyan: "#00F3FF", violet: "#8B5CF6" };
 
 const FORMATS = [
   { key: "pdf", icon: File, label: "PDF", ext: ".pdf", desc: "En iyi sonucu düz, tek sütunlu, 'Gün N' başlıklı belgelerde verir — taranmış/görsel PDF'lerde güvenilir değildir." },
   { key: "json", icon: FileJson, label: "JSON", ext: ".json", desc: "Routinix plan şablonu — en güvenilir ve eksiksiz yöntem." },
+  { key: "ics", icon: Calendar, label: "Takvim (.ics)", ext: ".ics", desc: "Google/Apple Takvim'den ya da Routinix'in kendi .ics dışa aktarımından — en iyi sonucu kendi dışa aktarımımızda verir." },
   { key: "markdown", icon: FileText, label: "Markdown", ext: ".md", desc: "# Gün başlıkları + - madde işaretli görevler." },
   { key: "csv", icon: FileSpreadsheet, label: "CSV", ext: ".csv", desc: "Excel'den 'CSV olarak kaydet' ile dışa aktarabilirsin — yalnızca görevler, rutinler CSV'ye dahil değildir." },
   { key: "txt", icon: FileType, label: "Düz Metin", ext: ".txt", desc: "Satır satır 'Gün N' / görev formatı." },

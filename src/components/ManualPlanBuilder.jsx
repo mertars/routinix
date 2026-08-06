@@ -25,10 +25,14 @@ import {
   ListChecks,
   ClipboardPaste,
   ClipboardX,
+  Loader2,
+  AlertTriangle,
+  CheckCircle2,
+  RotateCcw,
 } from "lucide-react";
 import { categoryOf, MONO_FONT } from "../constants";
 import usePerfMode from "../hooks/usePerfMode";
-import { parseTextualPlan, parseCsvPlan } from "../utils/planImportParsers";
+import { parseTextualPlan, parseCsvPlan, parseIcsPlan } from "../utils/planImportParsers";
 import { extractTextFromPdf } from "../utils/pdfTextExtract";
 import { buildIcsCalendar, downloadIcsFile } from "../utils/icsExport";
 import ImportFormatModal from "./ImportFormatModal";
@@ -118,11 +122,30 @@ const ROUTINE_FREQUENCY_CHOICES = [
 
 const IMPORT_ACCEPT = {
   json: "application/json,.json",
+  ics: ".ics,text/calendar",
   markdown: ".md,text/markdown",
   txt: ".txt,text/plain",
   csv: ".csv,text/csv",
   pdf: "application/pdf,.pdf",
 };
+
+// Format başına beklenen uzantı — savunma amaçlı çift kontrol (native
+// dosya diyaloğunun `accept` filtresi bazı tarayıcı/OS kombinasyonlarında
+// bypass edilebilir; kullanıcı "Tüm Dosyalar"ı seçip yanlış bir dosya
+// seçebilir).
+const EXPECTED_EXTENSION = {
+  json: ".json",
+  ics: ".ics",
+  markdown: ".md",
+  txt: ".txt",
+  csv: ".csv",
+  pdf: ".pdf",
+};
+
+// İçe aktarma sırasında KASITLI/tanımlanmış bir hata — catch bloğu bunu
+// "beklenmedik bir JS hatası"ndan ayırt edip mesajını OLDUĞU GİBİ gösterir;
+// sınıflandırılmamış her şey dürüst, genel bir mesaja düşer (bkz. handleImportFile).
+class ImportFormatError extends Error {}
 
 let localIdCounter = 0;
 function newLocalId() {
@@ -213,7 +236,12 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [importing, setImporting] = useState(false);
+  // İçe aktarma durumu — Kaydet akışının genel `error`'ından BİLEREK AYRI:
+  // ikisi karışırsa (ör. bir kayıt hatası ekrandayken kullanıcı yeni bir
+  // içe aktarma başlatırsa) yanlış mesaj yanlış anda görünürdü.
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState(null);
+  const [importSuccess, setImportSuccess] = useState(false);
   const [mobileStep, setMobileStep] = useState(1); // yalnızca <lg ekranlarda anlamlı
   const [dragIndex, setDragIndex] = useState(null);
   const fileInputRef = useRef(null);
@@ -566,15 +594,40 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
 
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
-    e.target.value = ""; // aynı dosyayı arka arkaya seçebilmek için input'u sıfırla
+    // Input HER ZAMAN sıfırlanır — başarı/hata FARK ETMEZ — aksi halde
+    // kullanıcı dosyasını düzeltip AYNI dosyayı tekrar seçtiğinde tarayıcı
+    // (değer değişmediği için) onChange'i hiç tetiklemezdi.
+    e.target.value = "";
     const format = pendingImportFormat;
     if (!file || !format) return;
-    setError("");
-    setImporting(true);
+
+    setImportError(null);
+    setImportSuccess(false);
+    setIsImporting(true);
+
     try {
+      // 1) Boş dosya — okumadan önce en ucuz/kesin kontrol.
+      if (file.size === 0) {
+        throw new ImportFormatError("Seçilen dosya boş veya okunamıyor.");
+      }
+      // 2) Uzantı — native dosya diyaloğunun `accept` filtresi bazı tarayıcı/
+      //    OS kombinasyonlarında bypass edilebilir ("Tüm Dosyalar" seçilirse).
+      const expectedExt = EXPECTED_EXTENSION[format];
+      if (expectedExt && !file.name.toLowerCase().endsWith(expectedExt)) {
+        throw new ImportFormatError(`Yalnızca ${expectedExt} uzantılı dosya yükleyebilirsiniz.`);
+      }
+
+      let result;
       if (format === "json") {
-        const parsed = JSON.parse(await file.text());
-        if (!parsed || typeof parsed !== "object" || !parsed.days) throw new Error("Geçersiz dosya");
+        let parsed;
+        try {
+          parsed = JSON.parse(await file.text());
+        } catch {
+          throw new ImportFormatError("Yüklenen dosya geçerli bir Routinix JSON formatında değil.");
+        }
+        if (!parsed || typeof parsed !== "object" || !parsed.days) {
+          throw new ImportFormatError("Plan yapısı eksik veya bozuk. Lütfen geçerli bir şablon deneyin.");
+        }
         // v1 (routines: düz metin, satır satır) ve v2 (routines: {content,
         // frequency}[]) dışa aktarımlarının İKİSİ de okunabilir.
         const normalizedRoutines = Array.isArray(parsed.routines)
@@ -582,25 +635,40 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
           : typeof parsed.routines === "string"
           ? parsed.routines.split("\n").map((l) => l.trim()).filter(Boolean).map((content) => ({ content, frequency: "daily" }))
           : [];
-        applyImportedData({ title: parsed.title, totalDays: parsed.totalDays, days: parsed.days, routines: normalizedRoutines });
+        result = { title: parsed.title, totalDays: parsed.totalDays, days: parsed.days, routines: normalizedRoutines };
+      } else if (format === "ics") {
+        const text = await file.text();
+        const { days } = parseIcsPlan(text);
+        if (Object.keys(days).length === 0) throw new ImportFormatError("Plan yapısı eksik veya bozuk. Lütfen geçerli bir şablon deneyin.");
+        result = { days, routines: [] };
       } else if (format === "markdown" || format === "txt") {
         const text = await file.text();
         const { title: parsedTitle, days, routines } = parseTextualPlan(text);
-        applyImportedData({ title: parsedTitle, days, routines });
+        if (Object.keys(days).length === 0) throw new ImportFormatError("Plan yapısı eksik veya bozuk. Lütfen geçerli bir şablon deneyin.");
+        result = { title: parsedTitle, days, routines };
       } else if (format === "csv") {
         const text = await file.text();
         const { days } = parseCsvPlan(text);
-        if (Object.keys(days).length === 0) throw new Error("CSV ayrıştırılamadı");
-        applyImportedData({ days, routines: [] });
+        if (Object.keys(days).length === 0) throw new ImportFormatError("Plan yapısı eksik veya bozuk. Lütfen geçerli bir şablon deneyin.");
+        result = { days, routines: [] };
       } else if (format === "pdf") {
         const text = await extractTextFromPdf(file);
         const { title: parsedTitle, days, routines } = parseTextualPlan(text);
-        applyImportedData({ title: parsedTitle, days, routines });
+        if (Object.keys(days).length === 0) throw new ImportFormatError("Plan yapısı eksik veya bozuk. Lütfen geçerli bir şablon deneyin.");
+        result = { title: parsedTitle, days, routines };
       }
-    } catch {
-      setError("Dosya okunamadı/ayrıştırılamadı — dosyanın seçtiğin formata ve beklenen düzene uygun olduğundan emin ol.");
+
+      applyImportedData(result);
+      setImportSuccess(true);
+      setTimeout(() => setImportSuccess(false), 2500);
+    } catch (err) {
+      // Yalnızca YUKARIDA BİLEREK fırlatılan (sınıflandırılmış) hatalar
+      // kendi mesajıyla gösterilir — beklenmedik/tanımlanmamış bir JS
+      // hatası (ör. pdfjs'in kendi iç hatası) dürüst, genel bir mesaja düşer;
+      // olmayan bir kesinlik İDDİA EDİLMEZ.
+      setImportError(err instanceof ImportFormatError ? err.message : "Dosya okunamadı/ayrıştırılamadı — dosyanın seçtiğin formata ve beklenen düzene uygun olduğundan emin ol.");
     } finally {
-      setImporting(false);
+      setIsImporting(false);
       setPendingImportFormat(null);
     }
   };
@@ -737,8 +805,22 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
             {/* Akıllı İçe/Dışa Aktar — küçük, ikon-yalnız, başlığın yanında;
                 format seçimi ImportFormatModal/ExportFormatModal'da yapılır. */}
             <input ref={fileInputRef} type="file" accept={IMPORT_ACCEPT[pendingImportFormat] || "*"} className="hidden" onChange={handleImportFile} />
-            <button onClick={() => setImportModalOpen(true)} aria-label="Plan dosyası içe aktar" title="İçe Aktar" className="hidden sm:flex w-9 h-9 rounded-xl items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" style={{ background: "rgba(var(--overlay-rgb), 0.06)" }}>
-              <Upload className="w-4 h-4" />
+            <button
+              onClick={() => setImportModalOpen(true)}
+              disabled={isImporting}
+              aria-label="Plan dosyası içe aktar"
+              title="İçe Aktar"
+              className={`hidden sm:flex items-center justify-center gap-2 h-9 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all disabled:opacity-90 disabled:cursor-wait overflow-hidden ${isImporting ? "w-auto px-3.5" : "w-9"}`}
+              style={{ background: "rgba(var(--overlay-rgb), 0.06)" }}
+            >
+              {isImporting ? (
+                <>
+                  <Loader2 className="w-4 h-4 shrink-0 motion-safe:animate-spin" style={{ color: NEON.cyan }} />
+                  <span className="text-[12px] font-semibold whitespace-nowrap">Plan Çözümleniyor...</span>
+                </>
+              ) : (
+                <Upload className="w-4 h-4" />
+              )}
             </button>
             <button onClick={() => setExportModalOpen(true)} aria-label="Planı dışa aktar" title="Dışa Aktar" className="hidden sm:flex w-9 h-9 rounded-xl items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" style={{ background: "rgba(var(--overlay-rgb), 0.06)" }}>
               <Download className="w-4 h-4" />
@@ -748,6 +830,56 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
             </button>
           </div>
         </div>
+
+        {/* İçe aktarma geri bildirimi — hangi tetikleyici (masaüstü başlık /
+            mobil footer ikonu) kullanılmış olursa olsun, aynı yerde ve tam
+            genişlikte görünür. */}
+        {importError && (
+          <div className="relative z-10 shrink-0 px-4 md:px-8 lg:px-10 pt-3">
+            <div
+              className="rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap sm:flex-nowrap"
+              style={{
+                background: "rgba(255, 110, 146, 0.08)",
+                border: "1px solid rgba(255, 110, 146, 0.35)",
+                boxShadow: "0 0 24px -10px rgba(255, 110, 146, 0.55)",
+              }}
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: "#FF6E92" }} />
+              <p className="flex-1 min-w-[180px] text-[12.5px] font-medium" style={{ color: "#FF6E92" }}>
+                ⚠️ {importError}
+              </p>
+              <button
+                onClick={() => {
+                  setImportError(null);
+                  setImportModalOpen(true);
+                }}
+                className="shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold transition-colors"
+                style={{ background: "rgba(255, 110, 146, 0.16)", color: "#FF6E92" }}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Tekrar Dene
+              </button>
+            </div>
+          </div>
+        )}
+        {importSuccess && (
+          <div className="relative z-10 shrink-0 px-4 md:px-8 lg:px-10 pt-3">
+            <div
+              className="rounded-2xl px-4 py-3 flex items-center gap-3 overflow-hidden relative animate-[fadeIn_0.2s_ease]"
+              style={{
+                background: "rgba(16, 185, 129, 0.08)",
+                border: "1px solid rgba(16, 185, 129, 0.35)",
+                boxShadow: "0 0 24px -10px rgba(16, 185, 129, 0.55)",
+              }}
+            >
+              <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: `linear-gradient(90deg, transparent, ${NEON.emerald}, transparent)` }} />
+              <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: NEON.emerald }} />
+              <p className="text-[12.5px] font-medium" style={{ color: NEON.emerald }}>
+                ✅ Plan başarıyla yüklendi! Günler ve görevler aktarıldı.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Gövde */}
         <div className="relative z-10 flex-1 min-h-0 overflow-y-auto px-4 md:px-8 lg:px-10 py-5 lg:py-8">
@@ -1246,15 +1378,28 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
           }}
         >
           <div className="min-w-0 flex items-center gap-3">
-            {(error || importing) && (
-              <p className="text-[12px] font-medium truncate" style={{ color: importing ? "var(--text-muted)" : "#FF6E92" }}>
-                {importing ? "Dosya işleniyor..." : error}
+            {error && (
+              <p className="text-[12px] font-medium truncate" style={{ color: "#FF6E92" }}>
+                {error}
               </p>
             )}
             {/* Mobilde İçe/Dışa Aktar (başlıkta gizliydi, sm:hidden) buraya taşınır. */}
             <div className="flex sm:hidden items-center gap-1.5">
-              <button onClick={() => setImportModalOpen(true)} aria-label="İçe aktar" className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "rgba(var(--overlay-rgb), 0.06)", color: "var(--text-muted)" }}>
-                <Upload className="w-4 h-4" />
+              <button
+                onClick={() => setImportModalOpen(true)}
+                disabled={isImporting}
+                aria-label="İçe aktar"
+                className={`flex items-center justify-center gap-1.5 h-11 rounded-xl transition-all disabled:opacity-90 disabled:cursor-wait overflow-hidden ${isImporting ? "w-auto px-3" : "w-11"}`}
+                style={{ background: "rgba(var(--overlay-rgb), 0.06)", color: "var(--text-muted)" }}
+              >
+                {isImporting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 shrink-0 motion-safe:animate-spin" style={{ color: NEON.cyan }} />
+                    <span className="text-[11px] font-semibold whitespace-nowrap">Çözümleniyor...</span>
+                  </>
+                ) : (
+                  <Upload className="w-4 h-4" />
+                )}
               </button>
               <button onClick={() => setExportModalOpen(true)} aria-label="Dışa aktar" className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "rgba(var(--overlay-rgb), 0.06)", color: "var(--text-muted)" }}>
                 <Download className="w-4 h-4" />
