@@ -69,7 +69,10 @@ export const MIN_GOAL_LENGTH = 5;
 // kontrolünü mount ANINDA, OnboardingTour'un kendisi (lazy chunk) henüz
 // hiç yüklenmemişken yapması gerekiyor — component'i lazy import edip
 // yalnızca bir string sabiti için tetiklemek istemedik.
-export const ONBOARDING_STORAGE_KEY = "routinix_onboarding_seen";
+// "_v2": 10 adımlı interaktif mikro-UI vitrinine geçişte BİLEREK yeni bir
+// anahtar — eski 4 adımlı turu daha önce görüp kapatmış kullanıcılar da
+// yeni, çok daha kapsamlı turu BİR KEZ görsün diye.
+export const ONBOARDING_STORAGE_KEY = "routinix_onboarding_v2";
 
 // "✨ Şablon Keşfet" (Template Hub) için görsel ağırlıklı, hazır rota kütüphanesi.
 // Her şablon: kapak görseli, süre, 2 cümlelik tanıtım, illüstratif tamamlanma
