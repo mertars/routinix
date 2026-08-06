@@ -4,9 +4,16 @@ import { useState } from "react";
 // gelir (useAuth'tan); modal sadece formu ve durumu (mod, hata, yükleniyor)
 // yönetir. Başarılı girişte onSuccess çağrılır (üst katman modalı kapatır).
 export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, onGoogle, onSuccess, isAnonymousUpgrade = false, contextMessage = null }) {
-  // Anonim yükseltme akışında "Giriş Yap" sekmesinin hiç anlamı yok — henüz
-  // gerçek bir email/şifreye bağlı olmayan (anonim) bir oturumla zaten
-  // GİRİŞLİ durumdayız, tek gereken bu oturumu kalıcı hale getirmek.
+  // KRİTİK DÜZELTME (canlıda bildirilen kilitlenme): "Giriş Yap" sekmesi
+  // eskiden isAnonymousUpgrade=true iken TAMAMEN GİZLİYDİ — varsayım
+  // "anonim bir kullanıcı zaten bu oturumu yükseltmek ister" idi, ama
+  // misafir modundaki (ör. /t/ paylaşım linkiyle gelmiş) bir kullanıcının
+  // ZATEN VAR OLAN gerçek bir hesabı olabilir ve tek istediği ONA giriş
+  // yapmaktır — "Hesabını Kaydet" (mevcut anonim oturumu email/şifreye
+  // bağlama) o kullanıcı için YANLIŞ eylemdir ve email zaten kayıtlıysa
+  // hatayla başarısız olur, kaçış yolu da YOKTU. Sekme artık HER ZAMAN
+  // görünür; varsayılan sekme yine "signup" (çoğunluk için doğru tahmin)
+  // ama kullanıcı istediği an "Giriş Yap"a geçebilir.
   const [tab, setTab] = useState(() => (isAnonymousUpgrade ? "signup" : "signin")); // "signin" | "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -106,10 +113,15 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
         <div className="flex items-start justify-between mb-5">
           <div>
             <h2 className="text-[18px] font-bold text-[var(--text-primary)]">
-              {isAnonymousUpgrade ? "Hesabını Kaydet" : tab === "signin" ? "Giriş Yap" : "Kayıt Ol"}
+              {isAnonymousUpgrade && tab === "signup" ? "Hesabını Kaydet" : tab === "signin" ? "Giriş Yap" : "Kayıt Ol"}
             </h2>
             <p className="text-[12px] text-[var(--text-muted)] mt-1">
-              {contextMessage || (isAnonymousUpgrade ? "Şu ana kadar oluşturduğun her şey kalır — sadece bir email/şifre ekle." : "Planlarını kaydetmek için hesabına bağlan.")}
+              {contextMessage ||
+                (isAnonymousUpgrade && tab === "signup"
+                  ? "Şu ana kadar oluşturduğun her şey kalır — sadece bir email/şifre ekle."
+                  : isAnonymousUpgrade && tab === "signin"
+                    ? "Zaten bir hesabın mı var? Giriş yap — bu misafir oturumundaki içerikler bu hesaba TAŞINMAZ, ayrı kalır."
+                    : "Planlarını kaydetmek için hesabına bağlan.")}
             </p>
           </div>
           <button
@@ -122,15 +134,16 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
           </button>
         </div>
 
-        {/* Sekme kontrolü — anonim yükseltmede gösterilmez (bkz. yukarıdaki not) */}
-        {!isAnonymousUpgrade && (
+        {/* Sekme kontrolü — ARTIK HER ZAMAN görünür (bkz. yukarıdaki kritik
+            düzeltme notu): misafir modundaki bir kullanıcının da mevcut
+            hesabına giriş yapabilmesi için kaçış yolu şart. */}
         <div
           className="flex rounded-xl p-1 gap-1 mb-4"
           style={{ background: "rgba(var(--overlay-rgb),0.045)", border: "1px solid rgba(var(--overlay-rgb),0.08)" }}
         >
           {[
             ["signin", "Giriş Yap"],
-            ["signup", "Kayıt Ol"],
+            ["signup", isAnonymousUpgrade ? "Hesabını Kaydet" : "Kayıt Ol"],
           ].map(([key, label]) => {
             const active = tab === key;
             return (
@@ -152,7 +165,6 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
             );
           })}
         </div>
-        )}
 
         {/* Google ile giriş */}
         <button
@@ -227,7 +239,7 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
             className="mt-1 w-full rounded-xl py-3 text-[14px] font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
             style={{ background: accentColor, color: "#0A0E13" }}
           >
-            {loading ? "Lütfen bekle..." : tab === "signin" ? "Giriş Yap" : "Kayıt Ol"}
+            {loading ? "Lütfen bekle..." : tab === "signin" ? "Giriş Yap" : isAnonymousUpgrade ? "Hesabını Kaydet" : "Kayıt Ol"}
           </button>
         </form>
       </div>
