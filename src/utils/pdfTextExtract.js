@@ -9,7 +9,10 @@
 // Dinamik import: pdfjs-dist (~1MB+) yalnızca kullanıcı GERÇEKTEN bir PDF
 // seçtiğinde indirilir — Vite bunu ayrı bir chunk'a böler, ana paketi
 // büyütmez.
-export async function extractTextFromPdf(file) {
+//
+// onProgress(percent:number) — her sayfa işlendiğinde çağrılır (0-100).
+// Çok sayfalı PDF'lerde UI'da gerçek bir ilerleme çubuğu göstermek için.
+export async function extractTextFromPdf(file, onProgress) {
   const pdfjsLib = await import("pdfjs-dist");
   const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
   pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -38,6 +41,7 @@ export async function extractTextFromPdf(file) {
     }
     if (line) lines.push(line);
     pageTexts.push(lines.join("\n"));
+    if (typeof onProgress === "function") onProgress(Math.round((pageNum / pdf.numPages) * 100));
   }
   return pageTexts.join("\n\n");
 }

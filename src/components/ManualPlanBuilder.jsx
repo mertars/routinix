@@ -29,10 +29,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   RotateCcw,
+  FileQuestion,
 } from "lucide-react";
 import { categoryOf, MONO_FONT } from "../constants";
 import usePerfMode from "../hooks/usePerfMode";
-import { parseTextualPlan, parseCsvPlan, parseIcsPlan } from "../utils/planImportParsers";
+import { parseTextualPlan, parseCsvPlan, parseIcsPlan, parseUniversalJson } from "../utils/planImportParsers";
 import { extractTextFromPdf } from "../utils/pdfTextExtract";
 import { buildIcsCalendar, downloadIcsFile } from "../utils/icsExport";
 import ImportFormatModal from "./ImportFormatModal";
@@ -123,29 +124,42 @@ const ROUTINE_FREQUENCY_CHOICES = [
 const IMPORT_ACCEPT = {
   json: "application/json,.json",
   ics: ".ics,text/calendar",
-  markdown: ".md,text/markdown",
+  markdown: ".md,.markdown,text/markdown",
   txt: ".txt,text/plain",
-  csv: ".csv,text/csv",
+  csv: ".csv,.tsv,text/csv",
   pdf: "application/pdf,.pdf",
 };
 
-// Format başına beklenen uzantı — savunma amaçlı çift kontrol (native
-// dosya diyaloğunun `accept` filtresi bazı tarayıcı/OS kombinasyonlarında
-// bypass edilebilir; kullanıcı "Tüm Dosyalar"ı seçip yanlış bir dosya
-// seçebilir).
-const EXPECTED_EXTENSION = {
-  json: ".json",
-  ics: ".ics",
-  markdown: ".md",
-  txt: ".txt",
-  csv: ".csv",
-  pdf: ".pdf",
+// Format başına kabul edilen uzantı(lar) — savunma amaçlı çift kontrol
+// (native dosya diyaloğunun `accept` filtresi bazı tarayıcı/OS
+// kombinasyonlarında bypass edilebilir; kullanıcı "Tüm Dosyalar"ı seçip
+// yanlış bir dosya seçebilir). CSV/TSV birlikte kabul edilir — ayırıcı
+// (virgül/noktalı virgül/TAB) planImportParsers.js'te otomatik algılanır.
+const EXPECTED_EXTENSIONS = {
+  json: [".json"],
+  ics: [".ics"],
+  markdown: [".md", ".markdown"],
+  txt: [".txt"],
+  csv: [".csv", ".tsv"],
+  pdf: [".pdf"],
 };
 
 // İçe aktarma sırasında KASITLI/tanımlanmış bir hata — catch bloğu bunu
 // "beklenmedik bir JS hatası"ndan ayırt edip mesajını OLDUĞU GİBİ gösterir;
 // sınıflandırılmamış her şey dürüst, genel bir mesaja düşer (bkz. handleImportFile).
 class ImportFormatError extends Error {}
+
+// Dosya OKUNDU ve çöktü değil, ama içinden hiçbir gün/görev çıkarılamadı
+// (ör. beklenmedik bir JSON şeması, ayrıştırıcının tanımadığı bir Markdown/
+// TXT düzeni). Bu durumda kullanıcıya sert bir hata yerine bir KURTARMA
+// seçeneği sunulur: ham metni tek bir güne düz görev satırları olarak
+// ekleyip taslağa devam edebilir (bkz. handleImportFallbackAccept).
+class ImportEmptyStructureError extends ImportFormatError {
+  constructor(rawText) {
+    super("Dosya okundu ancak anlamsal yapıya dönüştürülemedi. Düz metin olarak taslağa eklensin mi?");
+    this.rawText = rawText;
+  }
+}
 
 let localIdCounter = 0;
 function newLocalId() {
@@ -242,6 +256,10 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState(null);
   const [importSuccess, setImportSuccess] = useState(false);
+  const [importProgress, setImportProgress] = useState(0); // 0-100, yalnızca PDF'te gerçek yüzde
+  const [importedFileName, setImportedFileName] = useState(null);
+  // Yapı çözülemeyince sunulan kurtarma teklifi: {message, rawText, format} | null
+  const [importFallbackOffer, setImportFallbackOffer] = useState(null);
   const [mobileStep, setMobileStep] = useState(1); // yalnızca <lg ekranlarda anlamlı
   const [dragIndex, setDragIndex] = useState(null);
   const fileInputRef = useRef(null);
@@ -603,7 +621,18 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
 
     setImportError(null);
     setImportSuccess(false);
+    setImportFallbackOffer(null);
+    setImportProgress(0);
+    setImportedFileName(file.name);
     setIsImporting(true);
+
+    // Bir formatın sonucu "boş" (gün/görev çıkarılamadı) çıktığında sert
+    // bir hata yerine KURTARMA teklifi sunmak için — hangi ham metin
+    // üzerinden teklif sunulacağını bilmemiz gerekiyor.
+    const emptyOrThrow = (days, rawText) => {
+      const totalTasks = Object.values(days || {}).reduce((sum, arr) => sum + arr.length, 0);
+      if (totalTasks === 0) throw new ImportEmptyStructureError(rawText);
+    };
 
     try {
       // 1) Boş dosya — okumadan önce en ucuz/kesin kontrol.
@@ -612,49 +641,44 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
       }
       // 2) Uzantı — native dosya diyaloğunun `accept` filtresi bazı tarayıcı/
       //    OS kombinasyonlarında bypass edilebilir ("Tüm Dosyalar" seçilirse).
-      const expectedExt = EXPECTED_EXTENSION[format];
-      if (expectedExt && !file.name.toLowerCase().endsWith(expectedExt)) {
-        throw new ImportFormatError(`Yalnızca ${expectedExt} uzantılı dosya yükleyebilirsiniz.`);
+      const expectedExts = EXPECTED_EXTENSIONS[format] || [];
+      if (expectedExts.length && !expectedExts.some((ext) => file.name.toLowerCase().endsWith(ext))) {
+        throw new ImportFormatError(`Yalnızca ${expectedExts.join(" veya ")} uzantılı dosya yükleyebilirsiniz.`);
       }
 
       let result;
       if (format === "json") {
         let parsed;
+        const rawText = await file.text();
         try {
-          parsed = JSON.parse(await file.text());
+          parsed = JSON.parse(rawText);
         } catch {
           throw new ImportFormatError("Yüklenen dosya geçerli bir Routinix JSON formatında değil.");
         }
-        if (!parsed || typeof parsed !== "object" || !parsed.days) {
-          throw new ImportFormatError("Plan yapısı eksik veya bozuk. Lütfen geçerli bir şablon deneyin.");
-        }
-        // v1 (routines: düz metin, satır satır) ve v2 (routines: {content,
-        // frequency}[]) dışa aktarımlarının İKİSİ de okunabilir.
-        const normalizedRoutines = Array.isArray(parsed.routines)
-          ? parsed.routines.map((r) => ({ content: String((typeof r === "object" ? r.content : r) ?? "").trim(), frequency: (typeof r === "object" && r.frequency) || "daily" })).filter((r) => r.content)
-          : typeof parsed.routines === "string"
-          ? parsed.routines.split("\n").map((l) => l.trim()).filter(Boolean).map((content) => ({ content, frequency: "daily" }))
-          : [];
-        result = { title: parsed.title, totalDays: parsed.totalDays, days: parsed.days, routines: normalizedRoutines };
+        // Adaptif şema: katı bir yapı ARANMAZ — title/name/documentTitle,
+        // days/phases/sections/actionPlan/tasks dizilerinin hangisi varsa
+        // ondan otomatik gün/görev çıkarımı yapılır (bkz. parseUniversalJson).
+        result = parseUniversalJson(parsed);
+        emptyOrThrow(result.days, rawText);
       } else if (format === "ics") {
         const text = await file.text();
         const { days } = parseIcsPlan(text);
-        if (Object.keys(days).length === 0) throw new ImportFormatError("Plan yapısı eksik veya bozuk. Lütfen geçerli bir şablon deneyin.");
+        emptyOrThrow(days, text);
         result = { days, routines: [] };
       } else if (format === "markdown" || format === "txt") {
         const text = await file.text();
         const { title: parsedTitle, days, routines } = parseTextualPlan(text);
-        if (Object.keys(days).length === 0) throw new ImportFormatError("Plan yapısı eksik veya bozuk. Lütfen geçerli bir şablon deneyin.");
+        emptyOrThrow(days, text);
         result = { title: parsedTitle, days, routines };
       } else if (format === "csv") {
         const text = await file.text();
         const { days } = parseCsvPlan(text);
-        if (Object.keys(days).length === 0) throw new ImportFormatError("Plan yapısı eksik veya bozuk. Lütfen geçerli bir şablon deneyin.");
+        emptyOrThrow(days, text);
         result = { days, routines: [] };
       } else if (format === "pdf") {
-        const text = await extractTextFromPdf(file);
+        const text = await extractTextFromPdf(file, (pct) => setImportProgress(pct));
         const { title: parsedTitle, days, routines } = parseTextualPlan(text);
-        if (Object.keys(days).length === 0) throw new ImportFormatError("Plan yapısı eksik veya bozuk. Lütfen geçerli bir şablon deneyin.");
+        emptyOrThrow(days, text);
         result = { title: parsedTitle, days, routines };
       }
 
@@ -662,15 +686,46 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
       setImportSuccess(true);
       setTimeout(() => setImportSuccess(false), 2500);
     } catch (err) {
-      // Yalnızca YUKARIDA BİLEREK fırlatılan (sınıflandırılmış) hatalar
-      // kendi mesajıyla gösterilir — beklenmedik/tanımlanmamış bir JS
-      // hatası (ör. pdfjs'in kendi iç hatası) dürüst, genel bir mesaja düşer;
-      // olmayan bir kesinlik İDDİA EDİLMEZ.
-      setImportError(err instanceof ImportFormatError ? err.message : "Dosya okunamadı/ayrıştırılamadı — dosyanın seçtiğin formata ve beklenen düzene uygun olduğundan emin ol.");
+      // Sıralama ÖNEMLİ: ImportEmptyStructureError, ImportFormatError'ı
+      // GENİŞLETİR — önce en özel sınıf kontrol edilir. Yalnızca YUKARIDA
+      // bilerek fırlatılan (sınıflandırılmış) hatalar kendi mesajıyla
+      // gösterilir; beklenmedik/tanımlanmamış bir JS hatası (ör. pdfjs'in
+      // kendi iç hatası) dürüst, genel bir mesaja düşer — olmayan bir
+      // kesinlik İDDİA EDİLMEZ.
+      if (err instanceof ImportEmptyStructureError) {
+        setImportFallbackOffer({ message: err.message, rawText: err.rawText, format });
+      } else if (err instanceof ImportFormatError) {
+        setImportError(err.message);
+      } else {
+        setImportError("Dosya okunamadı/ayrıştırılamadı — dosyanın seçtiğin formata ve beklenen düzene uygun olduğundan emin ol.");
+      }
     } finally {
       setIsImporting(false);
+      setImportProgress(0);
       setPendingImportFormat(null);
     }
+  };
+
+  // Kurtarma teklifi kabul edildi: ham metnin her boş-olmayan satırı TEK bir
+  // güne (Gün 1) düz görev kartı olarak eklenir — kullanıcı Builder'da elle
+  // düzenleyebilir. Devasa bir dosya tek günde yüzlerce karta boğmasın diye
+  // makul bir üst sınır (200 satır) uygulanır.
+  const handleImportFallbackAccept = () => {
+    if (!importFallbackOffer) return;
+    const lines = String(importFallbackOffer.rawText || "")
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .slice(0, 200);
+    const tasks = lines.map((title) => ({ title, detail: null, duration_min: null, priority: null, estimated_cost: null, map_search_query: null }));
+    applyImportedData({ days: { 1: tasks }, routines: [] });
+    setImportFallbackOffer(null);
+    setImportSuccess(true);
+    setTimeout(() => setImportSuccess(false), 2500);
+  };
+
+  const handleImportFallbackDismiss = () => {
+    setImportFallbackOffer(null);
   };
 
   const handleSave = async () => {
@@ -831,9 +886,69 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
           </div>
         </div>
 
+        {/* İlerleme çubuğu — PDF'te GERÇEK sayfa yüzdesi; diğer formatlarda
+            (anlık işlemler) ince bir "bir şeyler oluyor" ipucu. */}
+        {isImporting && (
+          <>
+            {importProgress > 0 && importedFileName && (
+              <div className="relative z-10 shrink-0 px-4 md:px-8 lg:px-10 pt-2 flex items-center justify-between">
+                <p className="text-[11px] font-medium truncate text-[var(--text-faint)]" style={{ fontFamily: MONO_FONT }}>
+                  {importedFileName}
+                </p>
+                <p className="text-[11px] font-semibold tabular-nums shrink-0 ml-2" style={{ color: NEON.cyan }}>
+                  %{importProgress}
+                </p>
+              </div>
+            )}
+            <div className="relative z-10 shrink-0 h-[3px] w-full overflow-hidden" style={{ background: "rgba(var(--overlay-rgb),0.08)" }}>
+              <div
+                className="h-full transition-all duration-200 ease-out"
+                style={{
+                  width: `${importProgress > 0 ? importProgress : 15}%`,
+                  background: `linear-gradient(90deg, ${NEON.violet}, ${NEON.cyan})`,
+                  boxShadow: `0 0 8px ${NEON.cyan}88`,
+                }}
+              />
+            </div>
+          </>
+        )}
+
         {/* İçe aktarma geri bildirimi — hangi tetikleyici (masaüstü başlık /
             mobil footer ikonu) kullanılmış olursa olsun, aynı yerde ve tam
             genişlikte görünür. */}
+        {importFallbackOffer && (
+          <div className="relative z-10 shrink-0 px-4 md:px-8 lg:px-10 pt-3">
+            <div
+              className="rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap sm:flex-nowrap"
+              style={{
+                background: "rgba(245, 165, 36, 0.08)",
+                border: "1px solid rgba(245, 165, 36, 0.35)",
+                boxShadow: "0 0 24px -10px rgba(245, 165, 36, 0.55)",
+              }}
+            >
+              <FileQuestion className="w-4 h-4 shrink-0" style={{ color: "#F5A524" }} />
+              <p className="flex-1 min-w-[180px] text-[12.5px] font-medium" style={{ color: "#F5A524" }}>
+                {importFallbackOffer.message}
+              </p>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={handleImportFallbackDismiss}
+                  className="rounded-xl px-3 py-1.5 text-[12px] font-semibold transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  style={{ background: "rgba(var(--overlay-rgb), 0.08)" }}
+                >
+                  Vazgeç
+                </button>
+                <button
+                  onClick={handleImportFallbackAccept}
+                  className="rounded-xl px-3 py-1.5 text-[12px] font-semibold transition-colors"
+                  style={{ background: "rgba(245, 165, 36, 0.18)", color: "#F5A524" }}
+                >
+                  Evet, Taslağa Ekle
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {importError && (
           <div className="relative z-10 shrink-0 px-4 md:px-8 lg:px-10 pt-3">
             <div
