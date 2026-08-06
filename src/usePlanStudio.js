@@ -260,7 +260,16 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
         onRequireAuth?.();
         return;
       }
-      if (!planId) {
+      // `typeof planId === "string"` KASITLI bir savunma: bu fonksiyon bir
+      // yerde bare `onClick={ps.openManualBuilder}` olarak (argümansız çağrı
+      // sarmalayıcısı OLMADAN) bağlanırsa, React'in SyntheticEvent'i buraya
+      // "planId" olarak sızar — bir event nesnesi HER ZAMAN truthy olduğu
+      // için `!planId` kontrolü bunu YAKALAYAMAZ, sonuçta fetchPlanDetail
+      // geçersiz bir değerle çağrılır ve builder sessizce hiç açılmadan
+      // başarısız olur (bkz. CategoryIntro.jsx'teki canlıda yaşanmış örnek).
+      // Gerçek bir planId HER ZAMAN string (uuid) olduğundan bu kontrol
+      // yanlış-pozitif ÜRETMEZ.
+      if (!planId || typeof planId !== "string") {
         setEditingPlanPayload(null);
         setManualBuilderOpen(true);
         return;

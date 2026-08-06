@@ -156,8 +156,14 @@ export default function CategoryIntro({
               renk kimliği — "bu AI persona'larından biri DEĞİL" sinyali). */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
             <div className="group/manual relative flex items-center justify-center">
+              {/* onOpenManualBuilder() ARGÜMANSIZ çağrılmalı — bare `onClick=
+                  {onOpenManualBuilder}` React'in SyntheticEvent'ini 1. argüman
+                  (planId) olarak sızdırır; usePlanStudio.openManualBuilder bunu
+                  "düzenlenecek plan id'si" sanıp fetchPlanDetail'i geçersiz bir
+                  değerle çağırır — builder hiç açılmadan kısa bir yükleniyor
+                  ekranından sonra sessizce başarısız olur. */}
               <button
-                onClick={onOpenManualBuilder}
+                onClick={() => onOpenManualBuilder()}
                 aria-label="Kendi Planını Hazırla"
                 className="relative w-11 h-11 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95"
                 style={{
