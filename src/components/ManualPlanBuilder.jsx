@@ -61,23 +61,35 @@ const NEON = { cyan: "#00F3FF", magenta: "#FF007F", violet: "#8B5CF6", emerald: 
 const GRADIENT = `linear-gradient(90deg, transparent, ${NEON.violet}, ${NEON.cyan}, transparent)`;
 // İkincil aktif durum (gün/gün-sayısı sekmeleri, özellik çipleri, hızlı
 // ekle butonu) — cam efekti + ince violet kenarlık + yumuşak çift-renk glow.
+// KRİTİK DÜZELTME (canlıda bildirilen kontrast hatası): önceki sürüm
+// SAYDAM bir dolgu (rgba alpha 0.14-0.2) + neredeyse-beyaz metin (#ECE7FF)
+// kullanıyordu — bu, KOYU temada (--bg-app: #030304, neredeyse siyah)
+// güzel görünüyordu ama AÇIK temada (--bg-app: #ebf0f5, index.css'te
+// doğrulandı) saydam dolgu o AÇIK zeminle karışıp SOLUK bir eflatuna
+// dönüşüyordu — neredeyse-beyaz metin neredeyse-beyaz zemin üzerinde
+// GÖRÜNMEZ oluyordu. Çözüm: dolgu artık SAYDAM DEĞİL, OPAK/DÜZ bir
+// gradyan (violet→cyan-mavi, Studio'nun KENDİ NEON kimliğinden — bkz.
+// yukarıdaki NEON sabiti — ama parıltı için ayrılan AÇIK/parlak tonlar
+// yerine beyaz metnin WCAG AA geçtiği KOYU/doygun tonlar) — artık ARKADA
+// ne olursa olsun (koyu ya da açık tema) AYNI, garanti okunaklı görünür.
+// Kontrast HESAPLANDI (relative luminance, WCAG 2.1): beyaz/#7C3AED ≈
+// 5.7:1, beyaz/#0369A1 ≈ 5.9:1 — gradyanın HER İKİ UCU da normal metin
+// eşiğini (4.5:1) geçiyor, yalnızca "büyük metin" eşiğini (3:1) değil.
 const GLOW_ACTIVE_STYLE = {
-  background: `linear-gradient(135deg, rgba(139,92,246,0.2), rgba(0,243,255,0.14))`,
-  color: "#ECE7FF",
-  border: `1px solid rgba(139,92,246,0.5)`,
-  boxShadow: `0 0 18px -6px rgba(139,92,246,0.55), 0 0 10px -4px rgba(0,243,255,0.35)`,
-  backdropFilter: "blur(6px)",
-  WebkitBackdropFilter: "blur(6px)",
+  background: "linear-gradient(135deg, #7C3AED, #0369A1)",
+  color: "#ffffff",
+  fontWeight: 700,
+  border: "1px solid rgba(255,255,255,0.22)",
+  boxShadow: "0 0 0 2px rgba(139,92,246,0.35), 0 6px 16px -6px rgba(124,58,237,0.55)",
 };
-// Birincil aksiyon (Planı Kaydet, Görevlere Geç) — aynı ailenin biraz daha
-// dolgun/parlak hali, tıklama hissiyatı için daha güçlü gölge.
+// Birincil aksiyon (Planı Kaydet, Görevlere Geç) — AYNI opak gradyan,
+// tıklama hissiyatı için daha güçlü/geniş gölge (elevation) ile ayrışır.
 const PRIMARY_BUTTON_STYLE = {
-  background: `linear-gradient(135deg, rgba(139,92,246,0.34), rgba(0,243,255,0.22))`,
-  color: "#fff",
-  border: `1px solid rgba(139,92,246,0.62)`,
-  boxShadow: `0 10px 30px -12px rgba(139,92,246,0.6), 0 0 18px -4px rgba(0,243,255,0.4)`,
-  backdropFilter: "blur(8px)",
-  WebkitBackdropFilter: "blur(8px)",
+  background: "linear-gradient(135deg, #7C3AED, #0369A1)",
+  color: "#ffffff",
+  fontWeight: 800,
+  border: "1px solid rgba(255,255,255,0.25)",
+  boxShadow: "0 10px 30px -10px rgba(124,58,237,0.65), 0 0 20px -6px rgba(2,132,199,0.45)",
 };
 
 // Dinamik Görev Özellik Seçici — hangi alanların Hızlı Ekle formunda ve
@@ -769,7 +781,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                           key={n}
                           onClick={() => handleDayCountPick(n)}
                           className="min-h-[48px] lg:min-h-0 rounded-full px-4 lg:py-2 text-[13px] font-semibold transition-all duration-200 border"
-                          style={active ? GLOW_ACTIVE_STYLE : { borderColor: "var(--border-default)", background: "var(--bg-input)", color: "var(--text-secondary)" }}
+                          style={active ? GLOW_ACTIVE_STYLE : { borderColor: "var(--border-strong)", background: "var(--bg-input)", color: "var(--text-secondary)", fontWeight: 500 }}
                         >
                           {n} Gün
                         </button>
@@ -782,7 +794,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                           setCustomVal(String(totalDays));
                         }}
                         className="min-h-[48px] lg:min-h-0 rounded-full px-4 lg:py-2 text-[13px] font-semibold border transition-all duration-200"
-                        style={!DAY_COUNT_CHOICES.includes(totalDays) ? GLOW_ACTIVE_STYLE : { borderColor: "var(--border-default)", background: "var(--bg-input)", color: "var(--text-secondary)" }}
+                        style={!DAY_COUNT_CHOICES.includes(totalDays) ? GLOW_ACTIVE_STYLE : { borderColor: "var(--border-strong)", background: "var(--bg-input)", color: "var(--text-secondary)", fontWeight: 500 }}
                       >
                         {!DAY_COUNT_CHOICES.includes(totalDays) ? `${totalDays} Gün (Özel)` : "Özel"}
                       </button>
@@ -825,7 +837,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                           key={key}
                           onClick={() => toggleAttr(key)}
                           className="flex items-center gap-1.5 rounded-full pl-2.5 pr-3 min-h-[40px] lg:min-h-0 lg:py-1.5 text-[11.5px] font-semibold transition-all duration-200 border"
-                          style={active ? GLOW_ACTIVE_STYLE : { background: "var(--bg-input)", color: "var(--text-secondary)", borderColor: "var(--border-default)" }}
+                          style={active ? GLOW_ACTIVE_STYLE : { background: "var(--bg-input)", color: "var(--text-secondary)", borderColor: "var(--border-strong)", fontWeight: 500 }}
                         >
                           <Icon className="w-3.5 h-3.5" />
                           {label}
