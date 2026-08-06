@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
-import { STAGE_INTRO, STAGE_WIZARD, STAGE_LOADING, STAGE_ERROR, STAGE_PLAN } from "./constants";
+import { STAGE_INTRO, STAGE_WIZARD, STAGE_LOADING, STAGE_ERROR, STAGE_PLAN, ONBOARDING_STORAGE_KEY } from "./constants";
 import usePlanStudio from "./usePlanStudio";
 import useAuth from "./useAuth";
 import { tapFeedback } from "./lib/haptics";
-import { setLogUser } from "./utils/logger";
+import logger, { setLogUser } from "./utils/logger";
 import Header from "./components/Header";
 import ConfirmModal from "./components/ConfirmModal";
 import DrawerMenu from "./components/DrawerMenu";
@@ -55,6 +55,7 @@ const ManualPlanBuilder = lazy(() => import("./components/ManualPlanBuilder"));
 const RhythmStudio = lazy(() => import("./components/RhythmStudio"));
 const CommunityHub = lazy(() => import("./components/CommunityHub"));
 const NexusProfileOverlay = lazy(() => import("./components/community/NexusProfileOverlay"));
+const OnboardingTour = lazy(() => import("./components/OnboardingTour"));
 
 export default function App() {
   const auth = useAuth();
@@ -84,6 +85,20 @@ export default function App() {
   const [nexusProfileOpen, setNexusProfileOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [printRange, setPrintRange] = useState(Infinity);
+  const [tourOpen, setTourOpen] = useState(false);
+
+  // İlk ziyarette otomatik Onboarding Turu — yalnızca mount'ta BİR KEZ
+  // kontrol edilir (bağımlılık dizisi boş). localStorage okunamazsa (gizli
+  // tarama/quota) tur SESSİZCE gösterilmez — uygulama asla bu yüzden çökmez.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(ONBOARDING_STORAGE_KEY) !== "true") {
+        setTourOpen(true);
+      }
+    } catch (err) {
+      logger.warn("ONBOARDING", "localStorage okunamadı, tur atlanıyor", { error: err?.message });
+    }
+  }, []);
   // Tek, paylaşılan "auth iste" tetikleyicisi — hem düz "Giriş Yap" tıklamaları
   // (mesajsız, `requireAuth()`) hem de AI kilidi (mesajlı, `requireAuth(AI_GATE_MESSAGE)`)
   // BUNU kullanır; usePlanStudio'nun `onRequireAuth` prop'una GEÇİLEBİLMESİ için
@@ -121,7 +136,7 @@ export default function App() {
   // halde kullanıcı hiç GÖRMEDİĞİ bu animasyon GPU'yu meşgul etmeyi sürdürür
   // (ısınmanın asıl kaynağı genelde panelin kendi CSS'i değil, budur).
   const anyOverlayOpen =
-    authOpen || logoutConfirmOpen || deleteOpen || taskDrawerOpen || routinesOpen || hubOpen || plansOpen || pomodoroOpen || rhythmOpen || communityOpen || printOpen;
+    authOpen || logoutConfirmOpen || deleteOpen || taskDrawerOpen || routinesOpen || hubOpen || plansOpen || pomodoroOpen || rhythmOpen || communityOpen || printOpen || tourOpen;
 
   // Bugün / Rutinler / Şablon Keşfet / Planlarım / Pomodoro panellerinden aynı
   // anda yalnızca biri açık olur; tetiklendiklerinde hamburger menüsü de kapanır
@@ -189,6 +204,13 @@ export default function App() {
     ps.setMenuOpen(false);
     setNexusProfileOpen(true);
   }, [closeAllPanels, ps.setMenuOpen]);
+  // OnboardingTour — Header'daki ❓ ve DrawerMenu'deki "Nasıl Kullanılır?"
+  // AYNI stabil referansı paylaşır (memo'lu Header/DrawerMenu için gerekli,
+  // bkz. yukarıdaki AYNI ilke notu).
+  const openTour = useCallback(() => {
+    ps.setMenuOpen(false);
+    setTourOpen(true);
+  }, [ps.setMenuOpen]);
   // Görev kartındaki "Başlat" — Pomodoro Studio'yu bu görev seçiliyken açar
   // (bkz. PomodoroStudio.jsx `initialTask` prop'u). Tam görev objesi TaskCard'dan
   // geldiği için PomodoroStudio kendi başına ayrı bir plan/görev fetch'i
@@ -321,6 +343,7 @@ export default function App() {
           onAuthClick={openAuth}
           onSignOut={requestSignOut}
           onLogoClick={onLogoClick}
+          onTourClick={openTour}
           menuOpen={ps.menuOpen}
           onMenuToggle={toggleHamburger}
         />
@@ -342,6 +365,7 @@ export default function App() {
           onOpenCommunity={toggleCommunity}
           onOpenPomodoro={togglePomodoro}
           onOpenProfile={openNexusProfile}
+          onOpenTour={openTour}
           onSignOut={requestSignOut}
         />
 
@@ -497,6 +521,14 @@ export default function App() {
           hiçbir zaman eksik/kısmi veriyle mount edilmesin diye bu kısa
           pencerede ayrı bir yükleniyor katmanı gösterilir. */}
       {ps.editLoading && <OverlayFallback z={110} />}
+
+      {/* İlk Ziyaret Turu — ilk açılışta otomatik, sonrasında yalnızca
+          Header/DrawerMenu'deki ❓ Rehber ile. Koşullu mount. */}
+      {tourOpen && (
+        <Suspense fallback={<OverlayFallback z={150} />}>
+          <OnboardingTour open={tourOpen} onClose={() => setTourOpen(false)} />
+        </Suspense>
+      )}
 
       {/* Şablon Keşfet — hazır rota kütüphanesi. Koşullu mount. */}
       {hubOpen && (

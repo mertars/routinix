@@ -64,6 +64,13 @@ export const STAGE_PLAN = "plan";
 
 export const MIN_GOAL_LENGTH = 5;
 
+// OnboardingTour.jsx — localStorage anahtarı BURADA (yalın, lazy-load
+// GEREKTİRMEYEN bir dosyada) yaşar çünkü app.jsx "ilk ziyaret mi?"
+// kontrolünü mount ANINDA, OnboardingTour'un kendisi (lazy chunk) henüz
+// hiç yüklenmemişken yapması gerekiyor — component'i lazy import edip
+// yalnızca bir string sabiti için tetiklemek istemedik.
+export const ONBOARDING_STORAGE_KEY = "routinix_onboarding_seen";
+
 // "✨ Şablon Keşfet" (Template Hub) için görsel ağırlıklı, hazır rota kütüphanesi.
 // Her şablon: kapak görseli, süre, 2 cümlelik tanıtım, illüstratif tamamlanma
 // oranı ve önizleme için kısa rutin/gün listesi taşır. "Şablonu Kullan" tıklanınca

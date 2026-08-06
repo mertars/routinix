@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Timer, BarChart3, Users2, Menu, X } from "lucide-react";
+import { Timer, BarChart3, Users2, Menu, X, HelpCircle } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 // Standart hamburger tetikleyici — her ekran boyutunda görünür (mobil/
@@ -47,6 +47,23 @@ function ThemeToggle() {
   );
 }
 
+// ❓ Rehber — OnboardingTour'u istediği zaman yeniden açar (bkz.
+// OnboardingTour.jsx). Tur ilk ziyarette otomatik açılır ve bir daha
+// KENDİLİĞİNDEN gösterilmez; bu buton onu manuel geri getirmenin TEK yolu.
+function TourTrigger({ onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label="Nasıl Kullanılır / Rehber"
+      title="Nasıl Kullanılır / Rehber"
+      className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+      style={{ color: "var(--text-secondary)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}
+    >
+      <HelpCircle className="w-[18px] h-[18px]" strokeWidth={2} />
+    </button>
+  );
+}
+
 // App'in kök state'inde (usePlanStudio) çoğu değişiklik (ör. "goal" alanına
 // her tuş vuruşu) Header'ın props'larını ETKİLEMEZ — App.jsx'teki tüm
 // callback'ler useCallback ile sarılı olduğundan, memo bu durumlarda Header'ın
@@ -73,6 +90,7 @@ function Header({
   onAuthClick,
   onSignOut,
   onLogoClick,
+  onTourClick,
   menuOpen,
   onMenuToggle,
 }) {
@@ -252,6 +270,7 @@ function Header({
               Giriş Yap
             </button>
           )}
+          <TourTrigger onClick={onTourClick} />
           <ThemeToggle />
           <MenuTrigger open={menuOpen} onToggle={onMenuToggle} />
         </div>

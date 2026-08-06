@@ -436,6 +436,20 @@ export default function GlobalStyles() {
       }
       .pop-in { animation: popIn 0.18s cubic-bezier(0.32, 0.72, 0, 1); transform-origin: top right; }
 
+      /* --- OnboardingTour.jsx: adım içeriği yay-fizikli kayarak belirir ---
+         --tour-dir (1 ileri / -1 geri) yönü taşır; içerik ileri giderken
+         sağdan, geri giderken soldan gelir. React key={step} bu bloğu her
+         adımda yeniden mount ettiği için animasyon JS state'i olmadan
+         otomatik tekrar oynar. */
+      @keyframes tourStepIn {
+        from { opacity: 0; transform: translateX(calc(28px * var(--tour-dir, 1))); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      .tour-step-in { animation: tourStepIn 0.42s cubic-bezier(0.34, 1.56, 0.64, 1); }
+      @media (prefers-reduced-motion: reduce) {
+        .tour-step-in { animation: none !important; }
+      }
+
       /* --- Rutin tiklenince yeşil/mor neon parıltı --- */
       @keyframes checkGlow {
         0% { box-shadow: 0 0 0 0 rgba(46,217,163,0); }
