@@ -31,6 +31,22 @@ import logger from "../utils/logger";
 // geçilirse kullanılmak üzere ŞİMDİDEN istenir (bkz. spotifyPkce.js).
 const MusicContext = createContext(null);
 
+// Spotify Embed IFrame API controller çağrıları (play/pause/seek/loadUri)
+// SENKRON olarak fırlayabiliyor — canlı testte doğrulandı: henüz hiçbir şey
+// YÜKLENMEMİŞKEN pause() çağrılırsa Spotify'ın kendi iç SDK'sı "Cannot
+// perform operation; no list was loaded" hatasıyla throw ediyor. Bu çağrı
+// bir React event handler'ının İÇİNDEN geldiği için ErrorBoundary'ye kadar
+// YÜKSELİP tüm uygulamayı çökertebilir — üçüncü taraf bir widget'ın iç
+// hata durumu YÜZÜNDEN bu kabul edilemez, bu yüzden HER controller çağrısı
+// buradan geçer.
+function safeSpotifyCall(fn) {
+  try {
+    fn();
+  } catch (err) {
+    logger.warn("MUSIC_SPOTIFY", "Embed controller çağrısı başarısız (yok sayıldı)", { error: err?.message });
+  }
+}
+
 export const SPOTIFY_PRESET_PLAYLISTS = [
   { id: "37i9dQZF1DWYoYGBbGKurt", label: "Lo-Fi Beats" },
   { id: "37i9dQZF1DX9sIqqvKsjG8", label: "Deep Focus" },
@@ -47,6 +63,21 @@ export function MusicProvider({ children }) {
   const [activeTab, setActiveTab] = useState("spotify"); // "spotify" | "youtube"
   const [spotifyPlaylistId, setSpotifyPlaylistId] = useState(SPOTIFY_PRESET_PLAYLISTS[0].id);
   const [youtubeVideoId, setYoutubeVideoId] = useState(YOUTUBE_PRESET_VIDEOS[0].id);
+  // "Ref aynası" (ref mirror) — canlı testte YAKALANAN gerçek bir yarış
+  // durumunu önler: kullanıcı bir sekmeyi AÇAR AÇMAZ (script/player henüz
+  // ASENKRON kuruluyorken) farklı bir playlist/video SEÇERSE, controller/
+  // player OLUŞTURULDUĞUNDA (attach/createPlayer, aşağıda) state'i BİLEREK
+  // OKUMAZ — o an içinde bulunulan render'ın ESKİ (stale) closure'ını
+  // yakalardı. Bunun yerine HER ZAMAN bu ref'lerin GÜNCEL .current
+  // değerinden okunur.
+  const spotifyPlaylistIdRef = useRef(spotifyPlaylistId);
+  const youtubeVideoIdRef = useRef(youtubeVideoId);
+  useEffect(() => {
+    spotifyPlaylistIdRef.current = spotifyPlaylistId;
+  }, [spotifyPlaylistId]);
+  useEffect(() => {
+    youtubeVideoIdRef.current = youtubeVideoId;
+  }, [youtubeVideoId]);
 
   // Script enjeksiyonu + controller/player kurulumu TEMBEL — kullanıcı
   // Spotify/YouTube'u en az BİR KEZ açana kadar (openPanel) hiçbir harici
@@ -57,12 +88,21 @@ export function MusicProvider({ children }) {
 
   const [spotifyReady, setSpotifyReady] = useState(false);
   const [spotifyPlaying, setSpotifyPlaying] = useState(false);
+  // Embed IFrame API'nin playback_update olayından — MİLİSANİYE (Spotify'ın
+  // kendi birimi); dışarıya (bkz. positionSec/durationSec altta) SANİYEYE
+  // çevrilerek YouTube İLE AYNI birimde sunulur.
+  const [spotifyPositionMs, setSpotifyPositionMs] = useState(0);
+  const [spotifyDurationMs, setSpotifyDurationMs] = useState(0);
   const spotifyControllerRef = useRef(null);
   const spotifyMountRef = useRef(null);
 
   const [youtubeReady, setYoutubeReady] = useState(false);
   const [youtubePlaying, setYoutubePlaying] = useState(false);
   const [youtubeTitle, setYoutubeTitle] = useState("");
+  // YouTube IFrame API zaman güncellemesi PUSH ETMEZ — çalarken saniyede bir
+  // getCurrentTime() ile YOKLANIR (bkz. aşağıdaki polling efekti).
+  const [youtubePositionSec, setYoutubePositionSec] = useState(0);
+  const [youtubeDurationSec, setYoutubeDurationSec] = useState(0);
   const youtubePlayerRef = useRef(null);
   const youtubeMountRef = useRef(null);
 
@@ -92,7 +132,7 @@ export function MusicProvider({ children }) {
       youtubePlayerRef.current?.pauseVideo?.();
     } else {
       setYoutubeInitialized(true);
-      spotifyControllerRef.current?.pause?.();
+      safeSpotifyCall(() => spotifyControllerRef.current?.pause?.());
     }
   }, []);
 
@@ -224,14 +264,24 @@ export function MusicProvider({ children }) {
 
     function attach(IFrameAPI) {
       if (spotifyControllerRef.current || !spotifyMountRef.current) return;
+      // spotifyPlaylistIdRef.current (KAPANMA/closure DEĞİL) — script yüklenip
+      // bu callback tetiklenene kadar geçen sürede kullanıcı FARKLI bir liste
+      // seçmiş olabilir (canlı testte YAKALANAN gerçek bir yarış durumu).
       IFrameAPI.createController(
         spotifyMountRef.current,
-        { uri: `spotify:playlist:${spotifyPlaylistId}`, width: "100%", height: "100%" },
+        { uri: `spotify:playlist:${spotifyPlaylistIdRef.current}`, width: "100%", height: "100%" },
         (controller) => {
           spotifyControllerRef.current = controller;
           setSpotifyReady(true);
+          // playback_update, DÜRÜSTLÜK NOTU: Spotify'ın belgelenmiş Embed
+          // IFrame API sözleşmesine göre (isPaused/isBuffering/position/
+          // duration alanları) yazıldı — bu ortamda gerçek bir Spotify
+          // hesabıyla uçtan uca CANLI doğrulanamadı; ilerleme çubuğu/süre
+          // beklenenden farklı davranırsa ilk bakılacak yer burası.
           controller.addListener("playback_update", (e) => {
             setSpotifyPlaying(!e?.data?.isPaused && !e?.data?.isBuffering);
+            if (typeof e?.data?.position === "number") setSpotifyPositionMs(e.data.position);
+            if (typeof e?.data?.duration === "number") setSpotifyDurationMs(e.data.duration);
           });
         }
       );
@@ -254,7 +304,7 @@ export function MusicProvider({ children }) {
 
   // Aktif playlist değişince VAR OLAN controller'a yeni URI yükle.
   useEffect(() => {
-    spotifyControllerRef.current?.loadUri?.(`spotify:playlist:${spotifyPlaylistId}`);
+    safeSpotifyCall(() => spotifyControllerRef.current?.loadUri?.(`spotify:playlist:${spotifyPlaylistId}`));
   }, [spotifyPlaylistId]);
 
   // ------------------------------------------------------------------
@@ -265,15 +315,25 @@ export function MusicProvider({ children }) {
 
     function createPlayer() {
       if (youtubePlayerRef.current || !youtubeMountRef.current || !window.YT?.Player) return;
+      // youtubeVideoIdRef.current (KAPANMA/closure DEĞİL) — YT IFrame API
+      // script'i yüklenip bu fonksiyon tetiklenene kadar geçen sürede
+      // kullanıcı FARKLI bir video seçmiş olabilir (canlı testte YAKALANAN
+      // gerçek bir yarış durumu: eski/varsayılan video sessizce kalıcı
+      // olarak yüklenip kullanıcının seçimi YOK SAYILIYORDU).
       youtubePlayerRef.current = new window.YT.Player(youtubeMountRef.current, {
-        videoId: youtubeVideoId,
+        videoId: youtubeVideoIdRef.current,
         playerVars: { autoplay: 0, rel: 0, modestbranding: 1 },
         events: {
-          onReady: () => setYoutubeReady(true),
+          onReady: () => {
+            setYoutubeReady(true);
+            setYoutubeDurationSec(youtubePlayerRef.current?.getDuration?.() || 0);
+          },
           onStateChange: (e) => {
             setYoutubePlaying(e.data === window.YT.PlayerState.PLAYING);
             const title = youtubePlayerRef.current?.getVideoData?.()?.title;
             if (title) setYoutubeTitle(title);
+            const dur = youtubePlayerRef.current?.getDuration?.();
+            if (dur) setYoutubeDurationSec(dur);
           },
           onError: (e) => logger.warn("MUSIC_YOUTUBE", "YouTube oynatıcı hatası", { code: e?.data }),
         },
@@ -301,26 +361,92 @@ export function MusicProvider({ children }) {
   useEffect(() => {
     if (!youtubePlayerRef.current?.loadVideoById) return;
     setYoutubeTitle("");
+    setYoutubePositionSec(0);
+    setYoutubeDurationSec(0);
     youtubePlayerRef.current.loadVideoById(youtubeVideoId);
   }, [youtubeVideoId]);
 
+  // YouTube IFrame API bir "zaman ilerledi" olayı YAYINLAMAZ — bu yüzden
+  // yalnızca GERÇEKTEN çalarken saniyede bir getCurrentTime() ile YOKLANIR.
+  // Spotify tarafında buna gerek yok: playback_update olayı zaten periyodik
+  // olarak position/duration'ı kendisi gönderiyor (bkz. yukarıdaki listener).
+  useEffect(() => {
+    if (!youtubePlaying || !youtubePlayerRef.current?.getCurrentTime) return;
+    const id = setInterval(() => {
+      setYoutubePositionSec(youtubePlayerRef.current?.getCurrentTime?.() || 0);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [youtubePlaying]);
+
   const togglePlayPause = useCallback(() => {
     if (activeTab === "spotify") {
-      spotifyControllerRef.current?.togglePlay?.();
+      safeSpotifyCall(() => spotifyControllerRef.current?.togglePlay?.());
     } else if (youtubePlayerRef.current) {
       if (youtubePlaying) youtubePlayerRef.current.pauseVideo();
       else youtubePlayerRef.current.playVideo();
     }
   }, [activeTab, youtubePlaying]);
 
+  // Kaydırma çubuğu — kullanıcı bıraktığında (bkz. FocusMusicControlCard'ın
+  // onMouseUp/onTouchEnd/onKeyUp ile "commit" ettiği tek çağrı, ONCHANGE'İN
+  // HER PIXEL'İNDE DEĞİL) çağrılır. seconds: SANİYE (platform farkı burada
+  // gizlenir — Spotify'ın kendi ms biriminden BURADA çevrilir).
+  const seekTo = useCallback(
+    (seconds) => {
+      if (activeTab === "spotify") {
+        // DÜRÜSTLÜK NOTU: Embed IFrame API'nin seek(seconds) metodu Spotify'ın
+        // belgelenmiş sözleşmesine göre çağrılıyor, bu ortamda canlı
+        // doğrulanamadı (bkz. yukarıdaki playback_update yorumu).
+        safeSpotifyCall(() => spotifyControllerRef.current?.seek?.(seconds));
+      } else {
+        youtubePlayerRef.current?.seekTo?.(seconds, true);
+      }
+    },
+    [activeTab]
+  );
+
+  // Önceki/Sonraki — KASITLI bir kapsam kararı: ne Spotify Embed IFrame
+  // API'si ne de (tek video yüklenmiş, GERÇEK bir YouTube playlist'i
+  // OLMAYAN) bu YouTube player'ı programatik "parça atlama" desteklemiyor.
+  // Spotify'ın GERÇEK Web Playback SDK'sıyla parça-seviyesi atlama Premium
+  // hesap + çok daha büyük bir entegrasyon gerektirir (bkz. dosya başı
+  // yorumu — BİLİNÇLİ OLARAK kurulmadı). Bunun yerine "Önceki/Sonraki" BU
+  // sekmenin kürate edilmiş listesinde (Spotify: hazır + Kütüphanem,
+  // YouTube: hazır) bir SONRAKİ KAYNAĞA (çalma listesi/video) geçer — gerçek
+  // parça atlama DEĞİL, ama gerçekten ÇALIŞAN, dürüst bir "sıradaki" deneyimi.
+  const skipBy = useCallback(
+    (direction) => {
+      if (activeTab === "spotify") {
+        const list = [...SPOTIFY_PRESET_PLAYLISTS, ...spotifyUserPlaylists];
+        const idx = list.findIndex((p) => p.id === spotifyPlaylistId);
+        const next = list[(((idx === -1 ? 0 : idx) + direction) % list.length + list.length) % list.length];
+        if (next) setSpotifyPlaylistId(next.id);
+      } else {
+        const idx = YOUTUBE_PRESET_VIDEOS.findIndex((v) => v.id === youtubeVideoId);
+        const next = YOUTUBE_PRESET_VIDEOS[(((idx === -1 ? 0 : idx) + direction) % YOUTUBE_PRESET_VIDEOS.length + YOUTUBE_PRESET_VIDEOS.length) % YOUTUBE_PRESET_VIDEOS.length];
+        if (next) setYoutubeVideoId(next.id);
+      }
+    },
+    [activeTab, spotifyPlaylistId, spotifyUserPlaylists, youtubeVideoId]
+  );
+  const skipNext = useCallback(() => skipBy(1), [skipBy]);
+  const skipPrevious = useCallback(() => skipBy(-1), [skipBy]);
+
   const isPlaying = activeTab === "spotify" ? spotifyPlaying : youtubePlaying;
   const hasActivePlayer = spotifyInitialized || youtubeInitialized;
-  const nowPlayingLabel =
-    activeTab === "spotify"
-      ? spotifyUserPlaylists.find((p) => p.id === spotifyPlaylistId)?.label ||
-        SPOTIFY_PRESET_PLAYLISTS.find((p) => p.id === spotifyPlaylistId)?.label ||
-        "Spotify"
-      : youtubeTitle || YOUTUBE_PRESET_VIDEOS.find((v) => v.id === youtubeVideoId)?.label || "YouTube";
+  const activeSpotifyPlaylist =
+    spotifyUserPlaylists.find((p) => p.id === spotifyPlaylistId) || SPOTIFY_PRESET_PLAYLISTS.find((p) => p.id === spotifyPlaylistId);
+  const nowPlayingLabel = activeTab === "spotify" ? activeSpotifyPlaylist?.label || "Spotify" : youtubeTitle || YOUTUBE_PRESET_VIDEOS.find((v) => v.id === youtubeVideoId)?.label || "YouTube";
+  const nowPlayingSubLabel = activeTab === "spotify" ? "Spotify" : "YouTube";
+  // Spotify: yalnızca kullanıcının KENDİ kütüphanesindeki bir liste seçiliyse
+  // GERÇEK kapak görseli var (fetchUserPlaylists, bkz. spotifyWebApi.js).
+  // Hazır listelerde (giriş yapılmadan) kapak görseli YOKTUR — Spotify Web
+  // API'sine anonim bir kullanıcı adına istek ATILAMAZ (bkz. .env.example'daki
+  // Client Credentials notu — bilerek kurulmadı). YouTube'da HER ZAMAN gerçek
+  // küçük resim var (img.youtube.com, kimlik doğrulama gerekmez).
+  const thumbnailUrl = activeTab === "spotify" ? activeSpotifyPlaylist?.imageUrl || null : `https://img.youtube.com/vi/${youtubeVideoId}/mqdefault.jpg`;
+  const positionSec = activeTab === "spotify" ? spotifyPositionMs / 1000 : youtubePositionSec;
+  const durationSec = activeTab === "spotify" ? spotifyDurationMs / 1000 : youtubeDurationSec;
 
   const value = {
     panelOpen,
@@ -344,7 +470,14 @@ export function MusicProvider({ children }) {
     isPlaying,
     hasActivePlayer,
     nowPlayingLabel,
+    nowPlayingSubLabel,
+    thumbnailUrl,
+    positionSec,
+    durationSec,
     togglePlayPause,
+    seekTo,
+    skipNext,
+    skipPrevious,
     spotifyAuthStatus,
     spotifyAuthError,
     spotifyProfile,

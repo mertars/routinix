@@ -5,6 +5,7 @@ import logger from "../utils/logger";
 import { logFocusSession } from "../services/rhythmService";
 import { useMusic } from "../context/MusicContext";
 import TaskDrawer from "./TaskDrawer";
+import FocusMusicControlCard from "./FocusMusicControlCard";
 
 const DEFAULT_WORK_MIN = 25;
 const DEFAULT_BREAK_MIN = 5;
@@ -308,6 +309,14 @@ function HeroZone({
       </div>
 
       <ControlButtons running={running} toggleRunning={toggleRunning} resetTimer={resetTimer} accent={accent} />
+
+      {/* Müzik kontrol kartı — Odak Modu'nda BİLE gizlenmez (diğer "ekstra"
+          UI'ların aksine): müzik, tam da minimal/dikkat dağıtmayan Odak
+          Modu'nda en çok işe yarayan kontrol — kullanıcı burada kalmaya
+          devam etsin diye ayrı bir panele gitmesine gerek KALMASIN. */}
+      <div className="pt-6 w-full flex justify-center">
+        <FocusMusicControlCard />
+      </div>
     </div>
   );
 }
