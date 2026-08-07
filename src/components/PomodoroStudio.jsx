@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
-import { Timer as TimerIcon, ClipboardList, Music2, ListMusic } from "lucide-react";
+import { Timer as TimerIcon, ClipboardList, Music2, ListMusic, X } from "lucide-react";
 import { tapFeedback } from "../lib/haptics";
 import logger from "../utils/logger";
 import { logFocusSession } from "../services/rhythmService";

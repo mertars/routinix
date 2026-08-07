@@ -19,7 +19,7 @@ async function spotifyFetch(path, accessToken) {
 
 export async function fetchSpotifyProfile(accessToken) {
   const data = await spotifyFetch("/me", accessToken);
-  return { id: data.id, displayName: data.display_name || data.id, imageUrl: data.images?.[0]?.url || null };
+  return { id: data?.id ?? null, displayName: data?.display_name || data?.id || "Spotify kullanıcısı", imageUrl: data?.images?.[0]?.url || null };
 }
 
 // Yalnızca kullanıcının kendi oluşturduğu/takip ettiği listeleri döner —
@@ -29,7 +29,8 @@ export async function fetchSpotifyProfile(accessToken) {
 // yeterli; tam sayfalama (offset/next) bu kapsamda gerekli görülmedi.
 export async function fetchUserPlaylists(accessToken) {
   const data = await spotifyFetch("/me/playlists?limit=50", accessToken);
-  return (data.items || [])
+  return (data?.items || [])
     .filter(Boolean)
-    .map((p) => ({ id: p.id, label: p.name || "(İsimsiz liste)", imageUrl: p.images?.[0]?.url || null, ownerName: p.owner?.display_name || null }));
+    .map((p) => ({ id: p?.id, label: p?.name || "(İsimsiz liste)", imageUrl: p?.images?.[0]?.url || null, ownerName: p?.owner?.display_name || null }))
+    .filter((p) => p.id);
 }
