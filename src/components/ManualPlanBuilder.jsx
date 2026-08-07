@@ -33,8 +33,8 @@ import {
 } from "lucide-react";
 import { categoryOf, MONO_FONT } from "../constants";
 import usePerfMode from "../hooks/usePerfMode";
-import { parseTextualPlan, parseCsvPlan, parseIcsPlan, parseUniversalJson } from "../utils/planImportParsers";
 import { extractTextFromPdf } from "../utils/pdfTextExtract";
+import { parseFileWithGemini } from "../services/fileParseService";
 import { buildIcsCalendar, downloadIcsFile } from "../utils/icsExport";
 import ImportFormatModal from "./ImportFormatModal";
 import ExportFormatModal from "./ExportFormatModal";
@@ -134,7 +134,8 @@ const IMPORT_ACCEPT = {
 // (native dosya diyaloğunun `accept` filtresi bazı tarayıcı/OS
 // kombinasyonlarında bypass edilebilir; kullanıcı "Tüm Dosyalar"ı seçip
 // yanlış bir dosya seçebilir). CSV/TSV birlikte kabul edilir — ayırıcı
-// (virgül/noktalı virgül/TAB) planImportParsers.js'te otomatik algılanır.
+// (virgül/noktalı virgül/TAB) artık istemcide DEĞİL, /api/parse-file
+// üzerinden Gemini tarafından yorumlanıyor.
 const EXPECTED_EXTENSIONS = {
   json: [".json"],
   ics: [".ics"],
@@ -146,7 +147,7 @@ const EXPECTED_EXTENSIONS = {
 
 // İçe aktarma sırasında KASITLI/tanımlanmış bir hata — catch bloğu bunu
 // "beklenmedik bir JS hatası"ndan ayırt edip mesajını OLDUĞU GİBİ gösterir;
-// sınıflandırılmamış her şey dürüst, genel bir mesaja düşer (bkz. handleImportFile).
+// sınıflandırılmamış her şey dürüst, genel bir mesaja düşer (bkz. handleUniversalFileUpload).
 class ImportFormatError extends Error {}
 
 // Dosya OKUNDU ve çöktü değil, ama içinden hiçbir gün/görev çıkarılamadı
@@ -165,6 +166,32 @@ let localIdCounter = 0;
 function newLocalId() {
   localIdCounter += 1;
   return `local-${Date.now()}-${localIdCounter}`;
+}
+
+// /api/parse-file, Gemini'nin responseSchema'sıyla ZORUNLU kılınmış sabit
+// şekli döner: {title, days: [{dayNumber, title, tasks: [{title, priority}]}]}.
+// Burada builder'ın kendi PlanState şekline (days OBJESİ, Türkçe öncelik
+// rozetleri) çevrilir — PRIORITIES ("Yüksek"/"Orta"/"Düşük", aşağıda ~line
+// 1500 civarı) bu Türkçe değerlerle === karşılaştırma yapıyor.
+const GEMINI_PRIORITY_TO_TR = { high: "Yüksek", medium: "Orta", low: "Düşük" };
+function adaptGeminiPlanToBuilderShape(geminiPlan) {
+  const days = {};
+  for (const day of Array.isArray(geminiPlan?.days) ? geminiPlan.days : []) {
+    const dayNumber = Math.max(1, parseInt(day?.dayNumber, 10) || 1);
+    const tasks = (Array.isArray(day?.tasks) ? day.tasks : [])
+      .map((t) => ({
+        title: String(t?.title || "").trim(),
+        detail: null,
+        duration_min: null,
+        priority: GEMINI_PRIORITY_TO_TR[t?.priority] || null,
+        estimated_cost: null,
+        map_search_query: null,
+      }))
+      .filter((t) => t.title);
+    if (tasks.length === 0) continue;
+    days[dayNumber] = [...(days[dayNumber] || []), ...tasks];
+  }
+  return { title: String(geminiPlan?.title || "").trim(), days, routines: [] };
 }
 
 function emptyExtras() {
@@ -535,7 +562,9 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
   const exportJson = () => {
     const payload = {
       routinixManualPlan: true,
-      version: 2, // v2: routines artık {content,frequency}[] (v1: düz metin) — handleImportFile ikisini de okur.
+      version: 2, // v2: routines artık {content,frequency}[] (v1: düz metin). NOT: /api/parse-file üzerinden Gemini ile
+      // İÇE AKTARIRKEN routines bu dosyadan OKUNMAZ — FILE_PARSE_SCHEMA'da (api/_lib/geminiRouter.js) routines alanı
+      // YOK; dışa aktarılan bu JSON'ı geri İÇE AKTARMAK yalnızca title/days'i geri getirir, rutinler elle eklenmeli.
       title,
       totalDays,
       category,
@@ -610,7 +639,14 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
     requestAnimationFrame(() => fileInputRef.current?.click());
   };
 
-  const handleImportFile = async (e) => {
+  // Evrensel dosya içe aktarma — GERÇEK yapı çözümü artık istemcide DEĞİL,
+  // /api/parse-file üzerinden Gemini'de yapılır (bkz. api/parse-file.js dosya
+  // başı yorumu). Burada yalnızca: (1) ucuz/hızlı ön kontroller (boş dosya,
+  // yanlış uzantı — Gemini'ye gitmeden ÖNCE, ücretli çağrıyı boşa harcamamak
+  // için), (2) ham metin okuma (PDF için pdfjs-dist ile düz metne çevirme —
+  // bu bir "ayrıştırma" DEĞİL, salt metin çıkarımı), (3) sunucudan dönen sabit
+  // şekli builder'ın PlanState'ine uyarlama yapılır.
+  const handleUniversalFileUpload = async (e) => {
     const file = e.target.files?.[0];
     // Input HER ZAMAN sıfırlanır — başarı/hata FARK ETMEZ — aksi halde
     // kullanıcı dosyasını düzeltip AYNI dosyayı tekrar seçtiğinde tarayıcı
@@ -626,14 +662,6 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
     setImportedFileName(file.name);
     setIsImporting(true);
 
-    // Bir formatın sonucu "boş" (gün/görev çıkarılamadı) çıktığında sert
-    // bir hata yerine KURTARMA teklifi sunmak için — hangi ham metin
-    // üzerinden teklif sunulacağını bilmemiz gerekiyor.
-    const emptyOrThrow = (days, rawText) => {
-      const totalTasks = Object.values(days || {}).reduce((sum, arr) => sum + arr.length, 0);
-      if (totalTasks === 0) throw new ImportEmptyStructureError(rawText);
-    };
-
     try {
       // 1) Boş dosya — okumadan önce en ucuz/kesin kontrol.
       if (file.size === 0) {
@@ -646,41 +674,28 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
         throw new ImportFormatError(`Yalnızca ${expectedExts.join(" veya ")} uzantılı dosya yükleyebilirsiniz.`);
       }
 
-      let result;
-      if (format === "json") {
-        let parsed;
-        const rawText = await file.text();
-        try {
-          parsed = JSON.parse(rawText);
-        } catch {
-          throw new ImportFormatError("Yüklenen dosya geçerli bir Routinix JSON formatında değil.");
-        }
-        // Adaptif şema: katı bir yapı ARANMAZ — title/name/documentTitle,
-        // days/phases/sections/actionPlan/tasks dizilerinin hangisi varsa
-        // ondan otomatik gün/görev çıkarımı yapılır (bkz. parseUniversalJson).
-        result = parseUniversalJson(parsed);
-        emptyOrThrow(result.days, rawText);
-      } else if (format === "ics") {
-        const text = await file.text();
-        const { days } = parseIcsPlan(text);
-        emptyOrThrow(days, text);
-        result = { days, routines: [] };
-      } else if (format === "markdown" || format === "txt") {
-        const text = await file.text();
-        const { title: parsedTitle, days, routines } = parseTextualPlan(text);
-        emptyOrThrow(days, text);
-        result = { title: parsedTitle, days, routines };
-      } else if (format === "csv") {
-        const text = await file.text();
-        const { days } = parseCsvPlan(text);
-        emptyOrThrow(days, text);
-        result = { days, routines: [] };
-      } else if (format === "pdf") {
-        const text = await extractTextFromPdf(file, (pct) => setImportProgress(pct));
-        const { title: parsedTitle, days, routines } = parseTextualPlan(text);
-        emptyOrThrow(days, text);
-        result = { title: parsedTitle, days, routines };
+      const rawText = format === "pdf" ? await extractTextFromPdf(file, (pct) => setImportProgress(pct)) : await file.text();
+      if (!rawText || !rawText.trim()) {
+        throw new ImportFormatError(
+          format === "pdf" ? "Bu PDF'den metin çıkarılamadı — taranmış/görsel bir PDF olabilir." : "Seçilen dosya boş veya okunamıyor."
+        );
       }
+
+      let geminiPlan;
+      try {
+        geminiPlan = await parseFileWithGemini(rawText, format);
+      } catch (err) {
+        // fileParseService HER ZAMAN güvenli, kullanıcıya gösterilebilir bir
+        // Türkçe mesajla fırlatır (ağ hatası / sunucunun 4xx-5xx body.message'ı /
+        // api/_lib/aiErrors.js sınıflandırması) — ImportFormatError'a SARILIR
+        // ki aşağıdaki catch bloğu bunu "bilinmeyen bir JS hatası" fallback'ine
+        // DÜŞÜRMESİN, mesaj OLDUĞU GİBİ kullanıcıya gitsin.
+        throw new ImportFormatError(err?.message || "Dosya ayrıştırılırken bir sorun oluştu. Tekrar dener misin?");
+      }
+
+      const result = adaptGeminiPlanToBuilderShape(geminiPlan);
+      const totalTasks = Object.values(result.days || {}).reduce((sum, arr) => sum + arr.length, 0);
+      if (totalTasks === 0) throw new ImportEmptyStructureError(rawText);
 
       applyImportedData(result);
       setImportSuccess(true);
@@ -859,7 +874,7 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
           <div className="flex items-center gap-1.5 shrink-0">
             {/* Akıllı İçe/Dışa Aktar — küçük, ikon-yalnız, başlığın yanında;
                 format seçimi ImportFormatModal/ExportFormatModal'da yapılır. */}
-            <input ref={fileInputRef} type="file" accept={IMPORT_ACCEPT[pendingImportFormat] || "*"} className="hidden" onChange={handleImportFile} />
+            <input ref={fileInputRef} type="file" accept={IMPORT_ACCEPT[pendingImportFormat] || "*"} className="hidden" onChange={handleUniversalFileUpload} />
             <button
               onClick={() => setImportModalOpen(true)}
               disabled={isImporting}
@@ -1614,12 +1629,16 @@ function MiniField({ icon, placeholder, value, onChange, type = "text", width = 
 //   ilerlemesi KORUNUR: her görev editingPlan'dan yüklenirken bunu yolcu
 //   olarak taşır, yalnızca panodan yapıştırılan/yeni eklenen görevler
 //   false'la başlar.
-// - Akıllı İçe Aktarma (JSON/Markdown/TXT/CSV/PDF): JSON en güvenilir
-//   yoldur (Routinix'in kendi şeması). Markdown/TXT/PDF AYNI sezgisel
-//   ayrıştırıcıyı (utils/planImportParsers.js) paylaşır — PDF önce
-//   pdfjs-dist ile düz metne çevrilir. CSV yalnızca GÖREVLERİ içe aktarır
-//   (rutinler CSV'nin satır/gün modeline uymadığından bilinçli olarak
-//   dahil edilmez). Hiçbiri %100 doğruluk iddia etmez — kullanıcı sonucu
+// - Evrensel Dosya İçe Aktarma (JSON/Markdown/TXT/CSV/PDF/ICS): istemci
+//   yalnızca ham metni okur (PDF için pdfjs-dist ile düz metne çevirir,
+//   bkz. utils/pdfTextExtract.js) ve /api/parse-file'a gönderir — GERÇEK
+//   yapı çözümü orada, Gemini'nin Structured Output'uyla (JSON Mode +
+//   responseSchema, bkz. api/_lib/geminiRouter.js FILE_PARSE_SCHEMA) yapılır.
+//   Eskiden bu iş istemci tarafında (artık SİLİNMİŞ src/utils/
+//   planImportParsers.js) sezgisel/regex tabanlı bir motorla yapılıyordu —
+//   serbest biçimli dosyalarda kırılgandı. NOT: Gemini'nin şeması yalnızca
+//   title/days/tasks döner — routines bu yoldan İÇE AKTARILMAZ (elle
+//   eklenmeli). Hiçbir format %100 doğruluk iddia etmez — kullanıcı sonucu
 //   HER ZAMAN Builder'da görüp kaydetmeden önce düzeltebilir.
 // - Dışa Aktarma: JSON (tam yedek) + .ics (utils/icsExport.js — Gün 1
 //   bugüne bağlanır, saat notu yoksa 09:00 varsayılır, gerçek bir

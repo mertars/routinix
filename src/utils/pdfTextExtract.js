@@ -1,10 +1,9 @@
-// PDF içe aktarma — metni pdfjs-dist ile çıkarır. DÜRÜSTLÜK NOTU: bu yalnızca
-// PDF'in metin katmanını okur; taranmış/görsel (fotoğraflanmış) PDF'lerde
-// veya çok sütunlu karmaşık düzenlerde güvenilir sonuç VERMEZ — en iyi
-// sonucu Routinix'in kendi PDF/Markdown/TXT dışa aktarımı gibi düz,
-// tek-sütunlu, "Gün N" başlıklı belgelerde verir (bkz. planImportParsers.js
-// dosya başı yorumu, aynı ayrıştırıcıyı paylaşır). Bu sınır kullanıcıya
-// ImportFormatModal'da açıkça belirtilir.
+// PDF içe aktarma — metni pdfjs-dist ile çıkarır (yalnızca METİN ÇIKARIMI;
+// yapısal ayrıştırma artık /api/parse-file üzerinden Gemini'de yapılır, bkz.
+// ManualPlanBuilder.jsx handleUniversalFileUpload). DÜRÜSTLÜK NOTU: bu
+// yalnızca PDF'in metin katmanını okur; taranmış/görsel (fotoğraflanmış)
+// PDF'lerde güvenilir sonuç VERMEZ (Gemini'ye boş/anlamsız metin gider) — bu
+// sınır kullanıcıya ImportFormatModal'da açıkça belirtilir.
 //
 // Dinamik import: pdfjs-dist (~1MB+) yalnızca kullanıcı GERÇEKTEN bir PDF
 // seçtiğinde indirilir — Vite bunu ayrı bir chunk'a böler, ana paketi

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 // Merkezi model routing — hangi operasyonun hangi Gemini modeliyle ve hangi
 // maxOutputTokens tavanıyla çalışacağını TEK yerden belirler. Önceden
@@ -35,6 +35,41 @@ const FLASH_LITE = "gemini-flash-lite-latest";
 // ÖNCEDEN HİÇBİR ÇAĞRIDA maxOutputTokens YOKTU — varsayılan tavan bu
 // modellerde 65536 (gemini-flash-latest) / 65536 (flash-lite) idi, yani
 // pratikte SINIRSIZDI.
+
+// api/parse-file.js'in çıktı şeması — kullanıcının içeriği "title" + "days"
+// (her biri dayNumber/title/tasks taşıyan) dizisine indirgenir. priority
+// enum'u BİLEREK İngilizce (high/medium/low) — istemci tarafı (ManualPlanBuilder)
+// bunu kendi Türkçe rozet karşılığına (Yüksek/Orta/Düşük) çevirir.
+const FILE_PARSE_SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    title: { type: SchemaType.STRING },
+    days: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          dayNumber: { type: SchemaType.INTEGER },
+          title: { type: SchemaType.STRING },
+          tasks: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                title: { type: SchemaType.STRING },
+                priority: { type: SchemaType.STRING, format: "enum", enum: ["high", "medium", "low"] },
+              },
+              required: ["title"],
+            },
+          },
+        },
+        required: ["dayNumber", "tasks"],
+      },
+    },
+  },
+  required: ["title", "days"],
+};
+
 const ROUTES = {
   // AI Koç serbest metin — hem basit sınıflandırma hem karmaşık mutasyon
   // (plan küçültme/görev silme) AYNI çağrıda kararlaştırılıyor, bu yüzden
@@ -54,6 +89,14 @@ const ROUTES = {
   // Sonraki hafta (haftalık program revizesi) — tek haftalık (7 gün) çıktı,
   // plan.create'in first_week_tasks'ıyla aynı büyüklük mertebesinde.
   "plan.next_week": { model: FLASH_LITE, maxOutputTokens: 4096 },
+
+  // Evrensel dosya içe aktarma (api/parse-file.js) — kullanıcının yüklediği
+  // JSON/Markdown/TXT/CSV/PDF-metni/ICS'i sabit bir plan şemasına çevirir.
+  // responseSchema ile Structured Output ZORUNLU kılınır (bkz. FILE_PARSE_SCHEMA
+  // altında) — model şemanın DIŞINA çıkamaz, çıktı JSON.parse'ı asla tip
+  // hatasıyla başarısız olmaz. maxOutputTokens plan.create ile aynı mertebede
+  // (kaynak dosya çok günlü/kalabalık bir plan içerebilir).
+  "file.parse": { model: FLASH_LITE, maxOutputTokens: 8192, responseSchema: FILE_PARSE_SCHEMA },
 };
 
 let cachedClient = null;
@@ -67,13 +110,18 @@ function getClient() {
   return cachedClient;
 }
 
-// operation: yukarıdaki ROUTES anahtarlarından biri.
+// operation: yukarıdaki ROUTES anahtarlarından biri. responseSchema route'ta
+// TANIMLIYSA (bkz. "file.parse") generationConfig'e eklenir — Gemini'nin
+// Structured Output modu, yalnızca responseMimeType değil AYRICA katı bir
+// şemayla ZORUNLU kılınmış olur.
 export function getRoutedModel(operation, systemInstruction) {
   const route = ROUTES[operation];
   if (!route) throw new Error(`Bilinmeyen model route: "${operation}"`);
+  const generationConfig = { responseMimeType: "application/json", maxOutputTokens: route.maxOutputTokens };
+  if (route.responseSchema) generationConfig.responseSchema = route.responseSchema;
   return getClient().getGenerativeModel({
     model: route.model,
     systemInstruction,
-    generationConfig: { responseMimeType: "application/json", maxOutputTokens: route.maxOutputTokens },
+    generationConfig,
   });
 }

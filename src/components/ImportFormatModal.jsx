@@ -2,13 +2,18 @@ import { FileText, FileJson, FileSpreadsheet, FileType, File, Calendar } from "l
 
 const NEON = { cyan: "#00F3FF", violet: "#8B5CF6" };
 
+// Açıklamalar: yapı çözümü artık /api/parse-file üzerinden Gemini'de yapılır
+// (bkz. ManualPlanBuilder.jsx handleUniversalFileUpload) — katı bir düzen
+// ARANMAZ, serbest biçimli dosyalar da desteklenir. Tek gerçek sınır: PDF'in
+// yalnızca METİN KATMANI istemcide (pdfjs-dist) çıkarılabiliyor, taranmış/
+// görsel PDF'ler bu yüzden güvenilir sonuç vermez.
 const FORMATS = [
-  { key: "pdf", icon: File, label: "PDF", ext: ".pdf", desc: "En iyi sonucu düz, tek sütunlu, 'Gün N' başlıklı belgelerde verir — taranmış/görsel PDF'lerde güvenilir değildir." },
-  { key: "json", icon: FileJson, label: "JSON", ext: ".json", desc: "Routinix plan şablonu — en güvenilir ve eksiksiz yöntem." },
-  { key: "ics", icon: Calendar, label: "Takvim (.ics)", ext: ".ics", desc: "Google/Apple Takvim'den ya da Routinix'in kendi .ics dışa aktarımından — en iyi sonucu kendi dışa aktarımımızda verir." },
-  { key: "markdown", icon: FileText, label: "Markdown", ext: ".md", desc: "# Gün başlıkları + - madde işaretli görevler." },
-  { key: "csv", icon: FileSpreadsheet, label: "CSV", ext: ".csv", desc: "Excel'den 'CSV olarak kaydet' ile dışa aktarabilirsin — yalnızca görevler, rutinler CSV'ye dahil değildir." },
-  { key: "txt", icon: FileType, label: "Düz Metin", ext: ".txt", desc: "Satır satır 'Gün N' / görev formatı." },
+  { key: "pdf", icon: File, label: "PDF", ext: ".pdf", desc: "Yapay zeka içeriği serbest biçimde analiz eder — taranmış/görsel PDF'lerde güvenilir değildir (yalnızca metin katmanı okunur)." },
+  { key: "json", icon: FileJson, label: "JSON", ext: ".json", desc: "Routinix plan şablonu ya da herhangi bir JSON yapısı — yapay zeka otomatik olarak plana dönüştürür." },
+  { key: "ics", icon: Calendar, label: "Takvim (.ics)", ext: ".ics", desc: "Google/Apple Takvim'den ya da Routinix'in kendi .ics dışa aktarımından — yapay zeka etkinlikleri gün/görev yapısına çevirir." },
+  { key: "markdown", icon: FileText, label: "Markdown", ext: ".md", desc: "Serbest biçimli olabilir — yapay zeka başlıkları ve görevleri otomatik tanır." },
+  { key: "csv", icon: FileSpreadsheet, label: "CSV", ext: ".csv", desc: "Excel'den 'CSV olarak kaydet' ile dışa aktarabilirsin — sütun adları serbest olabilir, yapay zeka eşler." },
+  { key: "txt", icon: FileType, label: "Düz Metin", ext: ".txt", desc: "Serbest biçimli düz metin — yapay zeka gün ve görev yapısını otomatik çıkarır." },
 ];
 
 // Plan Studio & Editor Engine — "İçe Aktar" formatı seçim modalı. Kullanıcı
