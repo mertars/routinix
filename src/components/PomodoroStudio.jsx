@@ -19,12 +19,25 @@ const PLAYLIST = [
   { id: "jfKfPfyJRdk", label: "synthwave radio 🌌 beats to chill/game to" },
 ];
 
-// Spotify Embed iframe (resmi "Lo-Fi Beats" editöryel çalma listesi) — Spotify
-// Web Playback SDK (Premium hesap + OAuth gerektirir) olmadan DIŞARIDAN kontrol
-// (play/pause/skip) mümkün değil; bu yüzden Spotify kendi görünür oynatıcısıyla
-// yalnızca popover AÇIKKEN çalışır (bkz. SpotifyPopover).
-const SPOTIFY_PLAYLIST_ID = "37i9dQZF1DWWQRw9knGDs0";
-const SPOTIFY_EMBED_URL = `https://open.spotify.com/embed/playlist/${SPOTIFY_PLAYLIST_ID}?utm_source=generator&theme=0`;
+// Spotify Embed iframe — Spotify Web Playback SDK (Premium hesap + OAuth
+// gerektirir) olmadan DIŞARIDAN kontrol (play/pause/skip) mümkün değil; bu
+// yüzden Spotify kendi görünür oynatıcısıyla yalnızca popover AÇIKKEN çalışır
+// (bkz. SpotifyPopover). Hiçbir Spotify API anahtarı/OAuth KULLANILMAZ —
+// yalnızca genel/herkese açık Embed iframe'i (open.spotify.com/embed/...).
+//
+// Hazır odak çalma listeleri — kullanıcı SpotifyPopover içindeki <select>
+// ile aralarında geçiş yapabilir, ya da kendi Spotify çalma listesi linkini
+// yapıştırıp (regex ile playlist ID'si ayıklanır) YÜKLEYEBİLİR.
+const SPOTIFY_PRESET_PLAYLISTS = [
+  { id: "37i9dQZF1DX8Ueb1m2K9u0", label: "Lo-Fi Beats" },
+  { id: "37i9dQZF1DWZeKCadARdKQ", label: "Deep Focus" },
+  { id: "37i9dQZF1DX4sWSp23169p", label: "Jazz Focus" },
+  { id: "37i9dQZF1DXdLENIlT32Ms", label: "Ambient Chill" },
+];
+const SPOTIFY_PLAYLIST_URL_RE = /playlist\/([a-zA-Z0-9]+)/;
+function buildSpotifyEmbedUrl(playlistId) {
+  return `https://open.spotify.com/embed/playlist/${playlistId}?utm_source=generator&theme=0`;
+}
 
 const TIMER_FONT = '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
 
@@ -361,13 +374,92 @@ function MusicPopoverShell({ onClose, title, tint, children }) {
 // Web Playback SDK (Premium hesap + OAuth) olmadan dışarıdan kontrol edilemez —
 // bu yüzden sahte/çalışmayan bir Oynat/Durdur butonu GÖSTERİLMİYOR, kontrol
 // doğrudan Spotify'ın kendi embed arayüzünde yapılıyor.
+//
+// Hazır listeler arası geçiş (<select>) + kullanıcının kendi çalma listesi
+// linkini yapıştırıp yükleyebildiği bir alan sunar — HİÇBİR Spotify API
+// anahtarı/OAuth kullanılmaz, yalnızca herkese açık Embed iframe'i.
 function SpotifyPopover({ onClose }) {
+  const [activePlaylistId, setActivePlaylistId] = useState(SPOTIFY_PRESET_PLAYLISTS[0].id);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customUrlInput, setCustomUrlInput] = useState("");
+  const [customUrlError, setCustomUrlError] = useState(null);
+  const isPreset = SPOTIFY_PRESET_PLAYLISTS.some((p) => p.id === activePlaylistId);
+
+  const handleLoadCustomUrl = () => {
+    const match = SPOTIFY_PLAYLIST_URL_RE.exec(customUrlInput.trim());
+    if (!match) {
+      setCustomUrlError("Geçerli bir Spotify çalma listesi linki değil.");
+      return;
+    }
+    setActivePlaylistId(match[1]);
+    setCustomUrlError(null);
+    setCustomUrlInput("");
+    setShowCustomInput(false);
+  };
+
   return (
-    <MusicPopoverShell onClose={onClose} title="🎧 Spotify — Lo-Fi Beats" tint="#1DB954">
-      <div className="rounded-xl overflow-hidden">
+    <MusicPopoverShell onClose={onClose} title="🎧 Spotify — Odak Modu" tint="#1DB954">
+      <div className="flex items-center gap-1.5 mb-2.5">
+        <select
+          value={isPreset ? activePlaylistId : "custom"}
+          onChange={(e) => setActivePlaylistId(e.target.value)}
+          aria-label="Hazır çalma listesi seç"
+          className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-[11.5px] font-semibold bg-slate-100 dark:bg-slate-900 border border-emerald-500/20 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 focus:outline-none focus:border-emerald-500/60"
+        >
+          {!isPreset && (
+            <option value="custom" disabled>
+              Özel Liste
+            </option>
+          )}
+          {SPOTIFY_PRESET_PLAYLISTS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => {
+            setShowCustomInput((v) => !v);
+            setCustomUrlError(null);
+          }}
+          className="shrink-0 rounded-lg px-2.5 py-1.5 text-[10.5px] font-bold whitespace-nowrap transition-colors bg-slate-100 dark:bg-slate-900 border border-emerald-500/20 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+        >
+          {showCustomInput ? "Vazgeç" : "+ Kendi Linkini Ekle"}
+        </button>
+      </div>
+
+      {showCustomInput && (
+        <div className="mb-2.5">
+          <div className="flex items-center gap-1.5">
+            <input
+              type="text"
+              value={customUrlInput}
+              onChange={(e) => {
+                setCustomUrlInput(e.target.value);
+                setCustomUrlError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleLoadCustomUrl();
+              }}
+              placeholder="https://open.spotify.com/playlist/..."
+              className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-[11px] bg-slate-100 dark:bg-slate-900 border border-emerald-500/20 dark:border-emerald-500/30 text-gray-700 dark:text-white/80 placeholder:text-gray-400 dark:placeholder:text-white/25 focus:outline-none focus:border-emerald-500/60"
+            />
+            <button
+              onClick={handleLoadCustomUrl}
+              className="shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-bold transition-colors bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
+            >
+              Yükle
+            </button>
+          </div>
+          {customUrlError && <p className="mt-1.5 text-[10.5px] text-rose-500">{customUrlError}</p>}
+        </div>
+      )}
+
+      <div className="rounded-xl overflow-hidden border border-emerald-500/20 dark:border-emerald-500/30">
         <iframe
-          title="Spotify Lo-Fi Beats"
-          src={SPOTIFY_EMBED_URL}
+          key={activePlaylistId}
+          title="Spotify Player"
+          src={buildSpotifyEmbedUrl(activePlaylistId)}
           width="100%"
           height="152"
           frameBorder="0"
