@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
-import { Timer as TimerIcon, Music2, ListMusic, Play, Pause, X, ClipboardList } from "lucide-react";
+import { Timer as TimerIcon, Music2, ListMusic, X, ClipboardList } from "lucide-react";
 import { tapFeedback } from "../lib/haptics";
 import logger from "../utils/logger";
 import { logFocusSession } from "../services/rhythmService";
@@ -11,21 +11,30 @@ const WORK_STEP = 5;
 const BREAK_STEP = 1;
 
 // İki kısa, herkese açık, gömülü oynatım için tasarlanmış Lofi Girl canlı
-// yayını — gerçek bir "Önceki/Sonraki" deneyimi için (tek video yerine küçük
-// bir liste). Parça adı hazır olduğunda YouTube'un kendi verisinden
-// (player.getVideoData().title) çekilir; bu etiketler yalnızca ilk an/düşüş içindir.
-const PLAYLIST = [
+// yayını — YouTube'un standart Embed iframe'iyle (youtube.com/embed/VIDEO_ID)
+// gösterilir, tıpkı Spotify sekmesi gibi kendi native kontrolleriyle.
+// ÖNCEDEN gizli bir YT IFrame Player API örneği (script enjeksiyonu +
+// play/pause/track-değiştirme JS kontrolü) kullanılıyordu — Spotify sekmesiyle
+// AYNI felsefeye (harici API/OAuth YOK, kontrol doğrudan gömülü oynatıcının
+// KENDİ arayüzünde) geçildiği için bu karmaşıklık tamamen kaldırıldı.
+const YOUTUBE_PRESET_VIDEOS = [
   { id: "5qap5aO4i9A", label: "lofi hip hop radio 📚 beats to relax/study to" },
   { id: "jfKfPfyJRdk", label: "synthwave radio 🌌 beats to chill/game to" },
 ];
+// youtu.be/ID, youtube.com/watch?v=ID, youtube.com/embed/ID, youtube.com/shorts/ID
+// — YouTube video ID'leri her zaman 11 karakter (URL-güvenli base64 alfabesi).
+const YOUTUBE_VIDEO_URL_RE = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/;
+function buildYoutubeEmbedUrl(videoId) {
+  return `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1`;
+}
 
 // Spotify Embed iframe — Spotify Web Playback SDK (Premium hesap + OAuth
 // gerektirir) olmadan DIŞARIDAN kontrol (play/pause/skip) mümkün değil; bu
-// yüzden Spotify kendi görünür oynatıcısıyla yalnızca popover AÇIKKEN çalışır
-// (bkz. SpotifyPopover). Hiçbir Spotify API anahtarı/OAuth KULLANILMAZ —
+// yüzden Spotify kendi görünür oynatıcısıyla yalnızca panel AÇIKKEN çalışır
+// (bkz. MusicSidePanel). Hiçbir Spotify API anahtarı/OAuth KULLANILMAZ —
 // yalnızca genel/herkese açık Embed iframe'i (open.spotify.com/embed/...).
 //
-// Hazır odak çalma listeleri — kullanıcı SpotifyPopover içindeki <select>
+// Hazır odak çalma listeleri — kullanıcı MusicSidePanel içindeki <select>
 // ile aralarında geçiş yapabilir, ya da kendi Spotify çalma listesi linkini
 // yapıştırıp (regex ile playlist ID'si ayıklanır) YÜKLEYEBİLİR.
 //
@@ -352,59 +361,137 @@ function HeroZone({
   );
 }
 
-// Üst bardaki müzik popover'larının ortak iskeleti: tam ekran görünmez bir
-// backdrop (dışarı tıklayınca kapanır) + sağ üstte, diğer panellerle ASLA
-// çakışmayan yüksek z-index'li ([97]/[96]) küçük, kompakt bir kutu.
-function MusicPopoverShell({ onClose, title, tint, children }) {
+// Sağdan kayan büyük müzik paneli — eski küçük Spotify/YouTube popover'larının
+// yerine geçti. framer-motion KURULU DEĞİL (package.json'da yok, sırf bu tek
+// animasyon için yeni bir bağımlılık eklemek gereksiz) — giriş/çıkış Tailwind
+// transition-transform ile yapılıyor. `open` false olduktan PANEL_TRANSITION_MS
+// SONRA panel DOM'dan tamamen kaldırılıyor (rendered state) — bu yüzden
+// iframe'ler panel GERÇEKTEN kapanınca unmount olur ve müzik durur (Spotify/
+// YouTube'un kendi native kontrolleri dışında bir "durdurma" mekanizması yok).
+const PANEL_TRANSITION_MS = 300;
+
+function useSlideTransition(open, durationMs = PANEL_TRANSITION_MS) {
+  const [rendered, setRendered] = useState(open);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setRendered(true);
+      const raf = requestAnimationFrame(() => setVisible(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setVisible(false);
+    const timeout = setTimeout(() => setRendered(false), durationMs);
+    return () => clearTimeout(timeout);
+  }, [open, durationMs]);
+
+  return { rendered, visible };
+}
+
+const MUSIC_TABS = [
+  { key: "spotify", label: "Spotify", tint: "#1DB954", icon: Music2 },
+  { key: "youtube", label: "YouTube", tint: "#FF3B5C", icon: ListMusic },
+];
+
+// Focus Studio'nun TAMAMI sabit "neon-dark" (bkz. PomodoroStudio yorumu) —
+// bu panel de app'in light/dark tema tercihinden BAĞIMSIZ, tek bir koyu
+// palet kullanıyor (dark: varyantına gerek yok).
+function MusicSidePanel({ open, activeTab, onTabChange, onClose }) {
+  const { rendered, visible } = useSlideTransition(open);
+  if (!rendered) return null;
+
+  const tint = MUSIC_TABS.find((t) => t.key === activeTab)?.tint || "#06B6D4";
+
   return (
     <>
-      <div className="fixed inset-0 z-[96]" onClick={onClose} />
       <div
-        className="absolute top-full right-0 mt-2 z-[97] w-[300px] rounded-2xl p-4 border border-black/10 dark:border-white/10 backdrop-blur-xl"
-        style={{ background: "var(--pomo-bg)", boxShadow: `0 24px 60px -18px rgba(0,0,0,0.35), 0 0 0 1px ${tint}22` }}
+        className={`fixed inset-0 z-[96] bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}
+        onClick={onClose}
+      />
+      <div
+        className={`fixed right-4 top-20 bottom-8 z-[97] w-[420px] max-w-[calc(100vw-2rem)] transition-all duration-300 ease-out ${
+          visible ? "translate-x-0 opacity-100" : "translate-x-24 opacity-0"
+        }`}
       >
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-[12.5px] font-bold whitespace-nowrap" style={{ color: tint }}>
-            {title}
-          </h4>
-          <button
-            onClick={onClose}
-            aria-label="Kapat"
-            className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-900 dark:text-white/40 dark:hover:text-white transition-colors"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+        {/* Dış kutu — dönen conic-gradient ışıklı kenarlık. İç içerik kutusu
+            (p-[2px] boşluk BIRAKARAK) üstüne oturuyor, geriye yalnızca 2px'lik
+            dönen bir "ışık halkası" görünür kalıyor. */}
+        <div className="relative h-full w-full rounded-[30px] p-[2px] overflow-hidden" style={{ boxShadow: `0 24px 70px -20px ${tint}55` }}>
+          <div
+            className="absolute motion-safe:animate-[spin_4s_linear_infinite]"
+            style={{
+              top: "-100%",
+              left: "-100%",
+              width: "300%",
+              height: "300%",
+              background: "conic-gradient(from 0deg, #06b6d4, #3b82f6, #00f2fe, #06b6d4)",
+            }}
+          />
+          <div className="relative h-full w-full rounded-[28px] bg-slate-950/90 backdrop-blur-2xl p-6 flex flex-col overflow-hidden">
+            {/* Üst başlık: sekmeler + kapat */}
+            <div className="shrink-0 flex items-center justify-between gap-2 mb-5">
+              <div className="flex items-center gap-1 rounded-full p-1 bg-white/5 border border-white/10">
+                {MUSIC_TABS.map((t) => {
+                  const Icon = t.icon;
+                  const active = activeTab === t.key;
+                  return (
+                    <button
+                      key={t.key}
+                      onClick={() => onTabChange(t.key)}
+                      className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold transition-all"
+                      style={{ background: active ? `${t.tint}26` : "transparent", color: active ? t.tint : "rgba(255,255,255,0.4)" }}
+                    >
+                      <Icon className="w-3.5 h-3.5" strokeWidth={2.25} />
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={onClose}
+                aria-label="Kapat"
+                className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                style={{ background: "rgba(255,255,255,0.06)" }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* İçerik — sekmeye göre; her sekme kendi state'ini (aktif liste/
+                video, özel link input'u) TAŞIR, sekme değişince sıfırlanır. */}
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+              {activeTab === "spotify" ? <SpotifyPanelBody /> : <YoutubePanelBody />}
+            </div>
+          </div>
         </div>
-        {children}
       </div>
     </>
   );
 }
 
-// Spotify popover — resmi Embed iframe'i (kendi play/pause/ilerleme
-// çubuğuyla) yalnızca bu popover AÇIKKEN mount edilir/çalar; kapatınca durur.
-// Web Playback SDK (Premium hesap + OAuth) olmadan dışarıdan kontrol edilemez —
-// bu yüzden sahte/çalışmayan bir Oynat/Durdur butonu GÖSTERİLMİYOR, kontrol
-// doğrudan Spotify'ın kendi embed arayüzünde yapılıyor.
-//
-// Hazır listeler arası geçiş (<select>) + kullanıcının kendi çalma listesi
-// linkini yapıştırıp yükleyebildiği bir alan sunar — HİÇBİR Spotify API
-// anahtarı/OAuth kullanılmaz, yalnızca herkese açık Embed iframe'i.
-function SpotifyPopover({ onClose }) {
+const PANEL_CONTROL_CLASS =
+  "rounded-xl px-2.5 py-2 text-[12px] font-semibold bg-white/[0.04] border border-white/10 text-white/80 placeholder:text-white/25 focus:outline-none focus:border-cyan-400/50";
+
+// Spotify sekmesi — resmi Embed iframe'i (kendi play/pause/ilerleme
+// çubuğuyla) yalnızca panel AÇIKKEN mount edilir/çalar. Web Playback SDK
+// (Premium hesap + OAuth) olmadan dışarıdan kontrol edilemez — bu yüzden
+// sahte/çalışmayan bir Oynat/Durdur butonu GÖSTERİLMİYOR, kontrol doğrudan
+// Spotify'ın kendi embed arayüzünde yapılıyor.
+function SpotifyPanelBody() {
   const [activePlaylistId, setActivePlaylistId] = useState(SPOTIFY_PRESET_PLAYLISTS[0].id);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customUrlInput, setCustomUrlInput] = useState("");
   const [customUrlError, setCustomUrlError] = useState(null);
+  const isPreset = SPOTIFY_PRESET_PLAYLISTS.some((p) => p.id === activePlaylistId);
 
   // Hata ayıklama: iframe her yeni activePlaylistId ile render edilmeden
   // hemen önce, oluşan src'nin GERÇEKTEN doğru olduğunu konsolda doğrula
-  // (bkz. yukarıdaki KÖK NEDEN NOTU — sorun genelde URL yapısı değil, ölü/
-  // emekliye ayrılmış bir playlist ID'si olur).
+  // (bkz. SPOTIFY_PRESET_PLAYLISTS'in üstündeki KÖK NEDEN NOTU — sorun
+  // genelde URL yapısı değil, ölü/emekliye ayrılmış bir playlist ID'si olur).
   useEffect(() => {
     // eslint-disable-next-line no-console
     console.log("Aktif Spotify URL:", buildSpotifyEmbedUrl(activePlaylistId));
   }, [activePlaylistId]);
-  const isPreset = SPOTIFY_PRESET_PLAYLISTS.some((p) => p.id === activePlaylistId);
 
   const handleLoadCustomUrl = () => {
     const match = SPOTIFY_PLAYLIST_URL_RE.exec(customUrlInput.trim());
@@ -419,13 +506,13 @@ function SpotifyPopover({ onClose }) {
   };
 
   return (
-    <MusicPopoverShell onClose={onClose} title="🎧 Spotify — Odak Modu" tint="#1DB954">
-      <div className="flex items-center gap-1.5 mb-2.5">
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-1.5 mb-3">
         <select
           value={isPreset ? activePlaylistId : "custom"}
           onChange={(e) => setActivePlaylistId(e.target.value)}
           aria-label="Hazır çalma listesi seç"
-          className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-[11.5px] font-semibold bg-slate-100 dark:bg-slate-900 border border-emerald-500/20 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 focus:outline-none focus:border-emerald-500/60"
+          className={`flex-1 min-w-0 ${PANEL_CONTROL_CLASS}`}
         >
           {!isPreset && (
             <option value="custom" disabled>
@@ -443,14 +530,14 @@ function SpotifyPopover({ onClose }) {
             setShowCustomInput((v) => !v);
             setCustomUrlError(null);
           }}
-          className="shrink-0 rounded-lg px-2.5 py-1.5 text-[10.5px] font-bold whitespace-nowrap transition-colors bg-slate-100 dark:bg-slate-900 border border-emerald-500/20 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+          className={`shrink-0 whitespace-nowrap transition-colors hover:bg-white/[0.08] ${PANEL_CONTROL_CLASS}`}
         >
           {showCustomInput ? "Vazgeç" : "+ Kendi Linkini Ekle"}
         </button>
       </div>
 
       {showCustomInput && (
-        <div className="mb-2.5">
+        <div className="mb-3">
           <div className="flex items-center gap-1.5">
             <input
               type="text"
@@ -463,77 +550,136 @@ function SpotifyPopover({ onClose }) {
                 if (e.key === "Enter") handleLoadCustomUrl();
               }}
               placeholder="https://open.spotify.com/playlist/..."
-              className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-[11px] bg-slate-100 dark:bg-slate-900 border border-emerald-500/20 dark:border-emerald-500/30 text-gray-700 dark:text-white/80 placeholder:text-gray-400 dark:placeholder:text-white/25 focus:outline-none focus:border-emerald-500/60"
+              className={`flex-1 min-w-0 ${PANEL_CONTROL_CLASS}`}
             />
             <button
               onClick={handleLoadCustomUrl}
-              className="shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-bold transition-colors bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
+              className="shrink-0 rounded-xl px-3.5 py-2 text-[12px] font-bold transition-colors bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25"
             >
               Yükle
             </button>
           </div>
-          {customUrlError && <p className="mt-1.5 text-[10.5px] text-rose-500">{customUrlError}</p>}
+          {customUrlError && <p className="mt-1.5 text-[11px] text-rose-400">{customUrlError}</p>}
         </div>
       )}
 
-      <div className="rounded-xl overflow-hidden border border-emerald-500/20 dark:border-emerald-500/30">
+      <div className="rounded-2xl overflow-hidden border border-emerald-500/20">
         <iframe
           key={activePlaylistId}
           title="Spotify Player"
           src={buildSpotifyEmbedUrl(activePlaylistId)}
           width="100%"
-          height="152"
+          height="450"
           frameBorder="0"
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
           loading="lazy"
         />
       </div>
-      <p className="mt-2.5 text-[10.5px] leading-relaxed text-gray-500 dark:text-white/35">
-        Spotify'ın kendi oynatıcısı — kontrolü doğrudan burada yap. Bu pencereyi kapatman müziği durdurur.
+      <p className="mt-3 text-[11px] leading-relaxed text-white/35">
+        Spotify'ın kendi oynatıcısı — kontrolü doğrudan burada yap. Bu paneli kapatman müziği durdurur.
       </p>
-    </MusicPopoverShell>
+    </div>
   );
 }
 
-// YouTube Music popover — bir parça seçilince arkadaki gizli YouTube IFrame
-// Player'ı besler ve panel kendiliğinden kapanır. Oynat/Duraklat kontrolü de
-// burada yaşıyor (ayrı bir kontrol yüzeyi olmadan işlevsellik kaybolmasın diye).
-function YoutubePopover({ onClose, trackIndex, trackLabel, ytReady, ytPlaying, onTogglePlay, onSelectTrack }) {
+// YouTube sekmesi — Spotify İLE AYNI felsefe: standart Embed iframe
+// (youtube.com/embed/VIDEO_ID), kontrol doğrudan YouTube'un kendi native
+// arayüzünde. Hazır video listesi + kullanıcının kendi video linkini
+// yapıştırıp yükleyebildiği bir alan sunar.
+function YoutubePanelBody() {
+  const [activeVideoId, setActiveVideoId] = useState(YOUTUBE_PRESET_VIDEOS[0].id);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customUrlInput, setCustomUrlInput] = useState("");
+  const [customUrlError, setCustomUrlError] = useState(null);
+  const isPreset = YOUTUBE_PRESET_VIDEOS.some((v) => v.id === activeVideoId);
+
+  const handleLoadCustomUrl = () => {
+    const match = YOUTUBE_VIDEO_URL_RE.exec(customUrlInput.trim());
+    if (!match) {
+      setCustomUrlError("Geçerli bir YouTube video linki değil.");
+      return;
+    }
+    setActiveVideoId(match[1]);
+    setCustomUrlError(null);
+    setCustomUrlInput("");
+    setShowCustomInput(false);
+  };
+
   return (
-    <MusicPopoverShell onClose={onClose} title="▶ YouTube Music" tint="#FF3B5C">
-      <div className="flex items-center gap-2.5 mb-3 rounded-xl px-3 py-2.5 bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
-        <span className="flex-1 min-w-0 truncate text-[11.5px] font-semibold text-gray-600 dark:text-white/70 whitespace-nowrap">{trackLabel}</span>
-        <button
-          onClick={onTogglePlay}
-          disabled={!ytReady}
-          aria-label={ytPlaying ? "Duraklat" : "Oynat"}
-          className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 disabled:opacity-30"
-          style={{ background: "#FF3B5C22", color: "#FF3B5C" }}
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-1.5 mb-3">
+        <select
+          value={isPreset ? activeVideoId : "custom"}
+          onChange={(e) => setActiveVideoId(e.target.value)}
+          aria-label="Hazır video seç"
+          className={`flex-1 min-w-0 ${PANEL_CONTROL_CLASS}`}
         >
-          {ytPlaying ? <Pause className="w-3.5 h-3.5" fill="currentColor" /> : <Play className="w-3.5 h-3.5" fill="currentColor" />}
+          {!isPreset && (
+            <option value="custom" disabled>
+              Özel Video
+            </option>
+          )}
+          {YOUTUBE_PRESET_VIDEOS.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.label}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => {
+            setShowCustomInput((v) => !v);
+            setCustomUrlError(null);
+          }}
+          className={`shrink-0 whitespace-nowrap transition-colors hover:bg-white/[0.08] ${PANEL_CONTROL_CLASS}`}
+        >
+          {showCustomInput ? "Vazgeç" : "+ Kendi Linkini Ekle"}
         </button>
       </div>
-      <div className="flex flex-col gap-1.5">
-        {PLAYLIST.map((t, i) => {
-          const active = i === trackIndex;
-          return (
-            <button
-              key={t.id}
-              onClick={() => {
-                onSelectTrack(i);
-                onClose();
+
+      {showCustomInput && (
+        <div className="mb-3">
+          <div className="flex items-center gap-1.5">
+            <input
+              type="text"
+              value={customUrlInput}
+              onChange={(e) => {
+                setCustomUrlInput(e.target.value);
+                setCustomUrlError(null);
               }}
-              className={`text-left rounded-lg px-3 py-2.5 text-[12px] font-medium leading-relaxed transition-colors ${
-                active ? "bg-[#FF3B5C]/[0.14] text-[#FF3B5C]" : "bg-black/[0.03] dark:bg-white/[0.03] text-gray-600 dark:text-white/70 hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
-              }`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleLoadCustomUrl();
+              }}
+              placeholder="https://youtube.com/watch?v=..."
+              className={`flex-1 min-w-0 ${PANEL_CONTROL_CLASS}`}
+            />
+            <button
+              onClick={handleLoadCustomUrl}
+              className="shrink-0 rounded-xl px-3.5 py-2 text-[12px] font-bold transition-colors bg-[#FF3B5C]/15 border border-[#FF3B5C]/30 text-[#FF3B5C] hover:bg-[#FF3B5C]/25"
             >
-              {active ? "▶ " : ""}
-              {t.label}
+              Yükle
             </button>
-          );
-        })}
+          </div>
+          {customUrlError && <p className="mt-1.5 text-[11px] text-rose-400">{customUrlError}</p>}
+        </div>
+      )}
+
+      <div className="rounded-2xl overflow-hidden border border-[#FF3B5C]/20">
+        <iframe
+          key={activeVideoId}
+          title="YouTube Player"
+          src={buildYoutubeEmbedUrl(activeVideoId)}
+          width="100%"
+          height="300"
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          loading="lazy"
+        />
       </div>
-    </MusicPopoverShell>
+      <p className="mt-3 text-[11px] leading-relaxed text-white/35">
+        YouTube'un kendi oynatıcısı — kontrolü doğrudan burada yap. Bu paneli kapatman müziği durdurur.
+      </p>
+    </div>
   );
 }
 
@@ -545,7 +691,7 @@ function YoutubePopover({ onClose, trackIndex, trackLabel, ytReady, ytPlaying, o
 // (isFocusMode): üst bar ekstraları GERÇEKTEN (opaklık + pointer-events)
 // kaybolur, yalnızca halka + Başlat/Durdur/Sıfırla ve tek bir "Işıkları Aç"
 // düğmesi kalır. Alt bir medya çubuğu YOK — müzik yalnızca üst bardaki
-// Spotify/YouTube popover'larından kontrol edilir.
+// Spotify/YouTube butonlarının açtığı sağdan kayan MusicSidePanel'den kontrol edilir.
 export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
   const [mode, setMode] = useState("work"); // "work" | "break"
   const [workMin, setWorkMin] = useState(DEFAULT_WORK_MIN);
@@ -555,14 +701,8 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
   const [selectedTask, setSelectedTask] = useState(null);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
-  const [musicPopover, setMusicPopover] = useState(null); // null | "spotify" | "youtube"
-  const [ytReady, setYtReady] = useState(false);
-  const [ytPlaying, setYtPlaying] = useState(false);
-  const [trackIndex, setTrackIndex] = useState(0);
-  const [ytTitle, setYtTitle] = useState("");
-
-  const ytPlayerRef = useRef(null);
-  const ytContainerRef = useRef(null);
+  const [musicPanelOpen, setMusicPanelOpen] = useState(false);
+  const [musicTab, setMusicTab] = useState("spotify"); // "spotify" | "youtube"
 
   // Süre bittiğinde CountdownDisplay tarafından çağrılır — mod/running
   // değişimi burada, PomodoroStudio'nun (nadiren re-render olan) state'inde
@@ -603,55 +743,7 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
     if (open && initialTask) setSelectedTask(initialTask);
   }, [open, initialTask]);
 
-  // --- YouTube IFrame Player API: arkada, görünmez şekilde çalan gerçek
-  // oynatıcı (harici sekmeye YÖNLENDİRME YOK). ---
-  useEffect(() => {
-    if (!open || ytPlayerRef.current) return;
-    const createPlayer = () => {
-      if (ytPlayerRef.current || !ytContainerRef.current || !window.YT?.Player) return;
-      ytPlayerRef.current = new window.YT.Player(ytContainerRef.current, {
-        videoId: PLAYLIST[0].id,
-        playerVars: { autoplay: 0, controls: 0, modestbranding: 1, rel: 0 },
-        events: {
-          onReady: () => setYtReady(true),
-          onStateChange: (e) => {
-            setYtPlaying(e.data === window.YT.PlayerState.PLAYING);
-            const title = ytPlayerRef.current?.getVideoData?.()?.title;
-            if (title) setYtTitle(title);
-          },
-          onError: (e) => logger.warn("POMODORO_YT", "YouTube oynatıcı hatası", { code: e?.data }),
-        },
-      });
-    };
-    if (window.YT?.Player) {
-      createPlayer();
-      return;
-    }
-    if (!document.getElementById("youtube-iframe-api")) {
-      const tag = document.createElement("script");
-      tag.id = "youtube-iframe-api";
-      tag.src = "https://www.youtube.com/iframe_api";
-      document.body.appendChild(tag);
-    }
-    const previous = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      previous?.();
-      createPlayer();
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (open) return;
-    ytPlayerRef.current?.destroy?.();
-    ytPlayerRef.current = null;
-    setYtReady(false);
-    setYtPlaying(false);
-    setYtTitle("");
-    setTrackIndex(0);
-  }, [open]);
-
   const accent = ACCENT[mode];
-  const trackLabel = ytTitle || PLAYLIST[trackIndex].label;
 
   const adjustDuration = (field, delta) => {
     if (running) return;
@@ -674,17 +766,16 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
     setMode(nextMode);
   };
 
-  const toggleYoutube = () => {
-    if (!ytPlayerRef.current) return;
-    if (ytPlaying) ytPlayerRef.current.pauseVideo();
-    else ytPlayerRef.current.playVideo();
-  };
-
-  const goToTrack = (nextIndex) => {
-    const clamped = ((nextIndex % PLAYLIST.length) + PLAYLIST.length) % PLAYLIST.length;
-    setTrackIndex(clamped);
-    setYtTitle("");
-    ytPlayerRef.current?.loadVideoById?.(PLAYLIST[clamped].id);
+  // Aynı sekmenin butonuna panel AÇIKKEN tekrar basmak paneli kapatır (eski
+  // popover'ların toggle davranışıyla AYNI); farklı bir sekmeye basmak panel
+  // açıksa sadece sekme değiştirir, kapalıysa o sekmeyle açar.
+  const openMusicTab = (tab) => {
+    if (musicPanelOpen && musicTab === tab) {
+      setMusicPanelOpen(false);
+    } else {
+      setMusicTab(tab);
+      setMusicPanelOpen(true);
+    }
   };
 
   const heroProps = {
@@ -718,9 +809,6 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
       className="fixed inset-0 z-[90] flex flex-col transition-colors duration-700"
       style={{ display: open ? "flex" : "none", background: isFocusMode ? "var(--pomo-bg-focus)" : "var(--pomo-bg)" }}
     >
-      {/* YouTube oynatıcı — görünmez (1x1), arkada gerçekten çalar. */}
-      <div ref={ytContainerRef} style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none", overflow: "hidden" }} />
-
       {/* Üst bar */}
       <div className="shrink-0 px-4 md:px-8 pt-5 pb-3 flex items-center justify-between gap-2">
         <div className={`flex items-center gap-2.5 transition-opacity duration-300 ${isFocusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
@@ -728,8 +816,11 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
           <h2 className="text-[17px] font-bold text-gray-900 dark:text-white whitespace-nowrap">Focus Studio</h2>
         </div>
         <div className="flex items-center gap-2">
-          {/* Görevler ve Planlar + Spotify / YouTube Music — z-index izole popover'lar
-              açar; Odak Modu'nda gizlenir */}
+          {/* Görevler ve Planlar + Spotify / YouTube — Odak Modu'nda gizlenir.
+              Müzik butonları artık küçük bir popover DEĞİL, tek bir sağdan
+              kayan MusicSidePanel'i (aşağıda, bu div'in DIŞINDA render edilir
+              — sabit/fixed konumlandığı için bir buton'a "relative" ile
+              bağlı olmasına gerek yok) sekme seçili şekilde açar. */}
           <div className={`hidden md:flex items-center gap-2 transition-opacity duration-300 ${isFocusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
             <button
               onClick={() => setTaskDrawerOpen(true)}
@@ -739,38 +830,22 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
               <ClipboardList className="w-3.5 h-3.5" strokeWidth={2.25} />
               Görevler ve Planlar
             </button>
-            <div className="relative">
-              <button
-                onClick={() => setMusicPopover((v) => (v === "spotify" ? null : "spotify"))}
-                className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[12px] font-bold whitespace-nowrap transition-all"
-                style={{ background: musicPopover === "spotify" ? "#1DB9541f" : "rgba(var(--overlay-rgb),0.04)", color: "#1DB954" }}
-              >
-                <Music2 className="w-3.5 h-3.5" strokeWidth={2.25} />
-                Spotify
-              </button>
-              {musicPopover === "spotify" && <SpotifyPopover onClose={() => setMusicPopover(null)} />}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => setMusicPopover((v) => (v === "youtube" ? null : "youtube"))}
-                className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[12px] font-bold whitespace-nowrap transition-all"
-                style={{ background: musicPopover === "youtube" ? "#FF3B5C1f" : "rgba(var(--overlay-rgb),0.04)", color: "#FF3B5C" }}
-              >
-                <ListMusic className="w-3.5 h-3.5" strokeWidth={2.25} />
-                YouTube Music
-              </button>
-              {musicPopover === "youtube" && (
-                <YoutubePopover
-                  onClose={() => setMusicPopover(null)}
-                  trackIndex={trackIndex}
-                  trackLabel={trackLabel}
-                  ytReady={ytReady}
-                  ytPlaying={ytPlaying}
-                  onTogglePlay={toggleYoutube}
-                  onSelectTrack={goToTrack}
-                />
-              )}
-            </div>
+            <button
+              onClick={() => openMusicTab("spotify")}
+              className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[12px] font-bold whitespace-nowrap transition-all"
+              style={{ background: musicPanelOpen && musicTab === "spotify" ? "#1DB9541f" : "rgba(var(--overlay-rgb),0.04)", color: "#1DB954" }}
+            >
+              <Music2 className="w-3.5 h-3.5" strokeWidth={2.25} />
+              Spotify
+            </button>
+            <button
+              onClick={() => openMusicTab("youtube")}
+              className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[12px] font-bold whitespace-nowrap transition-all"
+              style={{ background: musicPanelOpen && musicTab === "youtube" ? "#FF3B5C1f" : "rgba(var(--overlay-rgb),0.04)", color: "#FF3B5C" }}
+            >
+              <ListMusic className="w-3.5 h-3.5" strokeWidth={2.25} />
+              YouTube
+            </button>
           </div>
 
           {/* Mobilde de Görevler ve Planlar erişimi — üst barda kompakt ikon buton */}
@@ -824,6 +899,8 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
         selectedTaskId={selectedTask?.id}
         onSelectTask={setSelectedTask}
       />
+
+      <MusicSidePanel open={musicPanelOpen} activeTab={musicTab} onTabChange={setMusicTab} onClose={() => setMusicPanelOpen(false)} />
     </div>
   );
 }
