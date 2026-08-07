@@ -54,12 +54,16 @@ function getClientId() {
 }
 
 // Spotify'a EKSİKSİZ AYNI şekilde geri gönderilmesi/kayıtlı olması gereken
-// adres — Dashboard'daki Redirect URI listesiyle TAM eşleşmeli (bkz.
-// .env.example). Sondaki "/" bilerek sabit: window.location.pathname'in o
-// anki alt sayfaya göre değişmesi Spotify'da "her olası path" için ayrı
-// kayıt gerektirirdi; bunun yerine HER ZAMAN kök adrese dönülür.
+// adres — Dashboard'daki Redirect URI listesiyle TAM eşleşmeli, aksi halde
+// Spotify "INVALID_CLIENT: Invalid redirect URI" ile reddeder. ÖNCELİK:
+// VITE_SPOTIFY_REDIRECT_URI tanımlıysa (Dashboard'a KAYITLI olan TAM değer)
+// o kullanılır — bu, `window.location.origin`'in prod'da alan adı yönlendirme/
+// önizleme URL'leri (ör. Vercel preview deploy'ları) yüzünden Dashboard'daki
+// kayıtla SESSİZCE uyuşmaz hale gelmesini önler. Tanımlı DEĞİLSE (ör. .env
+// henüz ayarlanmamış yerel bir ortam) `window.location.origin + "/"` yedeğe
+// düşülür (bkz. .env.example).
 function getRedirectUri() {
-  return `${window.location.origin}/`;
+  return import.meta.env.VITE_SPOTIFY_REDIRECT_URI || `${window.location.origin}/`;
 }
 
 // "Spotify Hesabını Bağla" butonuna basınca çağrılır — sayfayı Spotify'ın
