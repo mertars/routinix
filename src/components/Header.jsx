@@ -1,8 +1,47 @@
 import { memo, useState } from "react";
-import { Timer, BarChart3, Users2, Menu, X, HelpCircle, Target } from "lucide-react";
+import { Timer, BarChart3, Users2, Menu, X, HelpCircle, Target, Play, Pause, Maximize2 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { useMusic } from "../context/MusicContext";
 import { FEATURE_FLAGS } from "../constants";
 import SpotlightMenu from "./onboarding/SpotlightMenu";
+
+// Üst bar mini müzik widget'ı — büyük, ışıltılı MusicSidePanel kapatıldığında
+// müziği hızlıca yönetmek için (bkz. GlobalMusicPlayer.jsx, aynı useMusic()
+// context'i paylaşırlar). Bir oynatıcı en az BİR KEZ başlatılana kadar
+// (spotifyInitialized/youtubeInitialized) HİÇ render edilmez — kullanıcı
+// müzikle hiç ilgilenmediyse üst barda gereksiz bir widget görünmez.
+function MiniMusicWidget() {
+  const m = useMusic();
+  if (!m.hasActivePlayer || m.panelOpen) return null;
+
+  const tint = m.activeTab === "spotify" ? "#1DB954" : "#FF3B5C";
+
+  return (
+    <button
+      onClick={() => m.openPanel()}
+      className="flex items-center gap-1.5 rounded-full pl-1 pr-3 h-9 bg-slate-900/80 border border-emerald-500/30 transition-all hover:border-emerald-500/50"
+      title="Müzik panelini aç"
+    >
+      <span
+        onClick={(e) => {
+          e.stopPropagation();
+          m.togglePlayPause();
+        }}
+        role="button"
+        aria-label={m.isPlaying ? "Duraklat" : "Oynat"}
+        className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+        style={{ background: `${tint}26`, color: tint }}
+      >
+        {m.isPlaying ? <Pause className="w-3 h-3" fill="currentColor" /> : <Play className="w-3 h-3" fill="currentColor" />}
+      </span>
+      <span className="max-w-[120px] truncate text-[11.5px] font-semibold text-emerald-300">
+        🎵 {m.nowPlayingLabel}
+        {m.isPlaying ? " — Playing" : ""}
+      </span>
+      <Maximize2 className="w-3 h-3 shrink-0 text-white/30" />
+    </button>
+  );
+}
 
 // Standart hamburger tetikleyici — her ekran boyutunda görünür (mobil/
 // masaüstü ayrımı YOK, klasik/tutarlı davranış). Açıkken ikon ≡'den X'e
@@ -308,6 +347,8 @@ function Header({
               <Timer className="w-[13px] h-[13px]" strokeWidth={2.25} />
               Pomodoro
             </button>
+
+            <MiniMusicWidget />
           </div>
 
           {user ? (

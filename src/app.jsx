@@ -13,6 +13,7 @@ import PlanBoard from "./components/PlanBoard";
 import ScopedErrorBoundary from "./components/ScopedErrorBoundary";
 import BackgroundScene from "./components/BackgroundScene";
 import GlobalStyles from "./components/GlobalStyles";
+import GlobalMusicPlayer from "./components/GlobalMusicPlayer";
 // Nexus link paylaşımı ("/t/:templateId") — anonim ziyaretçiler için ilk
 // boyamada gerekebilir (yavaş bir "lazy" gecikmesi PLG akışında istenmez),
 // bu yüzden diğer panellerin aksine BİLEREK statik import edilir.
@@ -675,6 +676,12 @@ export default function App() {
       </Suspense>
 
       <GlobalStyles />
+
+      {/* Global Müzik Oynatıcı — Pomodoro/PrintModal gibi ekrandan/stage'ten
+          BAĞIMSIZ, uygulama ömrü boyunca TEK SEFER monte edilir (bkz.
+          GlobalMusicPlayer.jsx dosya başı yorumu). Header'daki mini widget
+          İLE AYNI useMusic() context'ini paylaşır. */}
+      <GlobalMusicPlayer />
     </div>
   );
 }
