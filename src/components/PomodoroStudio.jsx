@@ -28,11 +28,23 @@ const PLAYLIST = [
 // Hazır odak çalma listeleri — kullanıcı SpotifyPopover içindeki <select>
 // ile aralarında geçiş yapabilir, ya da kendi Spotify çalma listesi linkini
 // yapıştırıp (regex ile playlist ID'si ayıklanır) YÜKLEYEBİLİR.
+//
+// KÖK NEDEN NOTU (bir önceki "Page not found" hatası): iframe src YAPISI
+// ZATEN doğruydu (/embed/playlist/ID?utm_source=generator&theme=0) — sorun
+// ID'lerdi. Spotify'ın "37i9dQZF1DX..." önekli editöryel/algoritmik çalma
+// listesi ID'leri KALICI DEĞİL; Spotify bunları zaman zaman sessizce
+// emekliye ayırıp yeniden atıyor. Aşağıdaki 4 ID, embed sayfası doğrudan
+// GET edilip yanıtın GERÇEKTEN "Page not found" DEĞİL bir çalma listesi
+// döndürdüğü canlı olarak DOĞRULANDI (curl ile open.spotify.com/embed/
+// playlist/<id> içindeki "title" alanı kontrol edilerek) — yine de bu
+// ID'ler ileride Spotify tarafında tekrar emekliye ayrılabilir; iframe
+// gerçekten yeniden "Page not found" gösterirse ilk kontrol noktası BURASI
+// olmalı, src string birleştirmesi DEĞİL.
 const SPOTIFY_PRESET_PLAYLISTS = [
-  { id: "37i9dQZF1DX8Ueb1m2K9u0", label: "Lo-Fi Beats" },
-  { id: "37i9dQZF1DWZeKCadARdKQ", label: "Deep Focus" },
-  { id: "37i9dQZF1DX4sWSp23169p", label: "Jazz Focus" },
-  { id: "37i9dQZF1DXdLENIlT32Ms", label: "Ambient Chill" },
+  { id: "37i9dQZF1DWYoYGBbGKurt", label: "Lo-Fi Beats" },
+  { id: "37i9dQZF1DX9sIqqvKsjG8", label: "Deep Focus" },
+  { id: "37i9dQZF1DX0SM0LYsmbMT", label: "Jazz Focus" },
+  { id: "37i9dQZF1DWU0ScTcjJBdj", label: "Ambient Chill" },
 ];
 const SPOTIFY_PLAYLIST_URL_RE = /playlist\/([a-zA-Z0-9]+)/;
 function buildSpotifyEmbedUrl(playlistId) {
@@ -383,6 +395,15 @@ function SpotifyPopover({ onClose }) {
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customUrlInput, setCustomUrlInput] = useState("");
   const [customUrlError, setCustomUrlError] = useState(null);
+
+  // Hata ayıklama: iframe her yeni activePlaylistId ile render edilmeden
+  // hemen önce, oluşan src'nin GERÇEKTEN doğru olduğunu konsolda doğrula
+  // (bkz. yukarıdaki KÖK NEDEN NOTU — sorun genelde URL yapısı değil, ölü/
+  // emekliye ayrılmış bir playlist ID'si olur).
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log("Aktif Spotify URL:", buildSpotifyEmbedUrl(activePlaylistId));
+  }, [activePlaylistId]);
   const isPreset = SPOTIFY_PRESET_PLAYLISTS.some((p) => p.id === activePlaylistId);
 
   const handleLoadCustomUrl = () => {
