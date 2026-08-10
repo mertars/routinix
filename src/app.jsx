@@ -10,6 +10,7 @@ import DrawerMenu from "./components/DrawerMenu";
 import DeletePlanModal from "./components/DeletePlanModal";
 import CategoryIntro from "./components/CategoryIntro";
 import PlanBoard from "./components/PlanBoard";
+import PlanGeneratedSummaryModal from "./components/PlanGeneratedSummaryModal";
 import ScopedErrorBoundary from "./components/ScopedErrorBoundary";
 import BackgroundScene from "./components/BackgroundScene";
 import GlobalStyles from "./components/GlobalStyles";
@@ -433,6 +434,8 @@ export default function App() {
                 errorMsg={ps.errorMsg}
                 onBackToIntro={ps.resetToIntro}
                 onOpenManualBuilder={ps.openManualBuilder}
+                extraNote={ps.extraNote}
+                onExtraNoteChange={ps.setExtraNote}
               />
             )}
 
@@ -476,6 +479,14 @@ export default function App() {
           </ScopedErrorBoundary>
         </main>
       </div>
+
+      <PlanGeneratedSummaryModal
+        open={ps.planSummaryOpen}
+        summary={ps.planSummary}
+        planTitle={ps.dbPlan?.title}
+        accent={mode.accent}
+        onClose={ps.closePlanSummary}
+      />
 
       {/* Görevler ve Planlar (soldan kayan neon çekmece) — koşullu mount:
           kapalıyken DOM'da hiç yok. */}

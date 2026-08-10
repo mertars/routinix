@@ -271,6 +271,35 @@ function CounterWidget({ value, onUpdate }) {
   );
 }
 
+// ---- Metrik: Oyun Skoru (Galibiyet/Mağlubiyet) ----
+function GameScoreWidget({ value, onUpdate }) {
+  const v = value || {};
+  const wins = v.wins || 0;
+  const losses = v.losses || 0;
+  return (
+    <EditablePill label={`🎮 ${wins}G / ${losses}M`} tint="#B26BFF">
+      {[
+        ["wins", "Galibiyet"],
+        ["losses", "Mağlubiyet"],
+      ].map(([key, lbl]) => (
+        <div key={key}>
+          <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-faint)" }}>
+            {lbl}
+          </label>
+          <input
+            type="number"
+            min="0"
+            value={v[key] ?? 0}
+            onChange={(e) => onUpdate({ ...v, [key]: Number(e.target.value) || 0 })}
+            className={numInputClass}
+            style={numInputStyle}
+          />
+        </div>
+      ))}
+    </EditablePill>
+  );
+}
+
 // ---- Metrik: Kalori / Makro ----
 function CalorieWidget({ value, onUpdate }) {
   const v = value || {};
@@ -541,6 +570,7 @@ const RENDERERS = {
   counter: CounterWidget,
   calorie: CalorieWidget,
   sets_reps: SetsRepsWidget,
+  game_score: GameScoreWidget,
   spotify: SpotifyEmbedWidget,
   youtube: YoutubeEmbedWidget,
   image: ImageWidget,

@@ -31,6 +31,7 @@ import logger from "./utils/logger";
 import { runWhenIdle } from "./utils/idle";
 import { createWidget } from "./utils/taskWidgets";
 import { shiftStartDateForDay } from "./utils/planDate";
+import { detectSmartContext, injectSmartWidgets, getSmartWidgetBadges, buildStrategicAnalysis } from "./utils/smartWidgets";
 
 // Yalnızca `taskId`'nin ait olduğu hafta/gün nesnesini yeniden oluşturup
 // içindeki tek görevi `patch` ile güncelleyen SAF (pure) yardımcı —
@@ -126,6 +127,13 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   const [weeks, setWeeks] = useState([]); // groupTasksToWeeks çıktısı
   const [loadingNextWeek, setLoadingNextWeek] = useState(false);
   const [nextWeekError, setNextWeekError] = useState("");
+  // Stratejik Başarı Kartı (bkz. PlanGeneratedSummaryModal.jsx) — YENİ bir AI
+  // planı üretilip kaydedildiğinde finalizeAndGenerate tarafından doldurulur;
+  // { analysisText, widgetBadges } | null. PlanBoard ZATEN mount olur, bu
+  // modal onun ÜZERİNDE bir overlay olarak açılır — "Anladım, Planı Başlat"a
+  // kadar kullanıcı takvimi net göremez.
+  const [planSummary, setPlanSummary] = useState(null);
+  const [planSummaryOpen, setPlanSummaryOpen] = useState(false);
 
   // "Planlarım" — oturum açıksa DB'den çekilen kayıtlı planların özeti.
   const [savedPlans, setSavedPlans] = useState([]);
@@ -191,8 +199,12 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     setAnswers({});
     setWizardStep(0);
     setTemplateDaysOverride(null);
+    setPlanSummary(null);
+    setPlanSummaryOpen(false);
     setStage(STAGE_INTRO);
   }, []);
+
+  const closePlanSummary = useCallback(() => setPlanSummaryOpen(false), []);
 
   // Ortak: verilen kategori/hedef için dinamik onboarding sorularını üretip
   // wizard'a geçer. startOnboarding (manuel "Başla") ve startFromTemplate
@@ -277,6 +289,13 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       // gün sayısıyla ez — kullanıcıya vaat edilen süre ile plan birebir eşleşsin.
       if (templateDaysOverride) aiOutput.total_days = templateDaysOverride;
 
+      // Akıllı Widget Enjektörü (bkz. utils/smartWidgets.js) — kategori +
+      // hedef metnindeki anahtar kelimelere göre 1. haftanın görevlerine
+      // OTOMATİK varsayılan widget'lar ekler (savePlanToSupabase'e/flattenWeek'e
+      // gitmeden ÖNCE, ham AI çıktısı üzerinde).
+      const contextKey = detectSmartContext(category, goal);
+      aiOutput.first_week_tasks = injectSmartWidgets(aiOutput.first_week_tasks, contextKey);
+
       const { plan, routines: routineRows, tasks } = await savePlanToSupabase(aiOutput, user.id, category);
 
       setDbPlan(plan);
@@ -284,6 +303,14 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       setWeeks(groupTasksToWeeks(tasks));
       setStage(STAGE_PLAN);
       setTemplateDaysOverride(null);
+      // Stratejik Başarı Kartı — deterministik analiz cümlesi + bu planda
+      // enjekte edilen widget türlerinin rozet özeti (bkz. yukarıdaki
+      // contextKey). PlanBoard zaten mount olur; bu modal onun ÜZERİNDE açılır.
+      setPlanSummary({
+        analysisText: buildStrategicAnalysis({ category, contextKey, totalDays: aiOutput.total_days, firstWeekTasks: (aiOutput.first_week_tasks || []).flatMap((d) => d.tasks || []) }),
+        widgetBadges: getSmartWidgetBadges(contextKey),
+      });
+      setPlanSummaryOpen(true);
       refreshSavedPlans();
     } catch (err) {
       logger.error("PLAN_CREATE", "Plan oluşturulamadı", { category, error: err?.message });
@@ -400,7 +427,13 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
         weekTopic,
         lastTaskTitle,
       });
-      const rows = await saveWeekTasks(dbPlan.id, user.id, targetWeekNumber, week_tasks);
+      // Akıllı Widget Enjektörü — 1. haftada kullanılan AYNI mantık (bkz.
+      // finalizeAndGenerate). Orijinal hedef metni burada elde YOK (yalnızca
+      // week_tasks üretiliyor) — dbPlan.title/summary makul bir vekil, AI
+      // genelde bunları hedefin bir yansıması olarak üretiyor.
+      const contextKey = detectSmartContext(dbPlan.mode, `${dbPlan.title || ""} ${dbPlan.summary || ""}`);
+      const smartWeekTasks = injectSmartWidgets(week_tasks, contextKey);
+      const rows = await saveWeekTasks(dbPlan.id, user.id, targetWeekNumber, smartWeekTasks);
       setWeeks((prev) => [...prev, ...groupTasksToWeeks(rows)]);
     } catch (err) {
       logger.error("PLAN_WEEK", "Sonraki hafta üretilemedi", { planId: dbPlan?.id, targetWeekNumber, error: err?.message });
@@ -677,6 +710,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     // aktif plan
     dbPlan, routines, weeks, loadingNextWeek, nextWeekError,
     totalTasks, completedTasks, overallPct,
+    planSummary, planSummaryOpen, closePlanSummary,
     // setter/aksiyon
     setGoal, setExtraNote, setMenuOpen, setRemindersOn, setHapticsOn,
     handleCategoryChange, startOnboarding, setAnswer, goNextQuestion, goPrevQuestion, finalizeAndGenerate,

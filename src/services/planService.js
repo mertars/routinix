@@ -71,6 +71,7 @@ function flattenWeek(weekDays, { planId, userId, weekNumber }) {
         estimated_cost: null,
         map_search_query: null,
         is_completed: false,
+        widgets: [],
       });
       continue;
     }
@@ -88,6 +89,13 @@ function flattenWeek(weekDays, { planId, userId, weekNumber }) {
         estimated_cost: t.estimated_cost ?? null,
         map_search_query: t.map_search_query ?? null,
         is_completed: false,
+        // Akıllı Widget Enjektörü (bkz. utils/smartWidgets.js) burada
+        // flattenWeek'e gelmeden ÖNCE, AI'ın ham gün/görev dizisine
+        // t.widgets olarak zaten yazmış olabilir — taşınmazsa SESSİZCE
+        // silinirdi (is_completed/widgets İLE AYNI koruma ilkesi, bu
+        // oturumda önceki turlarda ManualPlanBuilder/planReplace.js'te de
+        // aynı hata sınıfı bulunup düzeltilmişti).
+        widgets: t.widgets ?? [],
       });
     }
   }
@@ -154,7 +162,16 @@ export async function savePlanToSupabase(aiOutput, userId, mode) {
   let tasks = [];
   const taskRows = flattenWeek(aiOutput.first_week_tasks, { planId: plan.id, userId, weekNumber: 1 });
   if (taskRows.length > 0) {
-    const { data, error } = await supabase.from("tasks").insert(taskRows).select();
+    let { data, error } = await supabase.from("tasks").insert(taskRows).select();
+    // tasks.widgets (bkz. supabase/task_widgets.sql) HENÜZ çalıştırılmamış
+    // bir migration olabilir — diğer insert noktalarındaki AYNI fail-open
+    // ilkesi: eksik bir migration, AI'ın ürettiği GERÇEK planın kaydedilmesini
+    // ASLA engellememeli.
+    if (error?.code === "PGRST204") {
+      logger.warn("SUPABASE", "tasks.widgets sütunu henüz yok (migration çalıştırılmamış) — widgets'sız kaydediliyor", { error: error.message });
+      const stripped = taskRows.map(({ widgets, ...rest }) => rest);
+      ({ data, error } = await supabase.from("tasks").insert(stripped).select());
+    }
     if (error) {
       logger.error("SUPABASE", "1. hafta görevleri kaydedilemedi", { table: "tasks", action: "insert", planId: plan.id, error });
       throw error;
@@ -292,7 +309,13 @@ export async function saveManualPlanToSupabase(builder, userId) {
 export async function saveWeekTasks(planId, userId, weekNumber, weekTasks) {
   const taskRows = flattenWeek(weekTasks, { planId, userId, weekNumber });
   if (taskRows.length === 0) return [];
-  const { data, error } = await supabase.from("tasks").insert(taskRows).select();
+  let { data, error } = await supabase.from("tasks").insert(taskRows).select();
+  // savePlanToSupabase İLE AYNI tasks.widgets fail-open ilkesi.
+  if (error?.code === "PGRST204") {
+    logger.warn("SUPABASE", "tasks.widgets sütunu henüz yok (migration çalıştırılmamış) — widgets'sız kaydediliyor", { error: error.message });
+    const stripped = taskRows.map(({ widgets, ...rest }) => rest);
+    ({ data, error } = await supabase.from("tasks").insert(stripped).select());
+  }
   if (error) {
     logger.error("SUPABASE", `${weekNumber}. hafta görevleri kaydedilemedi`, { table: "tasks", action: "insert", planId, weekNumber, error });
     throw error;

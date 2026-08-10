@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Wand2 } from "lucide-react";
 import { CATEGORIES, CATEGORY_KEYS, MIN_GOAL_LENGTH, TEMPLATE_CHIPS } from "../constants";
+import { getPromptSuggestions } from "../utils/promptSuggestions";
 import DashboardHeader from "./DashboardHeader";
 
 // Giriş ekranı: kategori (persona) seçimi + hedef, "Planlarım" listesi ve
@@ -19,9 +20,19 @@ export default function CategoryIntro({
   errorMsg,
   onBackToIntro,
   onOpenManualBuilder,
+  extraNote,
+  onExtraNoteChange,
 }) {
   const mode = CATEGORIES[category] || CATEGORIES.general;
   const [pulse, setPulse] = useState(false);
+  const suggestions = getPromptSuggestions(category);
+
+  // Öneri çipine tıklanınca metni extraNote'a EKLER (üzerine yazmaz) — kutu
+  // zaten doluysa aralarına bir boşluk/nokta ile ayrılmış olarak eklenir.
+  const appendSuggestion = (text) => {
+    const trimmed = (extraNote || "").trim();
+    onExtraNoteChange(trimmed ? `${trimmed} ${text}` : text);
+  };
 
   // Şablon çipi: kategori + hedefi doldurur, kısa bir parıltı animasyonu tetikler.
   const applyTemplate = (chip) => {
@@ -230,6 +241,41 @@ export default function CategoryIntro({
           <p className="mt-1.5 text-[11px] font-medium" style={{ color: "var(--amber-accent)" }}>
             Hedefini biraz daha açık yaz — en az {MIN_GOAL_LENGTH} karakter gerekli.
           </p>
+        )}
+
+        {/* Dinamik "Ek İstek / Soru" Alanı (Smart Prompt Assistant) —
+            extraNote zaten usePlanStudio.finalizeAndGenerate tarafından AI
+            bağlamına ekleniyordu (bkz. "Ek notlar / özel istekler" satırı),
+            ama hiçbir ekranda GERÇEK bir giriş alanı YOKTU — burada eklendi.
+            Kategoriye göre mikro rehber/placeholder/öneri çipleri değişir
+            (bkz. utils/promptSuggestions.js). */}
+        {onExtraNoteChange && (
+          <div className="mt-3 md:mt-4">
+            <label className="block text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 dark:text-[var(--text-faint)] mb-1">
+              Eklemek istediğin bir şey var mı?
+            </label>
+            <p className="text-[11px] text-[var(--text-faint)] mb-1.5 leading-relaxed">{suggestions.guide}</p>
+            <textarea
+              value={extraNote || ""}
+              onChange={(e) => onExtraNoteChange(e.target.value)}
+              placeholder={suggestions.placeholder}
+              rows={2}
+              className="input-glow glass w-full rounded-2xl p-3 bg-transparent outline-none resize-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)] leading-relaxed"
+              style={{ borderColor: "rgba(var(--overlay-rgb),0.10)" }}
+            />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {suggestions.chips.map((chip) => (
+                <button
+                  key={chip.label}
+                  onClick={() => appendSuggestion(chip.insertText)}
+                  className="rounded-full pl-2.5 pr-2.5 h-7 text-[11px] font-semibold transition-colors"
+                  style={{ background: "rgba(6,182,212,0.14)", color: "#06B6D4", border: "1px solid rgba(6,182,212,0.35)" }}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

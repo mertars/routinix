@@ -1,4 +1,4 @@
-import { Clock, Timer, Hash, Flame, Dumbbell, Music2, Clapperboard, Image, ListChecks, Gauge, StickyNote } from "lucide-react";
+import { Clock, Timer, Hash, Flame, Dumbbell, Music2, Clapperboard, Image, ListChecks, Gauge, StickyNote, Gamepad2 } from "lucide-react";
 
 // Widget Tabanlı Görev Sistemi — TEK doğruluk kaynağı (katalog + varsayılan
 // değerler). WidgetPicker.jsx (kategorize edilmiş arama popover'ı) ve
@@ -77,6 +77,19 @@ export const WIDGET_CATALOG = [
     // projede YOK — bilerek KURULMADI (bkz. WidgetPicker.jsx görsel widget
     // açıklaması). Bunun yerine bir görsel URL'si YAPIŞTIRILIR.
     defaultValue: () => ({ url: "" }),
+  },
+  {
+    type: "game_score",
+    category: "metric",
+    label: "Oyun Skoru (G/M)",
+    icon: Gamepad2,
+    // Akıllı Widget Enjektörü'nün (bkz. utils/smartWidgets.js) "Gaming"
+    // bağlamı için ürettiği TEK yeni widget türü — diğer tüm enjekte edilen
+    // türler (gym_set→sets_reps, nutrition_macro→calorie, academic_counter→
+    // counter, media_embed→spotify/youtube) zaten var olan katalog
+    // girdileriyle birebir eşleşiyordu, bu YENİ bir kavram olduğu için
+    // katalogda karşılığı yoktu.
+    defaultValue: () => ({ wins: 0, losses: 0 }),
   },
   {
     type: "checklist",
