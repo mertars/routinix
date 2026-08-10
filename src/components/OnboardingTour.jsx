@@ -134,7 +134,7 @@ const STEPS = [
     badge: "8 / 11 · Pomodoro & Derin Odak",
     title: "Müziğini Bağla, Odağa Geç",
     description:
-      "1. \"Süre & Görev\" sekmesinde çalışma süreni ayarla, bağlı görevi seç ➔ 2. \"Müzik\" sekmesinde Spotify ya da YouTube Music'i başlat ➔ 3. \"Odak Modu\" sekmesine geç — gereksiz kontroller gözden kaybolsun, geriye yalnızca sayaç kalsın.",
+      "1. \"Süre & Görev\" sekmesinde çalışma süreni ayarla, bağlı görevi seç ➔ 2. Duraklat/Başlat'ın yanındaki Spotify tuşuyla müziğini başlat ➔ 3. \"Odak Modu\" sekmesine geç — gereksiz kontroller gözden kaybolsun, geriye yalnızca sayaç kalsın.",
     accent: "#FB7185",
     Demo: PomodoroDemo,
     subSteps: [

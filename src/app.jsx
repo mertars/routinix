@@ -58,6 +58,7 @@ const RhythmStudio = lazy(() => import("./components/RhythmStudio"));
 const CommunityHub = lazy(() => import("./components/CommunityHub"));
 const NexusProfileOverlay = lazy(() => import("./components/community/NexusProfileOverlay"));
 const OnboardingTour = lazy(() => import("./components/OnboardingTour"));
+const SpotlightMenu = lazy(() => import("./components/onboarding/SpotlightMenu"));
 
 export default function App() {
   const auth = useAuth();
@@ -223,9 +224,9 @@ export default function App() {
     ps.setMenuOpen(false);
     setTourOpen(true);
   }, [ps.setMenuOpen]);
-  // Spotlight Interactive Guide Engine (Hızlı Öğretici) — açılır menünün
-  // kendisi Header'ın içinde yaşar (bkz. SpotlightTrigger/SpotlightMenu),
-  // burada yalnızca açık/kapalı durumu tutulur.
+  // Spotlight Interactive Guide Engine (Hızlı Öğretici) — modalin kendisi
+  // burada, DrawerMenu'nün "Hızlı Öğretici" satırıyla açılır (bkz.
+  // onboarding/SpotlightMenu.jsx), burada yalnızca açık/kapalı durumu tutulur.
   const toggleSpotlight = useCallback(() => setSpotlightOpen((v) => !v), []);
   const closeSpotlight = useCallback(() => setSpotlightOpen(false), []);
   // "Aktif Plan Ekranı" Spotlight girişi — yalnızca CURRENTLY açık bir plan
@@ -368,13 +369,6 @@ export default function App() {
           onAuthClick={openAuth}
           onSignOut={requestSignOut}
           onLogoClick={onLogoClick}
-          onTourClick={openTour}
-          spotlightOpen={spotlightOpen}
-          onSpotlightToggle={toggleSpotlight}
-          onSpotlightClose={closeSpotlight}
-          onNavigateIntro={ps.resetToIntro}
-          spotlightSavedPlansCount={ps.savedPlans.length}
-          onSpotlightEnsurePlanOpen={ensurePlanOpenForSpotlight}
           menuOpen={ps.menuOpen}
           onMenuToggle={toggleHamburger}
         />
@@ -397,6 +391,7 @@ export default function App() {
           onOpenPomodoro={togglePomodoro}
           onOpenProfile={openNexusProfile}
           onOpenTour={openTour}
+          onOpenSpotlight={toggleSpotlight}
           onSignOut={requestSignOut}
         />
 
@@ -574,6 +569,21 @@ export default function App() {
       {tourOpen && (
         <Suspense fallback={<OverlayFallback z={150} />}>
           <OnboardingTour open={tourOpen} onClose={() => setTourOpen(false)} />
+        </Suspense>
+      )}
+
+      {/* Hızlı Öğretici — eskiden Header'da (🎯), artık DrawerMenu'den açılan
+          ORTALANMIŞ bir modal (bkz. SpotlightMenu.jsx dosya başı yorumu).
+          Koşullu mount. */}
+      {spotlightOpen && (
+        <Suspense fallback={<OverlayFallback z={95} />}>
+          <SpotlightMenu
+            open={spotlightOpen}
+            onClose={closeSpotlight}
+            onNavigateIntro={ps.resetToIntro}
+            savedPlansCount={ps.savedPlans.length}
+            onEnsurePlanOpen={ensurePlanOpenForSpotlight}
+          />
         </Suspense>
       )}
 

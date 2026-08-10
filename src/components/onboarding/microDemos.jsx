@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CloudCheck, Wand2, FileDown, ClipboardPaste, Check, Music2, ListMusic, Search, Heart, HelpCircle, Moon, Menu } from "lucide-react";
+import { CloudCheck, Wand2, FileDown, ClipboardPaste, Check, Music2, Search, Heart, HelpCircle, Moon, Menu } from "lucide-react";
 import { CATEGORIES, CATEGORY_KEYS } from "../../constants";
 
 // OnboardingTour'un 10 adımının mikro-UI vitrinleri — HİÇBİR PNG/JPG YOK,
@@ -372,9 +372,6 @@ export function PomodoroDemo({ sub, accent }) {
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "#1DB9541f", color: "#1DB954" }}>
             <Music2 className="w-3 h-3" /> Spotify
-          </span>
-          <span className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "#FF3B5C1f", color: "#FF3B5C" }}>
-            <ListMusic className="w-3 h-3" /> YouTube
           </span>
         </div>
       </div>

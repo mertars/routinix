@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
-import { Timer as TimerIcon, ClipboardList, Music2, ListMusic, X } from "lucide-react";
+import { Timer as TimerIcon, ClipboardList, Music2, X } from "lucide-react";
 import { tapFeedback } from "../lib/haptics";
 import logger from "../utils/logger";
 import { logFocusSession } from "../services/rhythmService";
@@ -34,7 +34,7 @@ function formatTime(totalSeconds) {
 // gerçekten değişen prop'lar (secondsLeft/pct/ringOffset) için tekrar çizsin.
 const TimerRing = memo(function TimerRing({ secondsLeft, mode, accent, pct, ringCircumference, ringOffset, boost }) {
   return (
-    <div className="relative w-[250px] h-[250px] md:w-[300px] md:h-[300px] flex items-center justify-center shrink-0">
+    <div className="relative w-[220px] h-[220px] sm:w-[260px] sm:h-[260px] md:w-[300px] md:h-[300px] flex items-center justify-center shrink-0">
       <div
         className="absolute rounded-full bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 backdrop-blur-xl transition-all duration-700"
         style={{ inset: 20, boxShadow: `inset 0 0 46px -12px ${accent}` }}
@@ -56,7 +56,7 @@ const TimerRing = memo(function TimerRing({ secondsLeft, mode, accent, pct, ring
       </svg>
       <div className="relative flex flex-col items-center gap-1.5">
         <span
-          className="text-[56px] md:text-[68px] font-bold tabular-nums leading-none tracking-wider transition-all duration-500"
+          className="text-[48px] sm:text-[56px] md:text-[68px] font-bold tabular-nums leading-none tracking-wider transition-all duration-500"
           style={{
             fontFamily: TIMER_FONT,
             color: "var(--text-primary)",
@@ -73,32 +73,51 @@ const TimerRing = memo(function TimerRing({ secondsLeft, mode, accent, pct, ring
   );
 });
 
-// Başlat/Duraklat (devasa, neon dolgu) + Sıfırla — Odak Modu'nda da HER ZAMAN
-// görünür kalan TEK kontrol grubu.
-function ControlButtons({ running, toggleRunning, resetTimer, accent }) {
+// Başlat/Duraklat (devasa, neon dolgu) + Sıfırla + Spotify — Odak Modu'nda da
+// HER ZAMAN görünür kalan TEK kontrol grubu. Spotify tuşu, eskiden sağdaki
+// görünmez boşluk (simetri için) yer tutucusunun YERİNE geçti — Duraklat/
+// Başlat görsel olarak merkezde kalmaya devam ediyor, üçüncü slot artık
+// GERÇEKTEN işlevsel. React.memo: `running`/`accent` gibi primitiflerin
+// değişmediği (ör. yalnızca CountdownDisplay'in kendi iç saniye state'i
+// tetiklediği) render'larda bu satır TAMAMEN atlanır (bkz. PomodoroStudio'nun
+// altındaki useCallback'li handler'lar — memo'nun ETKİLİ olması için
+// fonksiyon prop'larının referansı da SABİT kalmalı).
+const ControlButtons = memo(function ControlButtons({ running, toggleRunning, resetTimer, accent, onOpenSpotify }) {
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-3 sm:gap-4">
       <button
         onClick={resetTimer}
         aria-label="Sıfırla"
-        className="w-12 h-12 rounded-full flex items-center justify-center text-[17px] text-gray-500 hover:text-gray-900 dark:text-white/50 dark:hover:text-white/90 bg-black/[0.04] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 transition-all active:scale-95"
+        className="w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-[17px] text-gray-500 hover:text-gray-900 dark:text-white/50 dark:hover:text-white/90 bg-black/[0.04] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 transition-all active:scale-95"
       >
         ↺
       </button>
       <button
         onClick={toggleRunning}
-        className="rounded-full px-11 py-4 text-[15px] font-bold whitespace-nowrap text-[#040608] transition-all active:scale-95"
+        className="rounded-full px-8 sm:px-11 py-3.5 sm:py-4 text-[14px] sm:text-[15px] font-bold whitespace-nowrap text-[#040608] transition-all active:scale-95"
         style={{ background: accent, boxShadow: `0 0 40px -6px ${accent}, 0 10px 34px -10px ${accent}` }}
       >
         {running ? "⏸ Duraklat" : "▶ Başlat"}
       </button>
-      <div className="w-12" aria-hidden="true" />
+      {/* Neon yeşil Spotify tetikleyici — global GlobalMusicPlayer.jsx
+          panelini açar/odaklar (bkz. PomodoroStudio'daki onOpenSpotify). */}
+      <button
+        onClick={onOpenSpotify}
+        aria-label="Spotify'ı Aç"
+        title="Spotify'ı Aç"
+        className="w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all active:scale-95"
+        style={{ background: "rgba(29,185,84,0.14)", color: "#1DB954", border: "1px solid rgba(29,185,84,0.4)", boxShadow: "0 0 16px -6px #1DB954" }}
+      >
+        <Music2 className="w-[18px] h-[18px]" strokeWidth={2.25} />
+      </button>
     </div>
   );
-}
+});
 
-// Odaklanma/Mola segmented control — neon geçişli.
-function ModeTabs({ mode, switchMode, running }) {
+// Odaklanma/Mola segmented control — neon geçişli. memo: PomodoroStudio'nun
+// saniyede bir tetiklenmeyen (yalnızca kullanıcı etkileşiminde değişen) state'i
+// için gereksiz yeniden çizimi önler.
+const ModeTabs = memo(function ModeTabs({ mode, switchMode, running }) {
   return (
     <div className="flex gap-1.5 p-1 rounded-full bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
       {[
@@ -126,11 +145,11 @@ function ModeTabs({ mode, switchMode, running }) {
       })}
     </div>
   );
-}
+});
 
 // Halkanın altındaki "Seçili Görev" rozeti — glassmorphism, tek satır truncate.
-// Dokununca (paylaşılan) TaskDrawer'ı açar.
-function SelectedTaskBadge({ selectedTask, accent, onOpen }) {
+// Dokununca (paylaşılan) TaskDrawer'ı açar. memo: yukarıdaki AYNI gerekçe.
+const SelectedTaskBadge = memo(function SelectedTaskBadge({ selectedTask, accent, onOpen }) {
   return (
     <button
       onClick={onOpen}
@@ -147,11 +166,12 @@ function SelectedTaskBadge({ selectedTask, accent, onOpen }) {
       </span>
     </button>
   );
-}
+});
 
 // Süre ayarı satırları — Odaklanma/Mola için ayrı ayrı, dikeyde hizalı iki
-// satır. Her satırda -/değer/+ ergonomik pill butonlar.
-function DurationSteppers({ workMin, breakMin, running, adjustDuration }) {
+// satır. Her satırda -/değer/+ ergonomik pill butonlar. memo: yukarıdaki
+// AYNI gerekçe.
+const DurationSteppers = memo(function DurationSteppers({ workMin, breakMin, running, adjustDuration }) {
   const rows = [
     { field: "work", label: "Odaklanma", value: workMin, step: WORK_STEP, accent: ACCENT.work },
     { field: "break", label: "Mola", value: breakMin, step: BREAK_STEP, accent: ACCENT.break },
@@ -186,7 +206,7 @@ function DurationSteppers({ workMin, breakMin, running, adjustDuration }) {
       ))}
     </div>
   );
-}
+});
 
 // ⏱️ İzole sayaç bileşeni — ticking state'ini TEK BAŞINA taşır (bkz. yukarısı:
 // bu sayede "tick" her saniye SADECE bu küçük yaprak bileşeni re-render eder,
@@ -262,7 +282,14 @@ const CountdownDisplay = memo(function CountdownDisplay({ mode, workMin, breakMi
 // ayarı `grid-template-rows` tekniğiyle YUMUŞAKÇA yüksekliği sıfıra iner +
 // solar (yalnızca opaklık değil, gerçekten yer de kaplamaz) — halka + kontrol
 // butonları HER ZAMAN kalır.
-function HeroZone({
+//
+// MOBİL YERLEŞİM (390-430px): `h-full justify-between` — dar/kısa
+// viewport'larda (dikey alan sıkışıksa) bölümler arasına gerekirse eşit
+// boşluk dağıtılır, İÇERİK TAŞARSA ebeveynin `overflow-y-auto`'su normal
+// kaydırmaya döner (bkz. PomodoroStudio'nun ana render'ı) — İKİSİ birbirini
+// EZMEZ. Masaüstünde (md:) `justify-normal` ile ESKİ, doğal üstten-akan
+// düzene dönülür (bu değişiklik BİLEREK yalnızca mobil için).
+const HeroZone = memo(function HeroZone({
   mode,
   switchMode,
   running,
@@ -273,16 +300,17 @@ function HeroZone({
   onOpenTaskDrawer,
   toggleRunning,
   resetTimer,
+  onOpenSpotify,
   workMin,
   breakMin,
   adjustDuration,
   isFocusMode,
 }) {
   return (
-    <div className="flex flex-col items-center w-full">
+    <div className="flex flex-col items-center w-full h-full justify-between md:justify-normal">
       <div className="w-full grid transition-[grid-template-rows] duration-500 ease-out" style={{ gridTemplateRows: isFocusMode ? "0fr" : "1fr" }}>
         <div className="overflow-hidden min-h-0">
-          <div className={`flex flex-col items-center pb-7 transition-opacity duration-300 ${isFocusMode ? "opacity-0" : "opacity-100"}`}>
+          <div className={`flex flex-col items-center pb-4 sm:pb-7 transition-opacity duration-300 ${isFocusMode ? "opacity-0" : "opacity-100"}`}>
             <ModeTabs mode={mode} switchMode={switchMode} running={running} />
           </div>
         </div>
@@ -301,25 +329,25 @@ function HeroZone({
 
       <div className="w-full grid transition-[grid-template-rows] duration-500 ease-out" style={{ gridTemplateRows: isFocusMode ? "0fr" : "1fr" }}>
         <div className="overflow-hidden min-h-0">
-          <div className={`flex flex-col items-center gap-5 pt-7 pb-7 transition-opacity duration-300 ${isFocusMode ? "opacity-0" : "opacity-100"}`}>
+          <div className={`flex flex-col items-center gap-3 sm:gap-5 pt-4 sm:pt-7 pb-4 sm:pb-7 transition-opacity duration-300 ${isFocusMode ? "opacity-0" : "opacity-100"}`}>
             <SelectedTaskBadge selectedTask={selectedTask} accent={accent} onOpen={onOpenTaskDrawer} />
             <DurationSteppers workMin={workMin} breakMin={breakMin} running={running} adjustDuration={adjustDuration} />
           </div>
         </div>
       </div>
 
-      <ControlButtons running={running} toggleRunning={toggleRunning} resetTimer={resetTimer} accent={accent} />
+      <ControlButtons running={running} toggleRunning={toggleRunning} resetTimer={resetTimer} accent={accent} onOpenSpotify={onOpenSpotify} />
 
       {/* Müzik kontrol kartı — Odak Modu'nda BİLE gizlenmez (diğer "ekstra"
           UI'ların aksine): müzik, tam da minimal/dikkat dağıtmayan Odak
           Modu'nda en çok işe yarayan kontrol — kullanıcı burada kalmaya
           devam etsin diye ayrı bir panele gitmesine gerek KALMASIN. */}
-      <div className="pt-6 w-full flex justify-center">
+      <div className="pt-4 sm:pt-6 pb-2 w-full flex justify-center">
         <FocusMusicControlCard />
       </div>
     </div>
   );
-}
+});
 
 // 🕐 Pomodoro & Focus Studio — sabit "neon-dark" bir odak odası (uygulamanın
 // light/dark tema tercihinden BİLEREK bağımsız). Görev/Plan seçimi artık
@@ -327,12 +355,20 @@ function HeroZone({
 // tamamen bağımsız bir Slide-Over çekmece (bkz. TaskDrawer.jsx). Mobil ve
 // masaüstü aynı tek "Hero Focus Zone" ekranını kullanır. Odak Modu
 // (isFocusMode): üst bar ekstraları GERÇEKTEN (opaklık + pointer-events)
-// kaybolur, yalnızca halka + Başlat/Durdur/Sıfırla ve tek bir "Işıkları Aç"
-// düğmesi kalır. Alt bir medya çubuğu YOK — müzik yalnızca üst bardaki
-// Spotify/YouTube butonlarının açtığı GLOBAL müzik panelinden kontrol edilir
-// (bkz. GlobalMusicPlayer.jsx/MusicContext.jsx — panel/oynatıcı artık BU
-// bileşenin İÇİNDE DEĞİL, App kökünde YAŞIYOR; Focus Studio kapansa/açılsa
-// da müzik KESİNTİYE UĞRAMAZ).
+// kaybolur, yalnızca halka + Başlat/Durdur/Sıfırla/Spotify ve tek bir
+// "Işıkları Aç" düğmesi kalır. Müzik, Duraklat/Başlat'ın yanındaki Spotify
+// tuşunun açtığı GLOBAL müzik panelinden kontrol edilir (bkz.
+// GlobalMusicPlayer.jsx/MusicContext.jsx — panel/oynatıcı artık BU bileşenin
+// İÇİNDE DEĞİL, App kökünde YAŞIYOR; Focus Studio kapansa/açılsa da müzik
+// KESİNTİYE UĞRAMAZ).
+//
+// PERFORMANS NOTU: aşağıdaki handler'ların TÜMÜ useCallback'e sarılı —
+// ControlButtons/ModeTabs/DurationSteppers/SelectedTaskBadge/HeroZone artık
+// React.memo (bkz. yukarıdaki tanımları); memo'nun gerçekten işe yaraması
+// (CountdownDisplay'in izole saniye tick'i sırasında bu bileşenlerin
+// YENİDEN ÇİZİLMEMESİ) için PomodoroStudio'nun her render'ında bu
+// fonksiyonların AYNI referansı taşıması ŞART — aksi halde memo, "prop
+// değişti" sanıp yine de re-render ederdi.
 export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
   const [mode, setMode] = useState("work"); // "work" | "break"
   const [workMin, setWorkMin] = useState(DEFAULT_WORK_MIN);
@@ -385,38 +421,50 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
 
   const accent = ACCENT[mode];
 
-  const adjustDuration = (field, delta) => {
-    if (running) return;
-    if (field === "work") setWorkMin((m) => Math.min(90, Math.max(5, m + delta)));
-    else setBreakMin((m) => Math.min(30, Math.max(1, m + delta)));
-  };
+  // NOT: bu handler'lar `running`'e bağımlı (dependency), ama `running`
+  // yalnızca kullanıcı Başlat/Duraklat'a bastığında değişir — CountdownDisplay'in
+  // İZOLE saniye tick'i (bkz. tanımı) BU state'e hiç dokunmaz. Yani asıl
+  // sık-tetiklenen render sırasında (her saniye) bu referanslar zaten
+  // SABİT kalır — memo'lu alt bileşenler (ControlButtons/ModeTabs/
+  // DurationSteppers) o an gereksiz yere yeniden çizilmez.
+  const adjustDuration = useCallback(
+    (field, delta) => {
+      if (running) return;
+      if (field === "work") setWorkMin((m) => Math.min(90, Math.max(5, m + delta)));
+      else setBreakMin((m) => Math.min(30, Math.max(1, m + delta)));
+    },
+    [running]
+  );
 
-  const toggleRunning = () => setRunning((r) => !r);
+  const toggleRunning = useCallback(() => setRunning((r) => !r), []);
 
   // secondsLeft artık CountdownDisplay'in kendi state'i olduğu için ebeveyn
   // onu doğrudan set edemez — resetNonce'u artırmak "sıfırla" sinyalini
   // aşağıdaki isolated bileşene iletir (bkz. CountdownDisplay'in reset efekti).
-  const resetTimer = () => {
+  const resetTimer = useCallback(() => {
     setRunning(false);
     setResetNonce((n) => n + 1);
-  };
+  }, []);
 
-  const switchMode = (nextMode) => {
-    if (running || nextMode === mode) return;
-    setMode(nextMode);
-  };
+  const switchMode = useCallback(
+    (nextMode) => {
+      if (running || nextMode === mode) return;
+      setMode(nextMode);
+    },
+    [running, mode]
+  );
 
-  // Aynı sekmenin butonuna panel AÇIKKEN tekrar basmak paneli kapatır (eski
-  // popover'ların toggle davranışıyla AYNI); farklı bir sekmeye basmak panel
-  // açıksa sadece sekme değiştirir, kapalıysa o sekmeyle açar.
-  // Aynı sekmenin butonuna panel AÇIKKEN tekrar basmak paneli kapatır (eski
-  // toggle davranışıyla AYNI); farklı bir sekmeye basmak panel açıksa sadece
-  // sekme değiştirir, kapalıysa o sekmeyle açar. Gerçek state artık global
-  // MusicContext'te (bkz. music.openPanel/music.closePanel).
-  const openMusicTab = (tab) => {
-    if (music.panelOpen && music.activeTab === tab) music.closePanel();
-    else music.openPanel(tab);
-  };
+  // Spotify tetikleyicisi — panel AÇIKKEN tekrar basmak kapatır (eski
+  // toggle davranışıyla AYNI), kapalıyken açar. Gerçek state global
+  // MusicContext'te (bkz. music.openPanel/music.closePanel). YouTube Music
+  // kaldırıldığından (bkz. MusicContext.jsx) artık tek bir kaynak var, tab
+  // parametresi gerekmiyor.
+  const openSpotifyPanel = useCallback(() => {
+    if (music.panelOpen) music.closePanel();
+    else music.openPanel();
+  }, [music]);
+
+  const onOpenTaskDrawer = useCallback(() => setTaskDrawerOpen(true), []);
 
   const heroProps = {
     mode,
@@ -428,11 +476,12 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
     selectedTask,
     toggleRunning,
     resetTimer,
+    onOpenSpotify: openSpotifyPanel,
     workMin,
     breakMin,
     adjustDuration,
     isFocusMode,
-    onOpenTaskDrawer: () => setTaskDrawerOpen(true),
+    onOpenTaskDrawer,
   };
 
   // NOT: `open` false iken artık `return null` YAPILMIYOR — CountdownDisplay
@@ -446,25 +495,27 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
   // kaldığı yerde "donmuş" değil, gerçekten geçen süre kadar düşmüş görünür.
   return (
     <div
-      className="fixed inset-0 z-[90] flex flex-col transition-colors duration-700"
+      className="fixed inset-0 h-[100dvh] z-[90] flex flex-col transition-colors duration-700"
       style={{ display: open ? "flex" : "none", background: isFocusMode ? "var(--pomo-bg-focus)" : "var(--pomo-bg)" }}
     >
       {/* Üst bar */}
-      <div className="shrink-0 px-4 md:px-8 pt-5 pb-3 flex items-center justify-between gap-2">
+      <div className="shrink-0 px-4 md:px-8 pt-4 sm:pt-5 pb-2.5 sm:pb-3 flex items-center justify-between gap-2">
         <div className={`flex items-center gap-2.5 transition-opacity duration-300 ${isFocusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
           <TimerIcon className="w-5 h-5 shrink-0" style={{ color: accent }} strokeWidth={2.25} />
           <h2 className="text-[17px] font-bold text-gray-900 dark:text-white whitespace-nowrap">Focus Studio</h2>
         </div>
         <div className="flex items-center gap-2">
-          {/* Görevler ve Planlar + Spotify / YouTube — Odak Modu'nda gizlenir.
-              Müzik butonları GlobalMusicPlayer.jsx'i (App kökünde, bu
-              bileşenin DIŞINDA render edilir — sabit/fixed konumlandığı için
-              bir buton'a "relative" ile bağlı olmasına gerek yok) doğru
-              sekmeyle açar/kapatır; gerçek panel/oynatıcı state'i global
-              MusicContext'te YAŞAR, Focus Studio kapansa da kaybolmaz. */}
+          {/* Görevler ve Planlar + Spotify — Odak Modu'nda gizlenir. Spotify
+              butonu GlobalMusicPlayer.jsx'i (App kökünde, bu bileşenin
+              DIŞINDA render edilir — sabit/fixed konumlandığı için bir
+              buton'a "relative" ile bağlı olmasına gerek yok) açar/kapatır;
+              gerçek panel/oynatıcı state'i global MusicContext'te YAŞAR,
+              Focus Studio kapansa da kaybolmaz. Mobilde AYNI tetikleyici
+              artık Duraklat/Başlat'ın yanında da var (bkz. ControlButtons)
+              — bu üst bar butonu masaüstünde ek bir kısayol. */}
           <div className={`hidden md:flex items-center gap-2 transition-opacity duration-300 ${isFocusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
             <button
-              onClick={() => setTaskDrawerOpen(true)}
+              onClick={onOpenTaskDrawer}
               className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[12px] font-bold whitespace-nowrap transition-all"
               style={{ background: `color-mix(in srgb, ${BRAND_ACCENT} 10%, transparent)`, color: BRAND_ACCENT }}
             >
@@ -472,26 +523,18 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
               Görevler ve Planlar
             </button>
             <button
-              onClick={() => openMusicTab("spotify")}
+              onClick={openSpotifyPanel}
               className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[12px] font-bold whitespace-nowrap transition-all"
-              style={{ background: music.panelOpen && music.activeTab === "spotify" ? "#1DB9541f" : "rgba(var(--overlay-rgb),0.04)", color: "#1DB954" }}
+              style={{ background: music.panelOpen ? "#1DB9541f" : "rgba(var(--overlay-rgb),0.04)", color: "#1DB954" }}
             >
               <Music2 className="w-3.5 h-3.5" strokeWidth={2.25} />
               Spotify
-            </button>
-            <button
-              onClick={() => openMusicTab("youtube")}
-              className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[12px] font-bold whitespace-nowrap transition-all"
-              style={{ background: music.panelOpen && music.activeTab === "youtube" ? "#FF3B5C1f" : "rgba(var(--overlay-rgb),0.04)", color: "#FF3B5C" }}
-            >
-              <ListMusic className="w-3.5 h-3.5" strokeWidth={2.25} />
-              YouTube
             </button>
           </div>
 
           {/* Mobilde de Görevler ve Planlar erişimi — üst barda kompakt ikon buton */}
           <button
-            onClick={() => setTaskDrawerOpen(true)}
+            onClick={onOpenTaskDrawer}
             aria-label="Görevler ve Planlar"
             className={`md:hidden w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
               isFocusMode ? "opacity-0 pointer-events-none scale-95" : "opacity-100 scale-100"
@@ -528,8 +571,12 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
       </div>
 
       {/* Tek, ortak odak ekranı — mobil ve masaüstünde AYNI. Görev/plan seçimi
-          artık gömülü bir panel değil, paylaşılan TaskDrawer (aşağıda). */}
-      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center px-6 py-4">
+          artık gömülü bir panel değil, paylaşılan TaskDrawer (aşağıda).
+          Mobilde (390-430px) daha sıkı yatay/dikey dolgu — HeroZone'un kendi
+          `h-full justify-between`i (bkz. tanımı) bu konteynerin GERÇEK
+          yüksekliğe sahip olmasına bağlı, bu yüzden bu satır flex-1 min-h-0
+          İLE BİRLİKTE çalışıyor. */}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center px-4 sm:px-6 py-3 sm:py-4">
         <HeroZone {...heroProps} />
       </div>
 

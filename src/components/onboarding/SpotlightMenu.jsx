@@ -1,13 +1,22 @@
 import { useState } from "react";
 import SpotlightOverlay from "./SpotlightOverlay";
 
-// Hızlı Öğretici / Feature Tour — Header'daki [🎯] düğmesiyle açılır.
-// Her satır, uygulamadaki GERÇEK bir arayüz elemanını (data-tour-id ile
-// işaretli — bkz. Header.jsx/CategoryIntro.jsx/PlanBoard.jsx) karartılmış
-// bir Spotlight ile gösterir. Her özellik artık BİRDEN FAZLA sıralı adıma
-// sahip olabilir (`steps: [...]`, tek hedefli özellikler tek elemanlı
-// dizi taşır) — "Aktif Plan Ekranı" bunu kullanır: plan alanı → gün
-// sekmeleri → görev kartları sırayla anlatılır.
+// Hızlı Öğretici / Feature Tour — DrawerMenu'deki (☰) "Hızlı Öğretici"
+// satırıyla açılır. Her satır, uygulamadaki GERÇEK bir arayüz elemanını
+// (data-tour-id ile işaretli — bkz. Header.jsx/CategoryIntro.jsx/
+// PlanBoard.jsx) karartılmış bir Spotlight ile gösterir. Her özellik artık
+// BİRDEN FAZLA sıralı adıma sahip olabilir (`steps: [...]`, tek hedefli
+// özellikler tek elemanlı dizi taşır) — "Aktif Plan Ekranı" bunu kullanır:
+// plan alanı → gün sekmeleri → görev kartları sırayla anlatılır.
+//
+// SUNUM NOTU: eskiden Header'daki [🎯] düğmesine "absolute right-0 top-full"
+// ile ANKORLANMIŞ küçük bir dropdown'dı. Tetikleyici artık DrawerMenu'nün
+// İÇİNDE yaşıyor — drawer kapanınca (go() sarmalayıcısı) o buton hemen
+// unmount olur, bir dropdown'ı ona ankorlamak KIRILGAN bir yarış durumu
+// yaratırdı (buton kaybolduktan HEMEN SONRA popover'ın konum hesaplaması
+// boşa düşerdi). Bunun yerine ConfirmModal.jsx İLE AYNI ORTALANMIŞ modal
+// deseni kullanılır — hiçbir anchor/ref gerektirmez, drawer kapansa da
+// sorunsuz açılır.
 //
 // needsIntro: true → seçilince ÖNCE Ana Sayfa'ya navigasyon (onNavigateIntro,
 // -> usePlanStudio.resetToIntro) tetiklenir (AI Uzmanları/Studio Builder
@@ -94,11 +103,21 @@ export default function SpotlightMenu({ open, onClose, onNavigateIntro, savedPla
   return (
     <>
       {open && (
-        <>
-          <div className="fixed inset-0 z-[95]" onClick={onClose} />
-          <div className="absolute right-0 top-full mt-2 z-[96] w-64 rounded-2xl p-1.5 glass" style={{ boxShadow: "0 20px 50px -16px rgba(0,0,0,0.4)" }}>
-            <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-faint)" }}>
-              Hızlı Öğretici
+        <div className="fixed inset-0 z-[95] flex items-center justify-center px-6" onClick={onClose}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="blur-cap-mobile relative w-full max-w-[320px] rounded-3xl p-2 animate-[fadeIn_0.2s_ease]"
+            style={{
+              background: "rgba(var(--glass-rgb), var(--alpha-modal))",
+              backdropFilter: "blur(24px) saturate(160%)",
+              WebkitBackdropFilter: "blur(24px) saturate(160%)",
+              border: "1px solid var(--modal-border)",
+              boxShadow: "0 24px 60px -20px rgba(0,0,0,0.7)",
+            }}
+          >
+            <p className="px-3 pt-3 pb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-faint)" }}>
+              🎯 Hızlı Öğretici
             </p>
             {FEATURES.map((f) => {
               const disabled = f.requiresPlan && savedPlansCount === 0;
@@ -108,15 +127,15 @@ export default function SpotlightMenu({ open, onClose, onNavigateIntro, savedPla
                   onClick={() => pick(f, disabled)}
                   disabled={disabled}
                   title={disabled ? "Önce bir plan oluşturmalısın" : undefined}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl text-[12.5px] font-semibold flex items-center gap-2.5 transition-colors ${disabled ? "" : "hover:bg-[rgba(var(--overlay-rgb),0.06)]"}`}
+                  className={`w-full text-left px-3 py-3 rounded-xl text-[13px] font-semibold flex items-center gap-2.5 transition-colors ${disabled ? "" : "hover:bg-[rgba(var(--overlay-rgb),0.06)]"}`}
                   style={disabled ? { color: "var(--text-faint)", opacity: 0.4, cursor: "not-allowed" } : { color: "var(--text-secondary)" }}
                 >
-                  <span className="text-[14px]">{f.icon}</span> {f.label}
+                  <span className="text-[15px]">{f.icon}</span> {f.label}
                 </button>
               );
             })}
           </div>
-        </>
+        </div>
       )}
       {activeFeature && currentStep && (
         <SpotlightOverlay

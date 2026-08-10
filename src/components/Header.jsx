@@ -1,20 +1,21 @@
-import { memo, useState } from "react";
-import { Timer, BarChart3, Users2, Menu, X, HelpCircle, Target, Play, Pause, Maximize2 } from "lucide-react";
+import { memo } from "react";
+import { Timer, BarChart3, Users2, Menu, X, Play, Pause, Maximize2 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useMusic } from "../context/MusicContext";
 import { FEATURE_FLAGS } from "../constants";
-import SpotlightMenu from "./onboarding/SpotlightMenu";
 
 // Üst bar mini müzik widget'ı — büyük, ışıltılı MusicSidePanel kapatıldığında
 // müziği hızlıca yönetmek için (bkz. GlobalMusicPlayer.jsx, aynı useMusic()
 // context'i paylaşırlar). Bir oynatıcı en az BİR KEZ başlatılana kadar
-// (spotifyInitialized/youtubeInitialized) HİÇ render edilmez — kullanıcı
-// müzikle hiç ilgilenmediyse üst barda gereksiz bir widget görünmez.
+// (spotifyInitialized) HİÇ render edilmez — kullanıcı müzikle hiç
+// ilgilenmediyse üst barda gereksiz bir widget görünmez. YouTube Music
+// altyapısı kaldırıldığından (bkz. MusicContext.jsx) tint artık HER ZAMAN
+// Spotify yeşili — tab'a göre değişen bir ternary'ye gerek kalmadı.
 function MiniMusicWidget() {
   const m = useMusic();
   if (!m.hasActivePlayer || m.panelOpen) return null;
 
-  const tint = m.activeTab === "spotify" ? "#1DB954" : "#FF3B5C";
+  const tint = "#1DB954";
 
   return (
     <button
@@ -85,45 +86,6 @@ function ThemeToggle() {
         ☀️
       </span>
     </button>
-  );
-}
-
-// ❓ Rehber — OnboardingTour'u istediği zaman yeniden açar (bkz.
-// OnboardingTour.jsx). Tur ilk ziyarette otomatik açılır ve bir daha
-// KENDİLİĞİNDEN gösterilmez; bu buton onu manuel geri getirmenin TEK yolu.
-function TourTrigger({ onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-label="Nasıl Kullanılır / Rehber"
-      title="Nasıl Kullanılır / Rehber"
-      className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
-      style={{ color: "var(--text-secondary)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}
-    >
-      <HelpCircle className="w-[18px] h-[18px]" strokeWidth={2} />
-    </button>
-  );
-}
-
-// 🎯 Hızlı Öğretici — Spotlight Interactive Guide Engine'in giriş kapısı
-// (bkz. onboarding/SpotlightMenu.jsx). ❓ Rehber'den (tam ekran, adım adım
-// tur) BİLEREK AYRI: bu buton belirli bir özelliği SEÇİP doğrudan o gerçek
-// arayüz elemanının üzerinde karartma+ok ile gösterir, tur baştan sona
-// izletmez. `relative` sarmalayıcı ZORUNLU — açılır menü buna göre konumlanır.
-function SpotlightTrigger({ open, onToggle, onClose, onNavigateIntro, savedPlansCount, onEnsurePlanOpen }) {
-  return (
-    <div className="relative">
-      <button
-        onClick={onToggle}
-        aria-label="Hızlı Öğretici"
-        title="Hızlı Öğretici"
-        className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
-        style={open ? { color: "#F0B37E", background: "rgba(240,179,126,0.14)", border: "1px solid rgba(240,179,126,0.4)" } : { color: "var(--text-secondary)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}
-      >
-        <Target className="w-[18px] h-[18px]" strokeWidth={2} />
-      </button>
-      <SpotlightMenu open={open} onClose={onClose} onNavigateIntro={onNavigateIntro} savedPlansCount={savedPlansCount} onEnsurePlanOpen={onEnsurePlanOpen} />
-    </div>
   );
 }
 
@@ -210,13 +172,6 @@ function Header({
   onAuthClick,
   onSignOut,
   onLogoClick,
-  onTourClick,
-  spotlightOpen,
-  onSpotlightToggle,
-  onSpotlightClose,
-  onNavigateIntro,
-  spotlightSavedPlansCount,
-  onSpotlightEnsurePlanOpen,
   menuOpen,
   onMenuToggle,
 }) {
@@ -375,15 +330,6 @@ function Header({
               Giriş Yap
             </button>
           )}
-          <TourTrigger onClick={onTourClick} />
-          <SpotlightTrigger
-            open={spotlightOpen}
-            onToggle={onSpotlightToggle}
-            onClose={onSpotlightClose}
-            onNavigateIntro={onNavigateIntro}
-            savedPlansCount={spotlightSavedPlansCount}
-            onEnsurePlanOpen={onSpotlightEnsurePlanOpen}
-          />
           <ThemeToggle />
           <MenuTrigger open={menuOpen} onToggle={onMenuToggle} />
         </div>

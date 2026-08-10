@@ -522,6 +522,47 @@ export default function RhythmStudio({ open, userId, onClose }) {
           </div>
         </div>
       </div>
+
+      {/* YAKINDA (Coming Soon) katmanı — Ritim & Gün Sonu modülü aktif
+          geliştirme aşamasında; gerçek arayüz SİLİNMEDİ (kod/veri akışı
+          olduğu gibi duruyor, yalnızca ÜZERİNE buzlu/karartılmış bir katman
+          geldi) — arkadaki gerçek panel hafifçe seçilebilir kalsın diye
+          `bg-black/70` (tam opak DEĞİL) + `backdrop-blur-sm` (hafif bulanıklık)
+          kullanıldı. Katmana veya "Geri Dön"e tıklamak paneli KAPATIR —
+          arkası zaten etkileşimsiz olduğundan kullanıcının çıkması için
+          tek anlamlı aksiyon bu. */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/70 px-6" onClick={onClose}>
+        <button
+          onClick={onClose}
+          aria-label="Kapat"
+          className="absolute top-5 right-5 w-9 h-9 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
+          style={{ background: "rgba(255,255,255,0.08)" }}
+        >
+          <X className="w-4 h-4" />
+        </button>
+        <div className="flex flex-col items-center text-center gap-4" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="rounded-full px-6 py-2.5 text-[13px] font-black uppercase tracking-[0.2em] text-white"
+            style={{
+              background: "linear-gradient(135deg, rgba(6,182,212,0.35), rgba(178,107,255,0.35))",
+              border: "1px solid rgba(178,107,255,0.5)",
+              boxShadow: "0 0 40px -8px #06B6D4, 0 0 60px -10px #B26BFF",
+            }}
+          >
+            ✨ Yakında
+          </div>
+          <p className="max-w-[280px] text-[13px] leading-relaxed text-white/70">
+            Ritim & Gün Sonu modülü şu anda geliştiriliyor — çok yakında burada olacak.
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-1 rounded-full px-5 py-2.5 text-[12.5px] font-bold text-white transition-colors hover:bg-white/15"
+            style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)" }}
+          >
+            Geri Dön
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
