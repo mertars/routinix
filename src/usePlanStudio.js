@@ -19,6 +19,7 @@ import {
   setTaskCompleted as setTaskCompletedSvc,
   setTaskWidgets as setTaskWidgetsSvc,
   createDraftTask as createDraftTaskSvc,
+  updatePlanStartDate as updatePlanStartDateSvc,
   fetchUserPlans,
   fetchPlanDetail,
   deletePlan as deletePlanSvc,
@@ -29,6 +30,7 @@ import { setHapticsEnabled } from "./lib/haptics";
 import logger from "./utils/logger";
 import { runWhenIdle } from "./utils/idle";
 import { createWidget } from "./utils/taskWidgets";
+import { shiftStartDateForDay } from "./utils/planDate";
 
 // Yalnızca `taskId`'nin ait olduğu hafta/gün nesnesini yeniden oluşturup
 // içindeki tek görevi `patch` ile güncelleyen SAF (pure) yardımcı —
@@ -522,6 +524,31 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     [weeks, dbPlan, user]
   );
 
+  // ---- Dinamik Gün/Tarih Bağlama — Tarih Kaydırma (Cascading Shift) ----
+  // PlanBoard.jsx'teki N. günün tarih seçicisinden çağrılır: kullanıcı o günü
+  // `selectedDateStr`e taşımak istediğinde, TÜM planın (1. günden itibaren)
+  // aynı miktarda kaymasını sağlayan yeni start_date hesaplanır (bkz.
+  // utils/planDate.shiftStartDateForDay) — toggleTask/updateTaskWidgets İLE
+  // AYNI lokal-önce/DB-sonra desen: `dbPlan.start_date` ANINDA güncellenir
+  // (usePlanDate.js'in dateForDay/currentDayNumber hesapları buna bağlı),
+  // gerçek yazma tarayıcı boştayken ertelenir.
+  const shiftPlanStartDate = useCallback(
+    (dayNumber, selectedDateStr) => {
+      if (!dbPlan?.id || !selectedDateStr) return;
+      const newStartDate = shiftStartDateForDay(dayNumber, selectedDateStr);
+      if (newStartDate === dbPlan.start_date) return;
+      startTransition(() => {
+        setDbPlan((prev) => (prev ? { ...prev, start_date: newStartDate } : prev));
+      });
+      runWhenIdle(() => {
+        updatePlanStartDateSvc(dbPlan.id, newStartDate).catch((err) =>
+          logger.error("PLAN_DATE", "Planın başlangıç tarihi güncellenemedi", { planId: dbPlan.id, error: err?.message })
+        );
+      });
+    },
+    [dbPlan]
+  );
+
   // ---- Kayıtlı bir planı yeniden aç ----
   const openSavedPlan = useCallback(async (planId) => {
     setStage(STAGE_LOADING);
@@ -653,7 +680,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     // setter/aksiyon
     setGoal, setExtraNote, setMenuOpen, setRemindersOn, setHapticsOn,
     handleCategoryChange, startOnboarding, setAnswer, goNextQuestion, goPrevQuestion, finalizeAndGenerate,
-    loadNextWeek, toggleTask, updateTaskWidgets, batchApplyWidgets, openSavedPlan, deletePlan, startNewPlan, resetToIntro, startFromTemplate,
+    loadNextWeek, toggleTask, updateTaskWidgets, batchApplyWidgets, shiftPlanStartDate, openSavedPlan, deletePlan, startNewPlan, resetToIntro, startFromTemplate,
     applyCoachAction, sendCoachMessage,
     openManualBuilder, closeManualBuilder, saveManualPlan,
   };

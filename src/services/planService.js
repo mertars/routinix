@@ -320,6 +320,20 @@ export async function setTaskWidgets(taskId, widgets) {
   }
 }
 
+// Dinamik Gün/Tarih Bağlama — Tarih Kaydırma (Cascading Shift, bkz.
+// usePlanStudio.shiftPlanStartDate/utils/planDate.js). `plans` tablosu
+// tasks'ın aksine sütun bazlı GRANT kısıtı TAŞIMAZ (yalnızca RLS
+// `plans_update_own`) — bu yüzden is_completed/widgets'taki gibi bir
+// service_role turuna gerek yok, sahibi doğrudan kendi planının
+// start_date'ini güncelleyebilir.
+export async function updatePlanStartDate(planId, newStartDate) {
+  const { error } = await supabase.from("plans").update({ start_date: newStartDate }).eq("id", planId);
+  if (error) {
+    logger.error("SUPABASE", "Planın başlangıç tarihi güncellenemedi", { table: "plans", action: "update", planId, error });
+    throw error;
+  }
+}
+
 // Toplu widget atamasında (bkz. usePlanStudio.batchApplyWidgets) hiç görevi
 // OLMAYAN bir güne widget eklenmek istendiğinde çağrılır — TEK, minimal bir
 // "taslak" görev satırı oluşturur (kullanıcı başlığını sonra kendi düzenler).

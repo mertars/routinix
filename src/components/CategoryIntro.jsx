@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Wand2 } from "lucide-react";
 import { CATEGORIES, CATEGORY_KEYS, MIN_GOAL_LENGTH, TEMPLATE_CHIPS } from "../constants";
+import DashboardHeader from "./DashboardHeader";
+import CircadianRhythmWidget from "./CircadianRhythmWidget";
 
 // Giriş ekranı: kategori (persona) seçimi + hedef, "Planlarım" listesi ve
 // yükleme/hata durumları. "Devam Et" ile dinamik onboarding sihirbazına geçilir.
@@ -94,23 +96,8 @@ export default function CategoryIntro({
           </div>
         )}
 
-        <div>
-          <h1 className="text-2xl md:text-5xl font-bold leading-[1.12] tracking-tight text-balance">
-            <span
-              style={{
-                background: "var(--hero-gradient)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              Hedefini tanımla, disiplinini yapılandıralım.
-            </span>
-          </h1>
-          <p className="mt-2 md:mt-3 text-sm md:text-lg text-[var(--text-muted)] leading-relaxed md:max-w-2xl">
-            Önce odak alanını seç, sonra hedefini net bir şekilde yaz.
-          </p>
-        </div>
+        <DashboardHeader />
+        <CircadianRhythmWidget />
       </div>
 
       {/* ORTA GRUP: 4'lü odak kartları — mobilde dikey alanı doldurur.

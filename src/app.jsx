@@ -465,6 +465,7 @@ export default function App() {
                 onToggleTask={ps.toggleTask}
                 onUpdateTaskWidgets={ps.updateTaskWidgets}
                 onBatchApplyWidgets={ps.batchApplyWidgets}
+                onShiftStartDate={ps.shiftPlanStartDate}
                 onLoadNextWeek={ps.loadNextWeek}
                 onStartPomodoro={startPomodoroForTask}
                 onPrint={() => setPrintOpen(true)}

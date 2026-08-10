@@ -4,6 +4,8 @@ import Accordion from "./Accordion";
 import TaskCard from "./TaskCard";
 import RoutineDetailModal from "./RoutineDetailModal";
 import DayBatchWidgetModal from "./DayBatchWidgetModal";
+import usePlanDate from "../usePlanDate";
+import { formatDateOnly } from "../utils/planDate";
 import { routineEmoji, routineMicroLabel } from "../utils/routineText";
 import { isRoutineChecked, setRoutineChecked } from "../utils/routineCheckin";
 
@@ -64,14 +66,19 @@ const RoutineCard = memo(RoutineCardImpl);
 // düz bir dolgu — daha sakin, daha "Apple/Linear" bir okuma). React.memo +
 // `onSelect` (setActiveDay, referansı sabit) + `day` (primitif) sayesinde,
 // aktif olmayan bir gün rozetinin tıklanması diğer rozetleri yeniden render ETMEZ.
-function DayPillImpl({ day, pct, active, accent, onSelect }) {
+// `isToday`: Dinamik Gün/Tarih Bağlama Sistemi'nin (bkz. usePlanDate.js)
+// gerçek takvim gününe göre işaretlediği rozet — "Gün" etiketinin yerine
+// "Bugün" yazar + aktif olmasa BİLE aksan rengiyle vurgular, kullanıcının
+// takvimdeki gerçek konumunu (yalnızca tıklayarak seçtiği "aktif gün"den
+// bağımsız olarak) bir bakışta görmesini sağlar.
+function DayPillImpl({ day, pct, active, isToday, accent, onSelect }) {
   return (
-    <button onClick={() => onSelect(day)} className="shrink-0 flex flex-col items-center gap-1.5 card-glow" aria-label={`${day}. gün`}>
+    <button onClick={() => onSelect(day)} className="shrink-0 flex flex-col items-center gap-1.5 card-glow" aria-label={`${day}. gün${isToday ? " (bugün)" : ""}`}>
       <div
         className="w-11 h-16 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-300"
         style={{
           background: active ? `linear-gradient(160deg, ${accent}, ${accent}CC)` : "rgba(var(--overlay-rgb),0.05)",
-          boxShadow: active ? `0 0 22px -4px ${accent}, 0 6px 16px -8px ${accent}` : "none",
+          boxShadow: active ? `0 0 22px -4px ${accent}, 0 6px 16px -8px ${accent}` : isToday ? `0 0 0 1.5px ${accent}88 inset` : "none",
         }}
       >
         <span
@@ -84,8 +91,8 @@ function DayPillImpl({ day, pct, active, accent, onSelect }) {
           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: active ? "#04040a" : accent }} />
         </div>
       </div>
-      <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: active ? accent : "var(--text-faint)" }}>
-        Gün
+      <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: active || isToday ? accent : "var(--text-faint)" }}>
+        {isToday ? "Bugün" : "Gün"}
       </span>
     </button>
   );
@@ -93,7 +100,12 @@ function DayPillImpl({ day, pct, active, accent, onSelect }) {
 const DayPill = memo(
   DayPillImpl,
   (prev, next) =>
-    prev.day === next.day && prev.pct === next.pct && prev.active === next.active && prev.accent === next.accent && prev.onSelect === next.onSelect
+    prev.day === next.day &&
+    prev.pct === next.pct &&
+    prev.active === next.active &&
+    prev.isToday === next.isToday &&
+    prev.accent === next.accent &&
+    prev.onSelect === next.onSelect
 );
 
 // Aktif plan ekranı: sabit başlık + genel ilerleme, rutinler (accordion), takvim
@@ -110,6 +122,7 @@ export default function PlanBoard({
   onToggleTask,
   onUpdateTaskWidgets,
   onBatchApplyWidgets,
+  onShiftStartDate,
   onLoadNextWeek,
   onStartPomodoro,
   onPrint,
@@ -120,6 +133,12 @@ export default function PlanBoard({
   const [detailRoutine, setDetailRoutine] = useState(null);
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const batchBtnRef = useRef(null);
+  // Dinamik Gün/Tarih Bağlama Sistemi — `plan` bu satırda henüz null olabilir
+  // (aşağıdaki `if (!plan) return null;`'DAN ÖNCE), usePlanDate bunu
+  // `startDate` undefined/null olarak zaten güvenle ele alır (bkz.
+  // usePlanDate.js). Hook'lar KOŞULSUZ, her render'da AYNI sırada çağrılmalı
+  // — bu yüzden bu çağrı erken return'ün ÜSTÜNDE.
+  const { currentDayNumber, dateForDay } = usePlanDate(plan?.start_date);
 
   // Yüklü (AI/DB) günleri gün no → gün verisi eşlemesine çevir + takvim
   // hücrelerini üret. `weeks`/`plan.total_days` değişmediği sürece (ör. yalnızca
@@ -332,6 +351,7 @@ export default function PlanBoard({
                     day={cell.dayNumber}
                     pct={dayPct(cell)}
                     active={cell.dayNumber === effectiveActiveDay}
+                    isToday={cell.dayNumber === currentDayNumber}
                     accent={accent}
                     onSelect={setActiveDay}
                   />
@@ -346,7 +366,7 @@ export default function PlanBoard({
           {/* Günün Stratejik Adımları */}
           {activeDayObj && (
             <div key={effectiveActiveDay} className="glass rounded-2xl p-4 md:p-5 day-reveal flex flex-col gap-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <span
                     className="text-[10.5px] font-bold px-2.5 py-1 rounded-full"
@@ -358,6 +378,28 @@ export default function PlanBoard({
                     {activeDayObj.weekNumber}. hafta
                   </span>
                 </div>
+                {/* Dinamik Gün/Tarih Bağlama — bu günün GERÇEK takvim tarihi
+                    (plan.start_date + gün no, bkz. usePlanDate.js). Tarihi
+                    değiştirmek Tarih Kaydırma'yı (Cascading Shift) tetikler:
+                    TÜM planın başlangıcı buna göre kayar (bkz.
+                    usePlanStudio.shiftPlanStartDate). */}
+                {onShiftStartDate && plan.start_date && (
+                  <label
+                    className="flex items-center gap-1.5 rounded-full pl-2.5 pr-2 h-7 text-[10.5px] font-semibold cursor-pointer transition-colors"
+                    style={{ background: "rgba(var(--overlay-rgb),0.05)", color: "var(--text-muted)", border: "1px solid var(--border-default)" }}
+                    title="Bu günün takvim tarihini değiştir"
+                  >
+                    📅
+                    <input
+                      type="date"
+                      value={formatDateOnly(dateForDay(effectiveActiveDay))}
+                      onChange={(e) => e.target.value && onShiftStartDate(effectiveActiveDay, e.target.value)}
+                      className="bg-transparent outline-none [color-scheme:light_dark]"
+                      style={{ color: "var(--text-muted)", fontFamily: MONO_FONT }}
+                      aria-label="Bu günün takvim tarihini değiştir"
+                    />
+                  </label>
+                )}
               </div>
               <h2 className="text-[15px] font-bold tracking-tight text-[var(--text-primary)] text-left -mt-1.5">Günün Stratejik Adımları</h2>
 
