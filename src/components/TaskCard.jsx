@@ -1,6 +1,7 @@
 import { memo, useState } from "react";
 import { ChevronRight, Play, MapPin } from "lucide-react";
 import FocusSidePanel from "./FocusSidePanel";
+import { WidgetAddButton, WidgetList } from "./TaskWidgets";
 
 const PRIORITY_STYLE = {
   Yüksek: { color: "#FF6E92", bg: "rgba(244,64,107,0.14)" },
@@ -28,20 +29,37 @@ function estimatePomodoros(durationMin) {
 // dokununca (checkbox/Başlat HARİÇ) mobilde alttan açılan Bottom Sheet,
 // masaüstünde sağdan süzülen Drawer ile açılır (bkz. FocusSidePanel.jsx).
 // Sert çerçeve YOK — yalnızca arka plan ton farkıyla (bg-white/5 eşleniği) ayrışır.
-function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onStartPomodoro }) {
+function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onStartPomodoro, onUpdateWidgets }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const pr = task.priority ? PRIORITY_STYLE[task.priority] : null;
   const pomodoros = showPomodoro ? estimatePomodoros(task.duration_min) : null;
   const hasDetails = Boolean(task.detail || task.duration_min || pr || task.estimated_cost || (isVacation && task.map_search_query));
   // Önceliğe göre renklendirilir; öncelik yoksa planın kategori aksanına düşer.
   const stripColor = pr?.color || accent;
+  const widgets = task.widgets || [];
 
   return (
     <>
+      {/* Widget-Based Task System: kart artık "Bento" bir kapsayıcı — GERÇEK
+          bir kenarlık (border) taşır (bkz. spesifikasyon: "bg-slate-900/80
+          border border-slate-800 rounded-2xl p-4"). Sabit slate rengi YERİNE
+          bilerek var(--bg-card)/var(--border-default) tema token'ları
+          kullanıldı — bu ekran (PlanBoard/TaskCard) uygulamanın GERİ KALANI
+          gibi tam açık/koyu tema desteğine sahip (Focus Studio'nun aksine,
+          bkz. o dosyanın "BİLEREK sabit koyu" notu); sabit slate-900 burada
+          açık temayı KIRARDI. Koyu temada zaten neredeyse AYNI görünüyor
+          (--bg-card koyu değeri #101319 ~ slate-900). Widget YOKSA (mevcut
+          planların ezici çoğunluğu) kart eskisi kadar KOMPAKT kalır —
+          alt widget satırı yalnızca 1+ widget varken render edilir.
+          Görev başlığının yanındaki "+" tetikleyicisi ise HER ZAMAN görünür. */}
       <div
-        className="task-card rounded-2xl card-glow flex items-center gap-3.5 pl-0 pr-3 py-3.5 overflow-hidden"
-        style={{ background: task.is_completed ? "rgba(var(--overlay-rgb),0.03)" : "rgba(var(--overlay-rgb),0.05)" }}
+        className="task-card rounded-2xl card-glow flex flex-col overflow-hidden"
+        style={{
+          background: task.is_completed ? "rgba(var(--overlay-rgb),0.03)" : "rgba(var(--overlay-rgb),0.05)",
+          border: "1px solid var(--border-default)",
+        }}
       >
+        <div className="flex items-center gap-3.5 pl-0 pr-3 py-3.5">
         <div className="self-stretch w-[3px] shrink-0 rounded-r-full" style={{ background: task.is_completed ? "var(--border-strong)" : stripColor }} />
 
         <button
@@ -61,24 +79,30 @@ function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onSt
         </button>
 
         <div className="flex-1 min-w-0 flex flex-col gap-1">
-          <button
-            onClick={() => hasDetails && setDetailOpen(true)}
-            className="flex-1 min-w-0 flex items-center gap-2 text-left"
-            disabled={!hasDetails}
-          >
-            <span
-              className="flex-1 min-w-0 truncate text-[14px] font-bold"
-              style={{ color: task.is_completed ? "var(--text-faint)" : "var(--text-primary)", textDecoration: task.is_completed ? "line-through" : "none" }}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => hasDetails && setDetailOpen(true)}
+              className="flex-1 min-w-0 flex items-center gap-2 text-left"
+              disabled={!hasDetails}
             >
-              {task.title}
-            </span>
-            {pomodoros ? (
-              <span className="shrink-0 text-[10.5px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: soft, color: accent }}>
-                🍅×{pomodoros}
+              <span
+                className="flex-1 min-w-0 truncate text-[14px] font-bold"
+                style={{ color: task.is_completed ? "var(--text-faint)" : "var(--text-primary)", textDecoration: task.is_completed ? "line-through" : "none" }}
+              >
+                {task.title}
               </span>
-            ) : null}
-            {hasDetails && <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-faint)" }} />}
-          </button>
+              {pomodoros ? (
+                <span className="shrink-0 text-[10.5px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: soft, color: accent }}>
+                  🍅×{pomodoros}
+                </span>
+              ) : null}
+              {hasDetails && <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-faint)" }} />}
+            </button>
+            {/* Widget Ekle — başlığın YANINDA (spesifikasyon), ayrı bir
+                <button> olduğu için üstteki başlık butonunun İÇİNE değil
+                YANINA (iç içe <button> geçersiz HTML olurdu) konur. */}
+            {onUpdateWidgets && <WidgetAddButton onAdd={(w) => onUpdateWidgets(task.id, [...widgets, w])} />}
+          </div>
 
           {/* Gezi görevlerinde bütçe — ÖNCEDEN yalnızca detay çekmecesinde
               görünüyordu (FocusSidePanel, aşağıda), kullanıcı karta dokunmadan
@@ -136,6 +160,13 @@ function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onSt
             <Play className="w-3.5 h-3.5" fill="currentColor" strokeWidth={0} />
           </button>
         )}
+        </div>
+
+        {widgets.length > 0 && onUpdateWidgets && (
+          <div className="pl-[55px] pr-3 pb-3.5">
+            <WidgetList widgets={widgets} onChange={(next) => onUpdateWidgets(task.id, next)} />
+          </div>
+        )}
       </div>
 
       {hasDetails && (
@@ -191,5 +222,6 @@ export default memo(
     prev.isVacation === next.isVacation &&
     prev.showPomodoro === next.showPomodoro &&
     prev.onToggle === next.onToggle &&
-    prev.onStartPomodoro === next.onStartPomodoro
+    prev.onStartPomodoro === next.onStartPomodoro &&
+    prev.onUpdateWidgets === next.onUpdateWidgets
 );

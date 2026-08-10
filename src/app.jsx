@@ -463,6 +463,7 @@ export default function App() {
                 loadingNextWeek={ps.loadingNextWeek}
                 nextWeekError={ps.nextWeekError}
                 onToggleTask={ps.toggleTask}
+                onUpdateTaskWidgets={ps.updateTaskWidgets}
                 onLoadNextWeek={ps.loadNextWeek}
                 onStartPomodoro={startPomodoroForTask}
                 onPrint={() => setPrintOpen(true)}

@@ -307,6 +307,17 @@ export async function setTaskCompleted(taskId, isCompleted) {
   }
 }
 
+// Bir görevin widget dizisini (bkz. src/utils/taskWidgets.js) günceller —
+// is_completed İLE AYNI güven seviyesinde, doğrudan istemciden yazılabilen
+// tek diğer sütun (bkz. supabase/task_widgets.sql'deki güvenlik notu).
+export async function setTaskWidgets(taskId, widgets) {
+  const { error } = await supabase.from("tasks").update({ widgets }).eq("id", taskId);
+  if (error) {
+    logger.error("SUPABASE", "Görev widget'ları güncellenemedi", { table: "tasks", action: "update", taskId, error });
+    throw error;
+  }
+}
+
 // GÜVENLİK NOTU: updateTasksBulk / insertTasks fonksiyonları buradan
 // KALDIRILDI — AI Koç'un "yüksek yetkili" görev mutasyonları (duration_min,
 // priority, day_number, yeni görev ekleme) artık YALNIZCA api/coach-action.js

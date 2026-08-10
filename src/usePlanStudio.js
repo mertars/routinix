@@ -17,6 +17,7 @@ import {
   saveWeekTasks,
   saveManualPlanToSupabase,
   setTaskCompleted as setTaskCompletedSvc,
+  setTaskWidgets as setTaskWidgetsSvc,
   fetchUserPlans,
   fetchPlanDetail,
   deletePlan as deletePlanSvc,
@@ -26,6 +27,29 @@ import { updateManualPlanInSupabase } from "./services/planEditService";
 import { setHapticsEnabled } from "./lib/haptics";
 import logger from "./utils/logger";
 import { runWhenIdle } from "./utils/idle";
+
+// Yalnızca `taskId`'nin ait olduğu hafta/gün nesnesini yeniden oluşturup
+// içindeki tek görevi `patch` ile güncelleyen SAF (pure) yardımcı —
+// toggleTask/updateTaskWidgets İKİSİ de bunu paylaşır. Dokunulmayan hafta/
+// gün/görev referansları AYNEN korunur (bkz. toggleTask'ın altındaki
+// performans yorumu — memoized TaskCard'ların gereksiz re-render'ı
+// atlayabilmesi buna bağlı).
+function patchTaskInWeeks(weeks, taskId, patch) {
+  for (const w of weeks) {
+    const dayIdx = w.days.findIndex((d) => d.tasks.some((t) => t.id === taskId));
+    if (dayIdx === -1) continue;
+    const day = w.days[dayIdx];
+    const taskIdx = day.tasks.findIndex((t) => t.id === taskId);
+    const nextTasks = day.tasks.slice();
+    nextTasks[taskIdx] = { ...nextTasks[taskIdx], ...patch };
+    const nextDay = { ...day, tasks: nextTasks };
+    const nextDays = w.days.slice();
+    nextDays[dayIdx] = nextDay;
+    const nextWeek = { ...w, days: nextDays };
+    return weeks.map((ww) => (ww === w ? nextWeek : ww));
+  }
+  return weeks;
+}
 
 // DB'den gelen düz tasks satırlarını haftalara/günlere gruplar.
 // [{ weekNumber, days: [{ dayNumber, tasks: [row...] }] }] (hafta & gün sıralı)
@@ -374,28 +398,24 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
   // hızlı tıklamalarda ana thread'i tıkamaması için ek bir güvenlik payı sağlar.
   const toggleTask = useCallback((taskId, nextVal) => {
     startTransition(() => {
-      setWeeks((prev) => {
-        for (const w of prev) {
-          const dayIdx = w.days.findIndex((d) => d.tasks.some((t) => t.id === taskId));
-          if (dayIdx === -1) continue;
-          const day = w.days[dayIdx];
-          const taskIdx = day.tasks.findIndex((t) => t.id === taskId);
-          const nextTasks = day.tasks.slice();
-          nextTasks[taskIdx] = { ...nextTasks[taskIdx], is_completed: nextVal };
-          const nextDay = { ...day, tasks: nextTasks };
-          const nextDays = w.days.slice();
-          nextDays[dayIdx] = nextDay;
-          const nextWeek = { ...w, days: nextDays };
-          return prev.map((ww) => (ww === w ? nextWeek : ww));
-        }
-        return prev;
-      });
+      setWeeks((prev) => patchTaskInWeeks(prev, taskId, { is_completed: nextVal }));
     });
     // DB yazması görsel olarak hiçbir şeye bağlı değil — parmak henüz ekrandan
     // kalkmamış/scroll sürüyor olabilir; bu yüzden tarayıcının boşta kaldığı ana
     // ertelenir (bkz. utils/idle.js, Safari için setTimeout düşüşlü).
     runWhenIdle(() => {
       setTaskCompletedSvc(taskId, nextVal).catch((err) => logger.error("TASK", "Görev durumu güncellenemedi", { taskId, error: err?.message }));
+    });
+  }, []);
+
+  // ---- Görev widget'ları (Widget-Based Task System) — checkbox İLE AYNI
+  // lokal-önce/DB-sonra desen, bkz. yukarıdaki toggleTask yorumu. ----
+  const updateTaskWidgets = useCallback((taskId, nextWidgets) => {
+    startTransition(() => {
+      setWeeks((prev) => patchTaskInWeeks(prev, taskId, { widgets: nextWidgets }));
+    });
+    runWhenIdle(() => {
+      setTaskWidgetsSvc(taskId, nextWidgets).catch((err) => logger.error("TASK", "Görev widget'ları güncellenemedi", { taskId, error: err?.message }));
     });
   }, []);
 
@@ -530,7 +550,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     // setter/aksiyon
     setGoal, setExtraNote, setMenuOpen, setRemindersOn, setHapticsOn,
     handleCategoryChange, startOnboarding, setAnswer, goNextQuestion, goPrevQuestion, finalizeAndGenerate,
-    loadNextWeek, toggleTask, openSavedPlan, deletePlan, startNewPlan, resetToIntro, startFromTemplate,
+    loadNextWeek, toggleTask, updateTaskWidgets, openSavedPlan, deletePlan, startNewPlan, resetToIntro, startFromTemplate,
     applyCoachAction, sendCoachMessage,
     openManualBuilder, closeManualBuilder, saveManualPlan,
   };

@@ -107,6 +107,7 @@ export default function PlanBoard({
   loadingNextWeek,
   nextWeekError,
   onToggleTask,
+  onUpdateTaskWidgets,
   onLoadNextWeek,
   onStartPomodoro,
   onPrint,
@@ -372,6 +373,7 @@ export default function PlanBoard({
                     showPomodoro={showPomodoro}
                     onToggle={onToggleTask}
                     onStartPomodoro={onStartPomodoro}
+                    onUpdateWidgets={onUpdateTaskWidgets}
                   />
                 ))}
               </div>
