@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 // ekranındaki eskiden SABİT "Hedefini tanımla, disiplinini yapılandıralım."
 // başlığının YERİNE geçer; günün saatine göre 4 bandın biri gösterilir.
 // 5 dakikada bir yeniden hesaplanır (saniyede bir tikleyen bir saat DEĞİL —
-// yalnızca bant sınırını geçtiğinde metnin bayatlamaması yeterli; canlı
-// saniye göstergesi CircadianRhythmWidget.jsx'in AYRI sorumluluğu).
+// yalnızca bant sınırını geçtiğinde metnin bayatlamaması yeterli).
 const GREETING_BANDS = [
   { start: 5, end: 12, title: "Günaydın. Odak gücün en yüksek seviyede.", subtitle: "Erken saatlerin sessizliğini derin çalışma bloğuna dönüştür." },
   { start: 12, end: 18, title: "Tünaydın. Günün ikinci yarısı başladı.", subtitle: "Ritimden kopma, gün içi hedeflerini tamamla." },

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Wand2 } from "lucide-react";
 import { CATEGORIES, CATEGORY_KEYS, MIN_GOAL_LENGTH, TEMPLATE_CHIPS } from "../constants";
 import DashboardHeader from "./DashboardHeader";
-import CircadianRhythmWidget from "./CircadianRhythmWidget";
 
 // Giriş ekranı: kategori (persona) seçimi + hedef, "Planlarım" listesi ve
 // yükleme/hata durumları. "Devam Et" ile dinamik onboarding sihirbazına geçilir.
@@ -97,7 +96,6 @@ export default function CategoryIntro({
         )}
 
         <DashboardHeader />
-        <CircadianRhythmWidget />
       </div>
 
       {/* ORTA GRUP: 4'lü odak kartları — mobilde dikey alanı doldurur.
