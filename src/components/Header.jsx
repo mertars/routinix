@@ -183,9 +183,19 @@ function Header({
     // max-w-7xl'de ortalanır.
     <div
       className="sticky top-0 z-20 backdrop-blur-md"
-      style={{ background: "rgba(var(--glass-rgb), var(--alpha-chrome))", borderBottom: "1px solid var(--border-header)" }}
+      style={{
+        background: "rgba(var(--glass-rgb), var(--alpha-chrome))",
+        borderBottom: "1px solid var(--border-header)",
+        // iOS Safe Area / PWA (viewport-fit=cover) durumunda çentik/durum
+        // çubuğu Header'ın üzerine biniyordu. `env(safe-area-inset-top)`
+        // BİLEREK bir alt-sınır (ör. max(12px, ...)) İLE SARILMADI: normal
+        // tarayıcıda ve masaüstünde bu değer 0px'dir, dolayısıyla mevcut
+        // görünüme HİÇ dokunmaz — yalnızca gerçek bir çentik/PWA tam ekran
+        // bağlamında (env() > 0) devreye girer.
+        paddingTop: "env(safe-area-inset-top, 0px)",
+      }}
     >
-      <header className="flex flex-nowrap items-center justify-between gap-3 px-4 md:px-6 py-3.5 max-w-7xl mx-auto w-full">
+      <header className="flex flex-nowrap items-center justify-between gap-2 px-4 md:px-6 h-14 max-w-7xl mx-auto w-full">
         {/* Logo + marka yazısı: Ana Sayfa'ya döner, basılınca hafifçe küçülür */}
         <button
           onClick={onLogoClick}
