@@ -39,6 +39,8 @@ import { buildIcsCalendar, downloadIcsFile } from "../utils/icsExport";
 import ImportFormatModal from "./ImportFormatModal";
 import ExportFormatModal from "./ExportFormatModal";
 import { WidgetAddButton, WidgetList } from "./TaskWidgets";
+import TaskAttributesModal from "./TaskAttributesModal";
+import { createWidget } from "../utils/taskWidgets";
 
 const PrintablePlan = lazy(() => import("./PrintablePlan"));
 
@@ -347,6 +349,11 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
       return next;
     });
   };
+  // "Görev Özellikleri" popover'ının açık/kapalı durumu — bkz.
+  // TaskAttributesModal.jsx (Standart Seçenekler + Widget Kütüphanesi TEK
+  // pencerede birleşir, enabledAttrs/toggleAttr'a hiçbir şekilde DOKUNMAZ).
+  const [attrPopoverOpen, setAttrPopoverOpen] = useState(false);
+  const attrBtnRef = useRef(null);
 
   // Hızlı Görev Ekle satırının kendi yerel state'i.
   const [quickTitle, setQuickTitle] = useState("");
@@ -418,6 +425,18 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
 
   const updateTask = (localId, patch) => {
     setDayTasks(activeDay, (list) => list.map((t) => (t.localId === localId ? { ...t, ...patch } : t)));
+  };
+
+  // TaskAttributesModal'ın "Aktif Güne Uygula"sından çağrılır — seçilen
+  // widget türlerinden aktif günün HER görevine taze birer kopya ekler
+  // (usePlanStudio.batchApplyWidgets İLE AYNI ilke, burada henüz kaydedilmemiş
+  // yerel taslak `daysData` üzerinde). Mevcut widget'ların ÜZERİNE yazmaz,
+  // yanına ekler.
+  const applyWidgetsToActiveDay = (widgetTypes) => {
+    if (!Array.isArray(widgetTypes) || widgetTypes.length === 0) return;
+    setDayTasks(activeDay, (list) =>
+      list.map((t) => ({ ...t, widgets: [...(t.widgets || []), ...widgetTypes.map(createWidget).filter(Boolean)] }))
+    );
   };
 
   const removeTask = (localId) => {
@@ -1087,34 +1106,54 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                   </div>
                 </div>
 
-                {/* Dinamik Görev Özellik Seçici — burada AÇILAN her alan, sağdaki
-                    Hızlı Ekle formunda ve görev kartlarında BELİRİR; kapatılan
-                    alan ekrandan tamamen kalkar. Bu, "tam ekranı dengeli
-                    doldur, sıkışık olmasın" isteğinin doğrudan çözümü: 6-7
-                    olası alanın HEPSİNİ her zaman göstermek yerine kullanıcı
-                    yalnızca bu plan için gerçekten gereken alanları seçer. */}
+                {/* Görev Özellikleri — tıklanınca TaskAttributesModal açılır:
+                    Standart Seçenekler (ATTRIBUTE_TOGGLES, davranış BİREBİR
+                    AYNI — hasAttr/toggleAttr'a hiç dokunulmadı) + Widget
+                    Kütüphanesi TEK pencerede. Açık özellikler burada, tetikleyici
+                    butonun altında neon, silinebilir pill'ler olarak canlı
+                    önizlenir (kaldır = doğrudan toggleAttr, popover açmaya
+                    gerek yok). */}
                 <div>
                   <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)] mb-2" style={{ fontFamily: MONO_FONT }}>
                     Görev Özellikleri
                   </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {ATTRIBUTE_TOGGLES.map(({ key, label, icon: Icon }) => {
-                      const active = hasAttr(key);
-                      return (
-                        <button
+                  <button
+                    ref={attrBtnRef}
+                    onClick={() => setAttrPopoverOpen((v) => !v)}
+                    className="flex items-center gap-1.5 rounded-full pl-3 pr-3.5 min-h-[40px] lg:min-h-0 lg:h-8 text-[11.5px] font-semibold transition-all"
+                    style={{ background: "rgba(16,185,129,0.16)", color: "#10B981", border: "1px solid rgba(16,185,129,0.4)" }}
+                  >
+                    ⚙️ Görev Özellikleri {enabledAttrs.size > 0 && `(${enabledAttrs.size})`}
+                  </button>
+                  <TaskAttributesModal
+                    anchorRef={attrBtnRef}
+                    open={attrPopoverOpen}
+                    onClose={() => setAttrPopoverOpen(false)}
+                    attributeToggles={ATTRIBUTE_TOGGLES}
+                    enabledAttrs={enabledAttrs}
+                    onToggleAttr={toggleAttr}
+                    onApplyWidgets={applyWidgetsToActiveDay}
+                    activeDayHasTasks={activeTasks.length > 0}
+                  />
+                  {enabledAttrs.size > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2.5">
+                      {ATTRIBUTE_TOGGLES.filter(({ key }) => hasAttr(key)).map(({ key, label, icon: Icon }) => (
+                        <span
                           key={key}
-                          onClick={() => toggleAttr(key)}
-                          className="flex items-center gap-1.5 rounded-full pl-2.5 pr-3 min-h-[40px] lg:min-h-0 lg:py-1.5 text-[11.5px] font-semibold transition-all duration-200 border"
-                          style={active ? GLOW_ACTIVE_STYLE : { background: "var(--bg-input)", color: "var(--text-secondary)", borderColor: "var(--border-strong)", fontWeight: 500 }}
+                          className="flex items-center gap-1 rounded-full pl-2.5 pr-1.5 h-7 text-[10.5px] font-semibold"
+                          style={{ background: "rgba(6,182,212,0.14)", color: "#06B6D4", border: "1px solid rgba(6,182,212,0.35)" }}
                         >
-                          <Icon className="w-3.5 h-3.5" />
+                          <Icon className="w-3 h-3" />
                           {label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                          <button onClick={() => toggleAttr(key)} aria-label={`${label} özelliğini kaldır`} className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-[rgba(6,182,212,0.25)]">
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <p className="mt-2 text-[10.5px] text-[var(--text-muted)] leading-relaxed">
-                    Açtığın özellikler Hızlı Ekle formunda ve görev kartlarında görünür.
+                    Açtığın özellikler Hızlı Ekle formunda ve görev kartlarında görünür; widget'lar aktif güne toplu eklenir.
                   </p>
                 </div>
 
