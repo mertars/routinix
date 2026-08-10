@@ -83,9 +83,14 @@ export default function CategoryIntro({
     );
   }
 
-  // stage === "intro" — mobilde tek ekrana kilitli (justify-between), md'den serbest.
+  // stage === "intro" — mobilde artık KATI "tek ekrana kilitli" DEĞİL: kartlar
+  // 1 sütuna geçtiğinden (bkz. ORTA GRUP) içerik eskisinden ÇOK daha uzun —
+  // `overflow-y-auto` BURADA (kök seviyede, iç içe/ayrı bir kaydırma kutusu
+  // DEĞİL) TEK, doğal bir kaydırma alanı sağlar; app.jsx'teki dış kabuk
+  // (`h-[100dvh] overflow-hidden`, intro-benzeri aşamalar için) DEĞİŞMEDİ —
+  // bu, o sabit-yükseklikli kabuğun İÇİNDE kayan TEK bölge.
   return (
-    <div className="flex flex-col h-full md:h-auto md:gap-8 animate-[fadeIn_0.35s_ease]">
+    <div className="flex flex-col h-full overflow-y-auto md:h-auto md:overflow-visible md:gap-8 animate-[fadeIn_0.35s_ease]">
       {/* ÜST GRUP: kayıtlı planlar (kompakt strip) + hero başlık */}
       <div className="shrink-0 flex flex-col gap-4 md:gap-6">
         {savedPlans.length > 0 && (
@@ -109,13 +114,21 @@ export default function CategoryIntro({
         <DashboardHeader />
       </div>
 
-      {/* ORTA GRUP: 4'lü odak kartları — mobilde dikey alanı doldurur.
-          `relative` sarmalayıcı, merkezdeki "Kendi Planını Hazırla" butonunu
-          2x2 ızgaranın TAM kesişim noktasına (top-1/2 left-1/2 + translate)
-          konumlandırmak için gerekli — 4 kartın da eşit boyutta/simetrik
-          olduğu bu grid'de o nokta görsel olarak gerçekten "ortadır". */}
-      <div className="flex-1 min-h-0 flex items-center md:flex-none md:block py-3 md:py-0">
-        <div data-tour-id="tour-category-cards" className="relative w-full grid grid-cols-2 gap-2.5 md:gap-5">
+      {/* ORTA GRUP: odak kartları. Mobilde (<640px) KESİNLİKLE tek sütun —
+          eskiden HER zaman grid-cols-2 idi (mobilde bile); dar ekranlarda
+          etiket/tagline farklı satır sayılarına sarınca satırlar EŞİT
+          YÜKSEKLİKTE olmuyordu (bkz. aşağıda kaldırılan merkez buton notu).
+          `min-h-[120px]` + `h-auto` (BİLEREK sabit yükseklik YOK) — içerik
+          uzarsa kart büyür, komşu kartların üstüne BİNMEZ.
+          ESKİDEN `flex-1 ... items-center` (sabit yükseklik + kaydırmasız
+          ortalama) taşıyordu — 1 sütuna geçince 4 kart üst üste dizilip
+          eskisinden ÇOK daha uzun bir blok oluşturunca, bu sabit kutunun
+          DIŞINA taşıp ALT GRUP'un (şablon çipleri) üzerine biniyordu (canlı
+          ortamda bildirilen ASIL çakışma buydu). Artık ÜST GRUP/ALT GRUP
+          İLE AYNI basit `shrink-0` (doğal yükseklik) — taşma varsa kök
+          kapsayıcının (yukarıdaki) TEK kaydırma alanı devreye girer. */}
+      <div className="shrink-0 py-3 md:py-0">
+        <div data-tour-id="tour-category-cards" className="relative w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
           {CATEGORY_KEYS.map((key) => {
             const c = CATEGORIES[key];
             const active = key === category;
@@ -124,8 +137,10 @@ export default function CategoryIntro({
                 key={key}
                 onClick={() => onCategoryChange(key)}
                 // İçerik hem dikey hem yatay TAM ORTALANMIŞ — ikon/başlık/alt
-                // açıklama kartın merkezinde.
-                className="category-card group relative flex flex-col items-center justify-center gap-1.5 md:gap-3 rounded-2xl p-3.5 md:p-6 text-center transition-all duration-200 card-glow"
+                // açıklama kartın merkezinde. `relative` (kart kendi rozetini
+                // absolute konumlandırır) + `h-auto min-h-[120px]` (sabit
+                // yükseklik YOK — içerik satır sayısına göre serbestçe büyür).
+                className="category-card group relative h-auto min-h-[120px] flex flex-col items-center justify-center gap-1.5 md:gap-3 rounded-2xl p-3.5 md:p-6 text-center transition-all duration-200 card-glow"
                 style={{
                   borderColor: active ? c.accent : undefined,
                   background: active ? `${c.accent}1f` : undefined,
@@ -143,60 +158,72 @@ export default function CategoryIntro({
               </button>
             );
           })}
+        </div>
+      </div>
 
-          {/* Merkez neon floating buton — "Kendi Planını Hazırla". Manuel
-              plan akışı AI ÇAĞIRMAZ (Gemini maliyeti yok), bu yüzden 4
-              AI-persona kartından BİLEREK görsel olarak ayrışan, kendine
-              özel bir mor-magenta→camgöbeği gradyanı taşır (mevcut AI Koç
-              tetikleyicisiyle AYNI "gradyan + dış parıltı" dili, ama farklı
-              renk kimliği — "bu AI persona'larından biri DEĞİL" sinyali). */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-            <div className="group/manual relative flex items-center justify-center">
-              {/* onOpenManualBuilder() ARGÜMANSIZ çağrılmalı — bare `onClick=
-                  {onOpenManualBuilder}` React'in SyntheticEvent'ini 1. argüman
-                  (planId) olarak sızdırır; usePlanStudio.openManualBuilder bunu
-                  "düzenlenecek plan id'si" sanıp fetchPlanDetail'i geçersiz bir
-                  değerle çağırır — builder hiç açılmadan kısa bir yükleniyor
-                  ekranından sonra sessizce başarısız olur. */}
-              <button
-                data-tour-id="tour-manual-plan-button"
-                onClick={() => onOpenManualBuilder()}
-                aria-label="Kendi Planını Hazırla"
-                className="relative w-11 h-11 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95"
-                style={{
-                  background: "linear-gradient(135deg, #FF007F, #B026FF 55%, #00F3FF)",
-                  boxShadow: "0 8px 28px -8px rgba(255,0,127,0.65), 0 0 22px -6px rgba(0,243,255,0.55)",
-                }}
-              >
-                {/* Hover'da neon pulse halkası — AiCoachWidget tetikleyicisindeki
-                    "canlı durum noktası" ping deseniyle AYNI teknik. */}
-                <span className="absolute inset-0 rounded-full motion-safe:group-hover/manual:animate-ping opacity-0 group-hover/manual:opacity-60" style={{ background: "#FF007F" }} />
-                <Wand2 className="relative w-4 h-4 md:w-5 md:h-5 text-white drop-shadow-sm" strokeWidth={2.25} />
-              </button>
+      {/* "Kendi Planını Hazırla" — eskiden bu grid'in İÇİNDE, `top-1/2 left-1/2`
+          ile "matematiksel merkeze" ankorlanmış bir overlay'di: kartlardan biri
+          (ör. tagline 2 satıra sarınca) komşusundan uzun olduğunda grid
+          satırları EŞİT YÜKSEKLİKTE olmuyor, bu da "merkez" noktasını kart
+          METNİNİN ÜSTÜNE kaydırıyordu — canlı ortamda bildirilen gerçek
+          çakışma buydu. Artık grid'den TAMAMEN bağımsız, viewport'a göre
+          `fixed` bir FAB (Floating Action Button): içerik ne kadar uzarsa
+          uzasın asla kartlarla ÇAKIŞAMAZ.
+          KONUM NOTU: spesifikasyon "bottom-6 right-6" istiyordu, ama o köşe
+          UYGULAMA GENELİNDE zaten AiCoachWidget.jsx'in kalıcı "AI Koç"
+          baloncuğu tarafından kullanılıyor (aynı `bottom-6 right-6`, z-40) —
+          ikisi üst üste binerdi. Bunun yerine KARŞI köşe (`bottom-6 left-6`)
+          kullanıldı; "köşede yüzen buton" niyeti aynen korunuyor. */}
+      <div className="fixed bottom-6 left-6 z-50">
+        <div className="group/manual relative flex items-center justify-center">
+          {/* onOpenManualBuilder() ARGÜMANSIZ çağrılmalı — bare `onClick=
+              {onOpenManualBuilder}` React'in SyntheticEvent'ini 1. argüman
+              (planId) olarak sızdırır; usePlanStudio.openManualBuilder bunu
+              "düzenlenecek plan id'si" sanıp fetchPlanDetail'i geçersiz bir
+              değerle çağırır — builder hiç açılmadan kısa bir yükleniyor
+              ekranından sonra sessizce başarısız olur. */}
+          <button
+            data-tour-id="tour-manual-plan-button"
+            onClick={() => onOpenManualBuilder()}
+            aria-label="Kendi Planını Hazırla"
+            className="relative w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95"
+            style={{
+              background: "linear-gradient(135deg, #FF007F, #B026FF 55%, #00F3FF)",
+              boxShadow: "0 8px 28px -8px rgba(255,0,127,0.65), 0 0 22px -6px rgba(0,243,255,0.55)",
+            }}
+          >
+            {/* Hover'da neon pulse halkası — AiCoachWidget tetikleyicisindeki
+                "canlı durum noktası" ping deseniyle AYNI teknik. */}
+            <span className="absolute inset-0 rounded-full motion-safe:group-hover/manual:animate-ping opacity-0 group-hover/manual:opacity-60" style={{ background: "#FF007F" }} />
+            <Wand2 className="relative w-4 h-4 md:w-5 md:h-5 text-white drop-shadow-sm" strokeWidth={2.25} />
+          </button>
 
-              {/* Tooltip/label — yalnızca hover'da (masaüstü), AI Koç
-                  tetikleyicisiyle AYNI opacity/translate geçiş deseni. */}
-              <div
-                className="absolute top-full mt-2 pointer-events-none opacity-0 translate-y-1 group-hover/manual:opacity-100 group-hover/manual:translate-y-0 transition-all duration-200 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold hidden md:block"
-                style={{
-                  background: "rgba(var(--glass-rgb), var(--alpha-modal))",
-                  backdropFilter: "blur(16px) saturate(160%)",
-                  WebkitBackdropFilter: "blur(16px) saturate(160%)",
-                  border: "1px solid var(--modal-border)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                ✨ Kendi Planını Hazırla
-              </div>
-            </div>
+          {/* Tooltip/label — yalnızca hover'da (masaüstü). ESKİDEN butonun
+              ALTINDA açılıyordu (`top-full`); artık buton ekranın en altında
+              olduğundan (`bottom-6`) bu, tooltip'i viewport'un DIŞINA
+              taşırırdı — ÜSTÜNDE açılacak şekilde çevrildi (`bottom-full`). */}
+          <div
+            className="absolute bottom-full mb-2 left-0 pointer-events-none opacity-0 translate-y-1 group-hover/manual:opacity-100 group-hover/manual:translate-y-0 transition-all duration-200 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold hidden md:block"
+            style={{
+              background: "rgba(var(--glass-rgb), var(--alpha-modal))",
+              backdropFilter: "blur(16px) saturate(160%)",
+              WebkitBackdropFilter: "blur(16px) saturate(160%)",
+              border: "1px solid var(--modal-border)",
+              color: "var(--text-primary)",
+            }}
+          >
+            ✨ Kendi Planını Hazırla
           </div>
         </div>
       </div>
 
       {/* ALT GRUP: şablon çipleri + hedef giriş çubuğu + Başla */}
       <div className="shrink-0 pt-2 md:pt-0">
-        {/* Akıllı şablon çipleri — yatay kaydırılabilir */}
-        <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 mb-2.5 flex gap-2 overflow-x-auto no-scrollbar">
+        {/* Akıllı şablon çipleri — yatay kaydırılabilir, ana başlıktan
+            (DashboardHeader/kategori kartları) AYRI bir grup; whitespace-nowrap
+            + shrink-0 (her çip zaten taşıyor) satır içi sarılmayı KESİN olarak
+            engeller, mb-4 altındaki "Hedefin" girişine binmesini önler. */}
+        <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 py-2 mb-4 flex gap-2 overflow-x-auto no-scrollbar whitespace-nowrap w-full">
           {TEMPLATE_CHIPS.map((chip) => {
             const c = CATEGORIES[chip.category] || CATEGORIES.general;
             return (
@@ -250,7 +277,11 @@ export default function CategoryIntro({
             Kategoriye göre mikro rehber/placeholder/öneri çipleri değişir
             (bkz. utils/promptSuggestions.js). */}
         {onExtraNoteChange && (
-          <div className="mt-3 md:mt-4">
+          // w-full max-w-full: bu kapsayıcı BAZ genişliği aşıp mobilde
+          // sağdan/soldan taşmasın diye açıkça sınırlanır (textarea zaten
+          // w-full'du ama sarmalayıcının kendisi sınırsızdı; çip satırı
+          // flex-wrap olduğundan taşmaz ama kapsayıcı yine de netleştirildi).
+          <div className="mt-3 md:mt-4 w-full max-w-full">
             <label className="block text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 dark:text-[var(--text-faint)] mb-1">
               Eklemek istediğin bir şey var mı?
             </label>
@@ -260,10 +291,10 @@ export default function CategoryIntro({
               onChange={(e) => onExtraNoteChange(e.target.value)}
               placeholder={suggestions.placeholder}
               rows={2}
-              className="input-glow glass w-full rounded-2xl p-3 bg-transparent outline-none resize-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)] leading-relaxed"
+              className="input-glow glass w-full max-w-full rounded-2xl p-3 bg-transparent outline-none resize-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)] leading-relaxed"
               style={{ borderColor: "rgba(var(--overlay-rgb),0.10)" }}
             />
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex flex-wrap gap-1.5 w-full max-w-full">
               {suggestions.chips.map((chip) => (
                 <button
                   key={chip.label}
