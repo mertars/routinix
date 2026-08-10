@@ -84,19 +84,20 @@ export default function CategoryIntro({
     );
   }
 
-  // stage === "intro" — bir önceki denemede mobilde KESİN "overflow-hidden"
-  // kilidi vardı; canlıda gerçek cihazlarda (farklı tarayıcı çubuğu/notch
-  // payları, kayıtlı plan şeridi gibi değişken içerik) içerik hesapladığımız
-  // paydan taştığında "Hedefin" inputu SESSİZCE kırpılıyordu. Artık
-  // `overflow-y-auto` + `pb-10`: içerik sığarsa `justify-between` üç grubu
-  // güzelce yayar (görsel fark yok); sığmazsa kırpmak yerine KAYDIRILABİLİR
-  // olur — input asla kaybolmaz. `h-screen` DEĞİL `h-full`/`max-h-full`
-  // kullanıldı: bileşen zaten Header/DrawerMenu altındaki `h-[100dvh]`
-  // kabuğun İÇİNDE — ham 100vh, Header payını düşmeden taşardı.
+  // stage === "intro" — mobilde KESİNLİKLE kaydırma YOK: `h-full overflow-
+  // hidden` + `justify-between` üç grubu (ÜST/ORTA/ALT) mevcut yüksekliğe
+  // (app.jsx'teki dış kabuk zaten `h-[100dvh]`) eşit aralıklarla yayar.
+  // `h-screen` DEĞİL `h-full`/`max-h-full`: bileşen zaten Header/DrawerMenu
+  // altındaki `h-[100dvh]` kabuğun İÇİNDE — ham 100vh, Header payını
+  // düşmeden kendi yüksekliğini o kadar büyütür, alt kısmı görünmez şekilde
+  // kırpardı. Yatay `p-3` BİLEREK eklenmedi: `main` (app.jsx) zaten
+  // `px-4 md:px-6 pt-4 md:pt-8 pb-4 md:pb-10` veriyor — üstüne bir p-3 daha
+  // eklemek dikeyde tam bu turun amacına (taşmadan sığdırma) ters, yatayda
+  // da chip şeritlerinin edge-to-edge kaydırma hizasını bozardı.
   return (
-    <div className="relative flex flex-col h-full max-h-full overflow-y-auto justify-between gap-2 pb-10 md:h-auto md:max-h-none md:overflow-visible md:justify-normal md:gap-8 md:pb-0 animate-[fadeIn_0.35s_ease]">
+    <div className="relative flex flex-col h-full max-h-full overflow-hidden justify-between gap-2 [@media(max-height:700px)]:gap-1 md:h-auto md:max-h-none md:overflow-visible md:justify-normal md:gap-8 animate-[fadeIn_0.35s_ease]">
       {/* ÜST GRUP: kayıtlı planlar (kompakt strip) + hero başlık */}
-      <div className="shrink-0 flex flex-col gap-4 md:gap-6">
+      <div className="shrink-0 flex flex-col gap-2.5 [@media(max-height:700px)]:gap-1.5 md:gap-6">
         {savedPlans.length > 0 && (
           <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 pr-6 flex gap-2 overflow-x-auto no-scrollbar whitespace-nowrap py-2 w-full">
             {savedPlans.map((p) => {
@@ -119,7 +120,7 @@ export default function CategoryIntro({
       </div>
 
       {/* ORTA GRUP: odak kartları. Mobilde DAİMA 2 sütun (`grid-cols-2`),
-          büyütülmüş/dolgun kartlar (`p-4`, `min-h-[140px]`). `auto-rows-fr`
+          büyütülmüş/dolgun kartlar (`p-4`, `min-h-[150px]`). `auto-rows-fr`
           KRİTİK: 4 kart 2 satıra dizilince (mobil/tablet) satırlardan biri
           (ör. bir kartın tagline'ı 2 satıra sarınca) komşusundan doğal
           olarak uzun olabilir — `auto-rows-fr` olmadan bu, aşağıdaki FAB'ın
@@ -127,11 +128,20 @@ export default function CategoryIntro({
           ÜSTÜNE bindirir (bu bileşende daha önce yaşanan gerçek hataydı).
           `auto-rows-fr` iki satırı da EN UZUN satıra göre eşitler — merkez
           nokta her zaman tam iki satırın arasında kalır, FAB asla kart
-          içeriğine binmez. */}
-      <div className="shrink-0 py-2 md:py-0">
+          içeriğine binmez.
+          `[@media(max-height:700px)]:` katmanı — test ederken buldum: Safari
+          adres çubuğu/araç çubuğu AÇIKKEN (sayfa ilk yüklendiğindeki
+          varsayılan durum) iPhone SE gibi cihazlarda GERÇEK görünür yükseklik
+          667px değil, ~580-620px civarına düşebiliyor. `min-h-[150px]` +
+          `overflow-hidden` sabit kalınca bu durumda "Hedefin" inputu YİNE
+          sessizce kırpılıyordu (bunu Playwright ile 620/600/580px'te
+          doğruladım). Bu katman SADECE kısa görünür alanlarda kartları
+          otomatik küçültüyor — normal/uzun ekranlarda (chrome kapalıyken)
+          görsel fark YOK, `min-h-[150px]` dolgun haliyle kalıyor. */}
+      <div className="shrink-0 py-2 [@media(max-height:700px)]:py-1 md:py-0">
         <div
           data-tour-id="tour-category-cards"
-          className="relative w-full grid grid-cols-2 lg:grid-cols-4 auto-rows-fr gap-3.5 md:gap-5"
+          className="relative w-full grid grid-cols-2 lg:grid-cols-4 auto-rows-fr gap-2.5 md:gap-5"
         >
           {CATEGORY_KEYS.map((key) => {
             const c = CATEGORIES[key];
@@ -140,7 +150,7 @@ export default function CategoryIntro({
               <button
                 key={key}
                 onClick={() => onCategoryChange(key)}
-                className="category-card group relative h-auto min-h-[150px] flex flex-col items-center justify-center gap-1.5 md:gap-3 rounded-2xl p-4 md:p-6 text-center transition-all duration-200 card-glow"
+                className="category-card group relative h-auto min-h-[150px] [@media(max-height:700px)]:min-h-[112px] flex flex-col items-center justify-center gap-1.5 md:gap-3 rounded-2xl p-4 [@media(max-height:700px)]:p-3 md:p-6 text-center transition-all duration-200 card-glow"
                 style={{
                   borderColor: active ? c.accent : undefined,
                   background: active ? `${c.accent}1f` : undefined,
@@ -205,17 +215,14 @@ export default function CategoryIntro({
         </div>
       </div>
 
-      {/* ALT GRUP: şablon çipleri + hedef giriş çubuğu + Başla. `mb-6`
-          (mobil) — canlıda ekranın en altına yakın kesilen/kaybolan
-          "Hedefin" inputunu, altında net bir boşlukla yukarı iter; kök
-          kapsayıcının `pb-10`'u ile birlikte çift güvence sağlar. */}
-      <div className="shrink-0 pt-2 mb-6 md:pt-0 md:mb-0">
+      {/* ALT GRUP: şablon çipleri + hedef giriş çubuğu + Başla. */}
+      <div className="shrink-0 pt-1.5 md:pt-0">
         {/* Akıllı şablon çipleri — yatay kaydırılabilir, ana başlıktan
             (DashboardHeader/kategori kartları) AYRI bir grup; whitespace-nowrap
             + shrink-0 (her çip zaten taşıyor) satır içi sarılmayı KESİN olarak
-            engeller. `my-3` hem üstteki kartlardan hem alttaki "Hedefin"
+            engeller. `my-2` hem üstteki kartlardan hem alttaki "Hedefin"
             girişinden net bir boşlukla ayırır, ikisi de üzerine binmez. */}
-        <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 pr-6 py-2 my-3 flex gap-2 overflow-x-auto no-scrollbar whitespace-nowrap w-full">
+        <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 pr-6 py-2 [@media(max-height:700px)]:py-1 my-2 [@media(max-height:700px)]:my-1 flex gap-2 overflow-x-auto no-scrollbar whitespace-nowrap w-full">
           {TEMPLATE_CHIPS.map((chip) => {
             const c = CATEGORIES[chip.category] || CATEGORIES.general;
             return (
@@ -263,7 +270,11 @@ export default function CategoryIntro({
             onChange={(e) => onGoalChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && canStart && onStart()}
             placeholder="Örn: 3 ayda full-stack geliştirici ol..."
-            className="flex-1 min-w-0 bg-transparent outline-none text-sm md:text-base text-[var(--text-primary)] placeholder:text-[var(--placeholder)] px-2.5"
+            // text-base (16px) BİLEREK taban: iOS Safari, input font'u 16px'in
+            // altındaysa dokunulduğunda sayfayı otomatik zoom'luyor — 16px
+            // (veya üstü) bunu engelliyor. sm: (640px+) itibarıyla artık
+            // dokunmatik zoom riski olmadığından biraz küçültülebilir.
+            className="flex-1 min-w-0 bg-transparent outline-none text-base sm:text-sm text-[var(--text-primary)] placeholder:text-[var(--placeholder)] px-2.5"
           />
           <button
             onClick={onStart}
