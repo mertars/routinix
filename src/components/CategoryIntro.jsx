@@ -94,7 +94,7 @@ export default function CategoryIntro({
       {/* ÜST GRUP: kayıtlı planlar (kompakt strip) + hero başlık */}
       <div className="shrink-0 flex flex-col gap-4 md:gap-6">
         {savedPlans.length > 0 && (
-          <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 flex gap-2 overflow-x-auto no-scrollbar">
+          <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 flex gap-2 overflow-x-auto no-scrollbar whitespace-nowrap py-2 w-full">
             {savedPlans.map((p) => {
               const cat = CATEGORIES[p.mode] || CATEGORIES.general;
               return (
@@ -114,21 +114,15 @@ export default function CategoryIntro({
         <DashboardHeader />
       </div>
 
-      {/* ORTA GRUP: odak kartları. Mobilde (<640px) KESİNLİKLE tek sütun —
-          eskiden HER zaman grid-cols-2 idi (mobilde bile); dar ekranlarda
-          etiket/tagline farklı satır sayılarına sarınca satırlar EŞİT
-          YÜKSEKLİKTE olmuyordu (bkz. aşağıda kaldırılan merkez buton notu).
-          `min-h-[120px]` + `h-auto` (BİLEREK sabit yükseklik YOK) — içerik
-          uzarsa kart büyür, komşu kartların üstüne BİNMEZ.
-          ESKİDEN `flex-1 ... items-center` (sabit yükseklik + kaydırmasız
-          ortalama) taşıyordu — 1 sütuna geçince 4 kart üst üste dizilip
-          eskisinden ÇOK daha uzun bir blok oluşturunca, bu sabit kutunun
-          DIŞINA taşıp ALT GRUP'un (şablon çipleri) üzerine biniyordu (canlı
-          ortamda bildirilen ASIL çakışma buydu). Artık ÜST GRUP/ALT GRUP
-          İLE AYNI basit `shrink-0` (doğal yükseklik) — taşma varsa kök
-          kapsayıcının (yukarıdaki) TEK kaydırma alanı devreye girer. */}
+      {/* ORTA GRUP: odak kartları. Orijinal tasarım geri getirildi — mobilde
+          (<640px) DAİMA 2 sütun (`grid-cols-2`). Kartlar sıkıştırıldı
+          (`p-3`, küçültülmüş font/ikon boyutları, `min-h-[100px]`) ki 2
+          sütuna rağmen ekrana rahat sığsın; metin taşarsa `line-clamp-2`
+          kesiyor. `h-auto` (sabit yükseklik YOK) hâlâ korunuyor — bir kart
+          diğerinden uzun olsa da komşu kartların üstüne BİNMEZ, sadece o
+          satırın yüksekliği büyür. */}
       <div className="shrink-0 py-3 md:py-0">
-        <div data-tour-id="tour-category-cards" className="relative w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
+        <div data-tour-id="tour-category-cards" className="relative w-full grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-5">
           {CATEGORY_KEYS.map((key) => {
             const c = CATEGORIES[key];
             const active = key === category;
@@ -136,24 +130,20 @@ export default function CategoryIntro({
               <button
                 key={key}
                 onClick={() => onCategoryChange(key)}
-                // İçerik hem dikey hem yatay TAM ORTALANMIŞ — ikon/başlık/alt
-                // açıklama kartın merkezinde. `relative` (kart kendi rozetini
-                // absolute konumlandırır) + `h-auto min-h-[120px]` (sabit
-                // yükseklik YOK — içerik satır sayısına göre serbestçe büyür).
-                className="category-card group relative h-auto min-h-[120px] flex flex-col items-center justify-center gap-1.5 md:gap-3 rounded-2xl p-3.5 md:p-6 text-center transition-all duration-200 card-glow"
+                className="category-card group relative h-auto min-h-[100px] flex flex-col items-center justify-center gap-1 md:gap-3 rounded-2xl p-3 md:p-6 text-center transition-all duration-200 card-glow"
                 style={{
                   borderColor: active ? c.accent : undefined,
                   background: active ? `${c.accent}1f` : undefined,
                   boxShadow: active ? `0 0 0 2px ${c.accent}, 0 10px 40px -18px ${c.accent}` : undefined,
                 }}
               >
-                <span className="text-2xl md:text-3xl">{c.emoji}</span>
-                <span className="text-sm md:text-lg font-semibold leading-snug text-[var(--text-primary)]">{c.label}</span>
-                <span className="text-[11px] md:text-sm text-[var(--text-muted)] leading-snug line-clamp-2 md:line-clamp-none">
+                <span className="text-xl md:text-3xl">{c.emoji}</span>
+                <span className="text-[13px] md:text-lg font-semibold leading-snug text-[var(--text-primary)]">{c.label}</span>
+                <span className="text-[10px] md:text-sm text-[var(--text-muted)] leading-snug line-clamp-2 md:line-clamp-none">
                   {c.tagline}
                 </span>
                 {active && (
-                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full" style={{ background: c.accent, boxShadow: `0 0 8px ${c.accent}` }} />
+                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ background: c.accent, boxShadow: `0 0 8px ${c.accent}` }} />
                 )}
               </button>
             );
@@ -161,20 +151,18 @@ export default function CategoryIntro({
         </div>
       </div>
 
-      {/* "Kendi Planını Hazırla" — eskiden bu grid'in İÇİNDE, `top-1/2 left-1/2`
-          ile "matematiksel merkeze" ankorlanmış bir overlay'di: kartlardan biri
-          (ör. tagline 2 satıra sarınca) komşusundan uzun olduğunda grid
-          satırları EŞİT YÜKSEKLİKTE olmuyor, bu da "merkez" noktasını kart
-          METNİNİN ÜSTÜNE kaydırıyordu — canlı ortamda bildirilen gerçek
-          çakışma buydu. Artık grid'den TAMAMEN bağımsız, viewport'a göre
+      {/* "Kendi Planını Hazırla" — grid'den TAMAMEN bağımsız, viewport'a göre
           `fixed` bir FAB (Floating Action Button): içerik ne kadar uzarsa
           uzasın asla kartlarla ÇAKIŞAMAZ.
-          KONUM NOTU: spesifikasyon "bottom-6 right-6" istiyordu, ama o köşe
-          UYGULAMA GENELİNDE zaten AiCoachWidget.jsx'in kalıcı "AI Koç"
-          baloncuğu tarafından kullanılıyor (aynı `bottom-6 right-6`, z-40) —
-          ikisi üst üste binerdi. Bunun yerine KARŞI köşe (`bottom-6 left-6`)
-          kullanıldı; "köşede yüzen buton" niyeti aynen korunuyor. */}
-      <div className="fixed bottom-6 left-6 z-50">
+          KONUM NOTU: istenen köşe sağ alt (`right-6`) — AMA o köşenin tam
+          `bottom-6` noktası UYGULAMA GENELİNDE zaten AiCoachWidget.jsx'in
+          kalıcı "AI Koç" baloncuğu tarafından kullanılıyor (aynı `right:
+          1.5rem, bottom: 1.5rem`, w-14 h-14, z-40) — piksel piksel aynı yere
+          konsaydı ikisi tam üst üste biner, biri diğerini tıklanamaz hale
+          getirirdi. Bunun yerine AYNI köşede, AI Koç baloncuğunun HEMEN
+          ÜSTÜNE istiflendi (`bottom-24 right-6`) — "sağ alt köşede sabit
+          buton" niyeti birebir korunuyor, sadece iki buton dikeyde ayrışıyor. */}
+      <div className="fixed bottom-24 right-6 z-50">
         <div className="group/manual relative flex items-center justify-center">
           {/* onOpenManualBuilder() ARGÜMANSIZ çağrılmalı — bare `onClick=
               {onOpenManualBuilder}` React'in SyntheticEvent'ini 1. argüman
@@ -198,12 +186,12 @@ export default function CategoryIntro({
             <Wand2 className="relative w-4 h-4 md:w-5 md:h-5 text-white drop-shadow-sm" strokeWidth={2.25} />
           </button>
 
-          {/* Tooltip/label — yalnızca hover'da (masaüstü). ESKİDEN butonun
-              ALTINDA açılıyordu (`top-full`); artık buton ekranın en altında
-              olduğundan (`bottom-6`) bu, tooltip'i viewport'un DIŞINA
-              taşırırdı — ÜSTÜNDE açılacak şekilde çevrildi (`bottom-full`). */}
+          {/* Tooltip/label — yalnızca hover'da (masaüstü). Buton artık sağ
+              kenara yakın (`right-6`) olduğundan, eskiden kullanılan `left-0`
+              ankraj tooltip'i sağa doğru büyütüp viewport dışına taşırırdı —
+              `right-0` ile SOLA doğru büyüyecek şekilde çevrildi. */}
           <div
-            className="absolute bottom-full mb-2 left-0 pointer-events-none opacity-0 translate-y-1 group-hover/manual:opacity-100 group-hover/manual:translate-y-0 transition-all duration-200 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold hidden md:block"
+            className="absolute bottom-full mb-2 right-0 pointer-events-none opacity-0 translate-y-1 group-hover/manual:opacity-100 group-hover/manual:translate-y-0 transition-all duration-200 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold hidden md:block"
             style={{
               background: "rgba(var(--glass-rgb), var(--alpha-modal))",
               backdropFilter: "blur(16px) saturate(160%)",
@@ -222,8 +210,9 @@ export default function CategoryIntro({
         {/* Akıllı şablon çipleri — yatay kaydırılabilir, ana başlıktan
             (DashboardHeader/kategori kartları) AYRI bir grup; whitespace-nowrap
             + shrink-0 (her çip zaten taşıyor) satır içi sarılmayı KESİN olarak
-            engeller, mb-4 altındaki "Hedefin" girişine binmesini önler. */}
-        <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 py-2 mb-4 flex gap-2 overflow-x-auto no-scrollbar whitespace-nowrap w-full">
+            engeller. `my-3` hem üstteki kartlardan hem alttaki "Hedefin"
+            girişinden net bir boşlukla ayırır, ikisi de üzerine binmez. */}
+        <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 py-2 my-3 flex gap-2 overflow-x-auto no-scrollbar whitespace-nowrap w-full">
           {TEMPLATE_CHIPS.map((chip) => {
             const c = CATEGORIES[chip.category] || CATEGORIES.general;
             return (
