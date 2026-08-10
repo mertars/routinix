@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Wand2 } from "lucide-react";
+import { Wand2, MessageSquarePlus, X } from "lucide-react";
 import { CATEGORIES, CATEGORY_KEYS, MIN_GOAL_LENGTH, TEMPLATE_CHIPS } from "../constants";
 import { getPromptSuggestions } from "../utils/promptSuggestions";
 import DashboardHeader from "./DashboardHeader";
@@ -25,6 +25,7 @@ export default function CategoryIntro({
 }) {
   const mode = CATEGORIES[category] || CATEGORIES.general;
   const [pulse, setPulse] = useState(false);
+  const [extraNoteOpen, setExtraNoteOpen] = useState(false);
   const suggestions = getPromptSuggestions(category);
 
   // Öneri çipine tıklanınca metni extraNote'a EKLER (üzerine yazmaz) — kutu
@@ -83,14 +84,17 @@ export default function CategoryIntro({
     );
   }
 
-  // stage === "intro" — mobilde artık KATI "tek ekrana kilitli" DEĞİL: kartlar
-  // 1 sütuna geçtiğinden (bkz. ORTA GRUP) içerik eskisinden ÇOK daha uzun —
-  // `overflow-y-auto` BURADA (kök seviyede, iç içe/ayrı bir kaydırma kutusu
-  // DEĞİL) TEK, doğal bir kaydırma alanı sağlar; app.jsx'teki dış kabuk
-  // (`h-[100dvh] overflow-hidden`, intro-benzeri aşamalar için) DEĞİŞMEDİ —
-  // bu, o sabit-yükseklikli kabuğun İÇİNDE kayan TEK bölge.
+  // stage === "intro" — mobilde KESİNLİKLE kaydırma YOK: `h-full overflow-
+  // hidden` + `justify-between` üç grubu (ÜST/ORTA/ALT) mevcut yüksekliğe
+  // (app.jsx'teki dış kabuk zaten `h-[100dvh]`) eşit aralıklarla yayar,
+  // hiçbiri taşmaz. `h-screen` DEĞİL `h-full` kullanıldı: bu bileşen zaten
+  // Header/DrawerMenu/GuestBanner'ın ALTINDA, o kabuğun kalan alanını
+  // dolduran bir `<main flex-1 min-h-0>` içinde — `h-screen` (ham 100vh)
+  // burada kullanılsaydı gerçek viewport'tan Header payını DÜŞMEDEN kendi
+  // yüksekliğini o kadar büyütür, alt kısım (input/Başla) görünmez şekilde
+  // dış `overflow-hidden` tarafından kırpılırdı.
   return (
-    <div className="flex flex-col h-full overflow-y-auto md:h-auto md:overflow-visible md:gap-8 animate-[fadeIn_0.35s_ease]">
+    <div className="relative flex flex-col h-full max-h-full overflow-hidden justify-between gap-2 md:h-auto md:max-h-none md:overflow-visible md:justify-normal md:gap-8 animate-[fadeIn_0.35s_ease]">
       {/* ÜST GRUP: kayıtlı planlar (kompakt strip) + hero başlık */}
       <div className="shrink-0 flex flex-col gap-4 md:gap-6">
         {savedPlans.length > 0 && (
@@ -114,15 +118,21 @@ export default function CategoryIntro({
         <DashboardHeader />
       </div>
 
-      {/* ORTA GRUP: odak kartları. Orijinal tasarım geri getirildi — mobilde
-          (<640px) DAİMA 2 sütun (`grid-cols-2`). Kartlar sıkıştırıldı
-          (`p-3`, küçültülmüş font/ikon boyutları, `min-h-[100px]`) ki 2
-          sütuna rağmen ekrana rahat sığsın; metin taşarsa `line-clamp-2`
-          kesiyor. `h-auto` (sabit yükseklik YOK) hâlâ korunuyor — bir kart
-          diğerinden uzun olsa da komşu kartların üstüne BİNMEZ, sadece o
-          satırın yüksekliği büyür. */}
-      <div className="shrink-0 py-3 md:py-0">
-        <div data-tour-id="tour-category-cards" className="relative w-full grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-5">
+      {/* ORTA GRUP: odak kartları. Mobilde DAİMA 2 sütun (`grid-cols-2`),
+          büyütülmüş/dolgun kartlar (`p-4`, `min-h-[140px]`). `auto-rows-fr`
+          KRİTİK: 4 kart 2 satıra dizilince (mobil/tablet) satırlardan biri
+          (ör. bir kartın tagline'ı 2 satıra sarınca) komşusundan doğal
+          olarak uzun olabilir — `auto-rows-fr` olmadan bu, aşağıdaki FAB'ın
+          `top-1/2` merkezini satır sınırından kaydırıp kart METNİNİN
+          ÜSTÜNE bindirir (bu bileşende daha önce yaşanan gerçek hataydı).
+          `auto-rows-fr` iki satırı da EN UZUN satıra göre eşitler — merkez
+          nokta her zaman tam iki satırın arasında kalır, FAB asla kart
+          içeriğine binmez. */}
+      <div className="shrink-0 py-2 md:py-0">
+        <div
+          data-tour-id="tour-category-cards"
+          className="relative w-full grid grid-cols-2 lg:grid-cols-4 auto-rows-fr gap-3.5 md:gap-5"
+        >
           {CATEGORY_KEYS.map((key) => {
             const c = CATEGORIES[key];
             const active = key === category;
@@ -130,77 +140,67 @@ export default function CategoryIntro({
               <button
                 key={key}
                 onClick={() => onCategoryChange(key)}
-                className="category-card group relative h-auto min-h-[100px] flex flex-col items-center justify-center gap-1 md:gap-3 rounded-2xl p-3 md:p-6 text-center transition-all duration-200 card-glow"
+                className="category-card group relative h-auto min-h-[140px] flex flex-col items-center justify-center gap-1.5 md:gap-3 rounded-2xl p-4 md:p-6 text-center transition-all duration-200 card-glow"
                 style={{
                   borderColor: active ? c.accent : undefined,
                   background: active ? `${c.accent}1f` : undefined,
                   boxShadow: active ? `0 0 0 2px ${c.accent}, 0 10px 40px -18px ${c.accent}` : undefined,
                 }}
               >
-                <span className="text-xl md:text-3xl">{c.emoji}</span>
-                <span className="text-[13px] md:text-lg font-semibold leading-snug text-[var(--text-primary)]">{c.label}</span>
-                <span className="text-[10px] md:text-sm text-[var(--text-muted)] leading-snug line-clamp-2 md:line-clamp-none">
+                <span className="text-2xl md:text-3xl">{c.emoji}</span>
+                <span className="text-sm md:text-lg font-semibold leading-snug text-[var(--text-primary)]">{c.label}</span>
+                <span className="text-[11px] md:text-sm text-[var(--text-muted)] leading-snug line-clamp-2 md:line-clamp-none">
                   {c.tagline}
                 </span>
                 {active && (
-                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ background: c.accent, boxShadow: `0 0 8px ${c.accent}` }} />
+                  <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full" style={{ background: c.accent, boxShadow: `0 0 8px ${c.accent}` }} />
                 )}
               </button>
             );
           })}
-        </div>
-      </div>
 
-      {/* "Kendi Planını Hazırla" — grid'den TAMAMEN bağımsız, viewport'a göre
-          `fixed` bir FAB (Floating Action Button): içerik ne kadar uzarsa
-          uzasın asla kartlarla ÇAKIŞAMAZ.
-          KONUM NOTU: istenen köşe sağ alt (`right-6`) — AMA o köşenin tam
-          `bottom-6` noktası UYGULAMA GENELİNDE zaten AiCoachWidget.jsx'in
-          kalıcı "AI Koç" baloncuğu tarafından kullanılıyor (aynı `right:
-          1.5rem, bottom: 1.5rem`, w-14 h-14, z-40) — piksel piksel aynı yere
-          konsaydı ikisi tam üst üste biner, biri diğerini tıklanamaz hale
-          getirirdi. Bunun yerine AYNI köşede, AI Koç baloncuğunun HEMEN
-          ÜSTÜNE istiflendi (`bottom-24 right-6`) — "sağ alt köşede sabit
-          buton" niyeti birebir korunuyor, sadece iki buton dikeyde ayrışıyor. */}
-      <div className="fixed bottom-24 right-6 z-50">
-        <div className="group/manual relative flex items-center justify-center">
-          {/* onOpenManualBuilder() ARGÜMANSIZ çağrılmalı — bare `onClick=
-              {onOpenManualBuilder}` React'in SyntheticEvent'ini 1. argüman
-              (planId) olarak sızdırır; usePlanStudio.openManualBuilder bunu
-              "düzenlenecek plan id'si" sanıp fetchPlanDetail'i geçersiz bir
-              değerle çağırır — builder hiç açılmadan kısa bir yükleniyor
-              ekranından sonra sessizce başarısız olur. */}
-          <button
-            data-tour-id="tour-manual-plan-button"
-            onClick={() => onOpenManualBuilder()}
-            aria-label="Kendi Planını Hazırla"
-            className="relative w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95"
-            style={{
-              background: "linear-gradient(135deg, #FF007F, #B026FF 55%, #00F3FF)",
-              boxShadow: "0 8px 28px -8px rgba(255,0,127,0.65), 0 0 22px -6px rgba(0,243,255,0.55)",
-            }}
-          >
-            {/* Hover'da neon pulse halkası — AiCoachWidget tetikleyicisindeki
-                "canlı durum noktası" ping deseniyle AYNI teknik. */}
-            <span className="absolute inset-0 rounded-full motion-safe:group-hover/manual:animate-ping opacity-0 group-hover/manual:opacity-60" style={{ background: "#FF007F" }} />
-            <Wand2 className="relative w-4 h-4 md:w-5 md:h-5 text-white drop-shadow-sm" strokeWidth={2.25} />
-          </button>
+          {/* "Kendi Planını Hazırla" — 2x2 grid'in tam kesişim noktasına
+              `absolute` ankorlu. Bu, grid kapsayıcısının BİR ÇOCUĞU (fixed
+              DEĞİL): mutlak konumlandırılmış grid çocukları CSS Grid
+              yerleşiminden tamamen ÇIKAR (grid item SAYILMAZ) — bu yüzden
+              5. bir "hücre" açmaz, sadece kapsayıcının tam ortasına oturur. */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
+            <div className="group/manual relative flex items-center justify-center">
+              {/* onOpenManualBuilder() ARGÜMANSIZ çağrılmalı — bare `onClick=
+                  {onOpenManualBuilder}` React'in SyntheticEvent'ini 1. argüman
+                  (planId) olarak sızdırır; usePlanStudio.openManualBuilder bunu
+                  "düzenlenecek plan id'si" sanıp fetchPlanDetail'i geçersiz bir
+                  değerle çağırır — builder hiç açılmadan kısa bir yükleniyor
+                  ekranından sonra sessizce başarısız olur. */}
+              <button
+                data-tour-id="tour-manual-plan-button"
+                onClick={() => onOpenManualBuilder()}
+                aria-label="Kendi Planını Hazırla"
+                className="relative w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95"
+                style={{
+                  background: "linear-gradient(135deg, #FF007F, #B026FF 55%, #00F3FF)",
+                  boxShadow: "0 8px 28px -8px rgba(255,0,127,0.65), 0 0 22px -6px rgba(0,243,255,0.55)",
+                }}
+              >
+                <span className="absolute inset-0 rounded-full motion-safe:group-hover/manual:animate-ping opacity-0 group-hover/manual:opacity-60" style={{ background: "#FF007F" }} />
+                <Wand2 className="relative w-4 h-4 md:w-5 md:h-5 text-white drop-shadow-sm" strokeWidth={2.25} />
+              </button>
 
-          {/* Tooltip/label — yalnızca hover'da (masaüstü). Buton artık sağ
-              kenara yakın (`right-6`) olduğundan, eskiden kullanılan `left-0`
-              ankraj tooltip'i sağa doğru büyütüp viewport dışına taşırırdı —
-              `right-0` ile SOLA doğru büyüyecek şekilde çevrildi. */}
-          <div
-            className="absolute bottom-full mb-2 right-0 pointer-events-none opacity-0 translate-y-1 group-hover/manual:opacity-100 group-hover/manual:translate-y-0 transition-all duration-200 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold hidden md:block"
-            style={{
-              background: "rgba(var(--glass-rgb), var(--alpha-modal))",
-              backdropFilter: "blur(16px) saturate(160%)",
-              WebkitBackdropFilter: "blur(16px) saturate(160%)",
-              border: "1px solid var(--modal-border)",
-              color: "var(--text-primary)",
-            }}
-          >
-            ✨ Kendi Planını Hazırla
+              {/* Tooltip/label — yalnızca hover'da (masaüstü); buton artık
+                  ekranın ORTASINDA olduğundan altında, yatayda ortalı açılır. */}
+              <div
+                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 translate-y-1 group-hover/manual:opacity-100 group-hover/manual:translate-y-0 transition-all duration-200 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold hidden md:block"
+                style={{
+                  background: "rgba(var(--glass-rgb), var(--alpha-modal))",
+                  backdropFilter: "blur(16px) saturate(160%)",
+                  WebkitBackdropFilter: "blur(16px) saturate(160%)",
+                  border: "1px solid var(--modal-border)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                ✨ Kendi Planını Hazırla
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -229,9 +229,27 @@ export default function CategoryIntro({
           })}
         </div>
 
-        <label className="block text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 dark:text-[var(--text-faint)] mb-1.5 md:mb-2">
-          Hedefin
-        </label>
+        {/* "Hedefin" başlığı + Ek İstek tetikleyicisi aynı satırda — eskiden
+            altında ayrı bir "Eklemek istediğin bir şey var mı?" bloğu
+            (rehber metni + textarea + öneri çipleri, ~90-110px) DAİMA
+            görünürdü; artık dikeyde YER KAPLAMAYAN küçük bir tıklanabilir
+            etikete indirgendi, tıklanınca aşağıdaki Popover/Modal açılır. */}
+        <div className="flex items-center justify-between mb-1.5 md:mb-2">
+          <label className="text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 dark:text-[var(--text-faint)]">
+            Hedefin
+          </label>
+          {onExtraNoteChange && (
+            <button
+              type="button"
+              onClick={() => setExtraNoteOpen(true)}
+              className="flex items-center gap-1 text-[10px] md:text-[11px] font-semibold transition-colors"
+              style={{ color: extraNote?.trim() ? mode.accent : "var(--text-faint)" }}
+            >
+              <MessageSquarePlus className="w-3.5 h-3.5" strokeWidth={2.25} />
+              Ek İstek{extraNote?.trim() ? " ✓" : ""}
+            </button>
+          )}
+        </div>
         <div
           className={`input-glow glass flex items-center gap-2 rounded-2xl p-2 md:p-2.5 ${pulse ? "chip-fill-pulse" : ""}`}
           style={{ borderColor: goalTooShort ? "var(--amber-accent)" : "rgba(var(--overlay-rgb),0.10)" }}
@@ -258,32 +276,49 @@ export default function CategoryIntro({
             Hedefini biraz daha açık yaz — en az {MIN_GOAL_LENGTH} karakter gerekli.
           </p>
         )}
+      </div>
 
-        {/* Dinamik "Ek İstek / Soru" Alanı (Smart Prompt Assistant) —
-            extraNote zaten usePlanStudio.finalizeAndGenerate tarafından AI
-            bağlamına ekleniyordu (bkz. "Ek notlar / özel istekler" satırı),
-            ama hiçbir ekranda GERÇEK bir giriş alanı YOKTU — burada eklendi.
-            Kategoriye göre mikro rehber/placeholder/öneri çipleri değişir
-            (bkz. utils/promptSuggestions.js). */}
-        {onExtraNoteChange && (
-          // w-full max-w-full: bu kapsayıcı BAZ genişliği aşıp mobilde
-          // sağdan/soldan taşmasın diye açıkça sınırlanır (textarea zaten
-          // w-full'du ama sarmalayıcının kendisi sınırsızdı; çip satırı
-          // flex-wrap olduğundan taşmaz ama kapsayıcı yine de netleştirildi).
-          <div className="mt-3 md:mt-4 w-full max-w-full">
-            <label className="block text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 dark:text-[var(--text-faint)] mb-1">
-              Eklemek istediğin bir şey var mı?
-            </label>
-            <p className="text-[11px] text-[var(--text-faint)] mb-1.5 leading-relaxed">{suggestions.guide}</p>
+      {/* "Ek İstek" Popover/Modal — extraNote zaten usePlanStudio.
+          finalizeAndGenerate tarafından AI bağlamına ekleniyor (bkz. "Ek
+          notlar / özel istekler" satırı); rehber metni/placeholder/öneri
+          çipleri kategoriye göre değişir (bkz. utils/promptSuggestions.js).
+          `fixed inset-0` olduğundan flex akışında YER KAPLAMAZ — kök
+          kapsayıcının `justify-between` dağılımını etkilemez. */}
+      {extraNoteOpen && onExtraNoteChange && (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center px-6" onClick={() => setExtraNoteOpen(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="blur-cap-mobile relative w-full max-w-[380px] rounded-3xl p-5 animate-[fadeIn_0.2s_ease]"
+            style={{
+              background: "rgba(var(--glass-rgb), var(--alpha-modal))",
+              backdropFilter: "blur(24px) saturate(160%)",
+              WebkitBackdropFilter: "blur(24px) saturate(160%)",
+              border: "1px solid var(--modal-border)",
+              boxShadow: "0 24px 60px -20px rgba(0,0,0,0.7)",
+            }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[14.5px] font-bold text-[var(--text-primary)]">Eklemek istediğin bir şey var mı?</h3>
+              <button
+                onClick={() => setExtraNoteOpen(false)}
+                aria-label="Kapat"
+                className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <X className="w-4 h-4" strokeWidth={2.25} />
+              </button>
+            </div>
+            <p className="text-[11.5px] text-[var(--text-faint)] mb-2 leading-relaxed">{suggestions.guide}</p>
             <textarea
               value={extraNote || ""}
               onChange={(e) => onExtraNoteChange(e.target.value)}
               placeholder={suggestions.placeholder}
-              rows={2}
-              className="input-glow glass w-full max-w-full rounded-2xl p-3 bg-transparent outline-none resize-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)] leading-relaxed"
+              rows={3}
+              autoFocus
+              className="input-glow glass w-full rounded-2xl p-3 bg-transparent outline-none resize-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)] leading-relaxed"
               style={{ borderColor: "rgba(var(--overlay-rgb),0.10)" }}
             />
-            <div className="mt-2 flex flex-wrap gap-1.5 w-full max-w-full">
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
               {suggestions.chips.map((chip) => (
                 <button
                   key={chip.label}
@@ -295,9 +330,16 @@ export default function CategoryIntro({
                 </button>
               ))}
             </div>
+            <button
+              onClick={() => setExtraNoteOpen(false)}
+              className="mt-4 w-full rounded-xl py-2.5 text-[13.5px] font-semibold transition-opacity hover:opacity-90"
+              style={{ background: mode.accent, color: "#0A0E13" }}
+            >
+              Tamam
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
