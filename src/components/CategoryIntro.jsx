@@ -84,21 +84,21 @@ export default function CategoryIntro({
     );
   }
 
-  // stage === "intro" — mobilde KESİNLİKLE kaydırma YOK: `h-full overflow-
-  // hidden` + `justify-between` üç grubu (ÜST/ORTA/ALT) mevcut yüksekliğe
-  // (app.jsx'teki dış kabuk zaten `h-[100dvh]`) eşit aralıklarla yayar,
-  // hiçbiri taşmaz. `h-screen` DEĞİL `h-full` kullanıldı: bu bileşen zaten
-  // Header/DrawerMenu/GuestBanner'ın ALTINDA, o kabuğun kalan alanını
-  // dolduran bir `<main flex-1 min-h-0>` içinde — `h-screen` (ham 100vh)
-  // burada kullanılsaydı gerçek viewport'tan Header payını DÜŞMEDEN kendi
-  // yüksekliğini o kadar büyütür, alt kısım (input/Başla) görünmez şekilde
-  // dış `overflow-hidden` tarafından kırpılırdı.
+  // stage === "intro" — bir önceki denemede mobilde KESİN "overflow-hidden"
+  // kilidi vardı; canlıda gerçek cihazlarda (farklı tarayıcı çubuğu/notch
+  // payları, kayıtlı plan şeridi gibi değişken içerik) içerik hesapladığımız
+  // paydan taştığında "Hedefin" inputu SESSİZCE kırpılıyordu. Artık
+  // `overflow-y-auto` + `pb-10`: içerik sığarsa `justify-between` üç grubu
+  // güzelce yayar (görsel fark yok); sığmazsa kırpmak yerine KAYDIRILABİLİR
+  // olur — input asla kaybolmaz. `h-screen` DEĞİL `h-full`/`max-h-full`
+  // kullanıldı: bileşen zaten Header/DrawerMenu altındaki `h-[100dvh]`
+  // kabuğun İÇİNDE — ham 100vh, Header payını düşmeden taşardı.
   return (
-    <div className="relative flex flex-col h-full max-h-full overflow-hidden justify-between gap-2 md:h-auto md:max-h-none md:overflow-visible md:justify-normal md:gap-8 animate-[fadeIn_0.35s_ease]">
+    <div className="relative flex flex-col h-full max-h-full overflow-y-auto justify-between gap-2 pb-10 md:h-auto md:max-h-none md:overflow-visible md:justify-normal md:gap-8 md:pb-0 animate-[fadeIn_0.35s_ease]">
       {/* ÜST GRUP: kayıtlı planlar (kompakt strip) + hero başlık */}
       <div className="shrink-0 flex flex-col gap-4 md:gap-6">
         {savedPlans.length > 0 && (
-          <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 flex gap-2 overflow-x-auto no-scrollbar whitespace-nowrap py-2 w-full">
+          <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 pr-6 flex gap-2 overflow-x-auto no-scrollbar whitespace-nowrap py-2 w-full">
             {savedPlans.map((p) => {
               const cat = CATEGORIES[p.mode] || CATEGORIES.general;
               return (
@@ -140,7 +140,7 @@ export default function CategoryIntro({
               <button
                 key={key}
                 onClick={() => onCategoryChange(key)}
-                className="category-card group relative h-auto min-h-[140px] flex flex-col items-center justify-center gap-1.5 md:gap-3 rounded-2xl p-4 md:p-6 text-center transition-all duration-200 card-glow"
+                className="category-card group relative h-auto min-h-[150px] flex flex-col items-center justify-center gap-1.5 md:gap-3 rounded-2xl p-4 md:p-6 text-center transition-all duration-200 card-glow"
                 style={{
                   borderColor: active ? c.accent : undefined,
                   background: active ? `${c.accent}1f` : undefined,
@@ -176,14 +176,14 @@ export default function CategoryIntro({
                 data-tour-id="tour-manual-plan-button"
                 onClick={() => onOpenManualBuilder()}
                 aria-label="Kendi Planını Hazırla"
-                className="relative w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95"
+                className="relative w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95"
                 style={{
                   background: "linear-gradient(135deg, #FF007F, #B026FF 55%, #00F3FF)",
                   boxShadow: "0 8px 28px -8px rgba(255,0,127,0.65), 0 0 22px -6px rgba(0,243,255,0.55)",
                 }}
               >
                 <span className="absolute inset-0 rounded-full motion-safe:group-hover/manual:animate-ping opacity-0 group-hover/manual:opacity-60" style={{ background: "#FF007F" }} />
-                <Wand2 className="relative w-4 h-4 md:w-5 md:h-5 text-white drop-shadow-sm" strokeWidth={2.25} />
+                <Wand2 className="relative w-5 h-5 md:w-6 md:h-6 text-white drop-shadow-sm" strokeWidth={2.25} />
               </button>
 
               {/* Tooltip/label — yalnızca hover'da (masaüstü); buton artık
@@ -205,14 +205,17 @@ export default function CategoryIntro({
         </div>
       </div>
 
-      {/* ALT GRUP: şablon çipleri + hedef giriş çubuğu + Başla */}
-      <div className="shrink-0 pt-2 md:pt-0">
+      {/* ALT GRUP: şablon çipleri + hedef giriş çubuğu + Başla. `mb-6`
+          (mobil) — canlıda ekranın en altına yakın kesilen/kaybolan
+          "Hedefin" inputunu, altında net bir boşlukla yukarı iter; kök
+          kapsayıcının `pb-10`'u ile birlikte çift güvence sağlar. */}
+      <div className="shrink-0 pt-2 mb-6 md:pt-0 md:mb-0">
         {/* Akıllı şablon çipleri — yatay kaydırılabilir, ana başlıktan
             (DashboardHeader/kategori kartları) AYRI bir grup; whitespace-nowrap
             + shrink-0 (her çip zaten taşıyor) satır içi sarılmayı KESİN olarak
             engeller. `my-3` hem üstteki kartlardan hem alttaki "Hedefin"
             girişinden net bir boşlukla ayırır, ikisi de üzerine binmez. */}
-        <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 py-2 my-3 flex gap-2 overflow-x-auto no-scrollbar whitespace-nowrap w-full">
+        <div className="edge-fade-x -mx-4 md:-mx-6 px-4 md:px-6 pr-6 py-2 my-3 flex gap-2 overflow-x-auto no-scrollbar whitespace-nowrap w-full">
           {TEMPLATE_CHIPS.map((chip) => {
             const c = CATEGORIES[chip.category] || CATEGORIES.general;
             return (
