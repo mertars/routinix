@@ -55,6 +55,13 @@ export async function replacePlanContents(admin, plan, userId, builder) {
         // taşımayanlar) false'a düşer — "düzenle" akışı asla sessizce
         // tamamlanma geçmişini SIFIRLAMAZ.
         is_completed: t.is_completed ?? false,
+        // is_completed İLE AYNI koruma mantığı: builder'daki her görev, bu
+        // planı düzenlemeden ÖNCE DB'den yüklenirken widget'larını yolcu
+        // olarak taşımış olabilir (bkz. ManualPlanBuilder.jsx'in daysData
+        // pre-fill useState'i) — taşınmazsa PlanBoard'da eklenen widget'lar
+        // her "Değişiklikleri Kaydet" sonrası SESSİZCE SİLİNİRDİ (bu fonksiyon
+        // delete-all+insert-all yapıyor).
+        widgets: t.widgets ?? [],
         sort_order: idx,
       });
     });
@@ -62,14 +69,15 @@ export async function replacePlanContents(admin, plan, userId, builder) {
   let tasks = [];
   if (taskRows.length > 0) {
     let { data, error } = await admin.from("tasks").insert(taskRows).select();
-    // tasks.sort_order (bkz. supabase/task_sort_order.sql) HENÜZ
-    // çalıştırılmamış bir migration olabilir — client tarafındaki AYNI
+    // tasks.sort_order (bkz. supabase/task_sort_order.sql) VE tasks.widgets
+    // (bkz. supabase/task_widgets.sql) İKİSİ de SONRADAN eklenen, HENÜZ
+    // çalıştırılmamış olabilecek migration'lar — client tarafındaki AYNI
     // fail-open ilkesi (bkz. planService.saveManualPlanToSupabase) burada da
     // geçerli: eksik bir migration, kullanıcının GERÇEK düzenlemesini
     // kaydetmesini ASLA engellememeli.
     if (error?.code === "PGRST204") {
-      const withoutSortOrder = taskRows.map(({ sort_order, ...rest }) => rest);
-      ({ data, error } = await admin.from("tasks").insert(withoutSortOrder).select());
+      const stripped = taskRows.map(({ sort_order, widgets, ...rest }) => rest);
+      ({ data, error } = await admin.from("tasks").insert(stripped).select());
     }
     if (error) throw error;
     tasks = data || [];

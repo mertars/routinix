@@ -252,6 +252,7 @@ export async function saveManualPlanToSupabase(builder, userId) {
         estimated_cost: t.estimated_cost ?? null,
         map_search_query: t.map_search_query ?? null,
         is_completed: false,
+        widgets: t.widgets ?? [],
         // Builder'daki sürükle-bırak sırası — array index'i BİREBİR yazılır
         // (bkz. supabase/task_sort_order.sql + fetchPlanDetail/
         // fetchDashboardData'nın ikincil .order("sort_order") sorgusu).
@@ -263,17 +264,18 @@ export async function saveManualPlanToSupabase(builder, userId) {
   let tasks = [];
   if (taskRows.length > 0) {
     let { data, error } = await supabase.from("tasks").insert(taskRows).select();
-    // sort_order sütunu (bkz. supabase/task_sort_order.sql) henüz
-    // ÇALIŞTIRILMAMIŞ bir migration olabilir — PostgREST bunu "şema
-    // önbelleğinde böyle bir sütun yok" (PGRST204) hatasıyla reddeder.
-    // BU DURUMDA planın TAMAMEN kaydedilememesi YERİNE (sürükle-bırak
-    // sırası henüz kalıcı olmasa bile) sort_order'sız tekrar denenir —
-    // aynı fail-open ilkesi: eksik bir migration, kullanıcının GERÇEK
-    // planını kaydetmesini ASLA engellememeli.
+    // sort_order (bkz. supabase/task_sort_order.sql) VE widgets (bkz.
+    // supabase/task_widgets.sql) İKİSİ de SONRADAN eklenen, henüz
+    // ÇALIŞTIRILMAMIŞ olabilecek migration'lar — PostgREST eksik bir sütunu
+    // "şema önbelleğinde yok" (PGRST204) hatasıyla reddeder. Hangisi (ya da
+    // ikisi BİRDEN) eksik olursa olsun planın TAMAMEN kaydedilememesi
+    // YERİNE (o alan/alanlar henüz kalıcı olmasa bile) İKİSİ de çıkarılıp
+    // tekrar denenir — aynı fail-open ilkesi: eksik bir migration,
+    // kullanıcının GERÇEK planını kaydetmesini ASLA engellememeli.
     if (error?.code === "PGRST204") {
-      logger.warn("SUPABASE", "tasks.sort_order sütunu henüz yok (migration çalıştırılmamış) — sort_order'sız kaydediliyor", { error: error.message });
-      const withoutSortOrder = taskRows.map(({ sort_order, ...rest }) => rest);
-      ({ data, error } = await supabase.from("tasks").insert(withoutSortOrder).select());
+      logger.warn("SUPABASE", "tasks.sort_order/widgets sütunlarından biri henüz yok (migration çalıştırılmamış) — onlarsız kaydediliyor", { error: error.message });
+      const stripped = taskRows.map(({ sort_order, widgets, ...rest }) => rest);
+      ({ data, error } = await supabase.from("tasks").insert(stripped).select());
     }
     if (error) {
       logger.error("SUPABASE", "Manuel plan görevleri kaydedilemedi", { table: "tasks", action: "insert", planId: plan.id, error });
@@ -316,6 +318,35 @@ export async function setTaskWidgets(taskId, widgets) {
     logger.error("SUPABASE", "Görev widget'ları güncellenemedi", { table: "tasks", action: "update", taskId, error });
     throw error;
   }
+}
+
+// Toplu widget atamasında (bkz. usePlanStudio.batchApplyWidgets) hiç görevi
+// OLMAYAN bir güne widget eklenmek istendiğinde çağrılır — TEK, minimal bir
+// "taslak" görev satırı oluşturur (kullanıcı başlığını sonra kendi düzenler).
+// GÜVENLİK: bu, AŞAĞIDAKİ notta bahsedilen "AI Koç'un yüksek yetkili toplu
+// mutasyonu" DEĞİL — saveManualPlanToSupabase/saveWeekTasks İLE AYNI, RLS
+// `tasks_insert_own` politikasıyla zaten kısıtlı, kullanıcının KENDİ
+// başlattığı normal bir "yeni görev ekle" eylemi; doğrudan istemciden
+// (service_role turu GEREKMEDEN) yapılabilir.
+export async function createDraftTask(planId, userId, weekNumber, dayNumber, widgets) {
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      plan_id: planId,
+      user_id: userId,
+      week_number: weekNumber,
+      day_number: dayNumber,
+      title: "Yeni Görev",
+      is_completed: false,
+      widgets: widgets || [],
+    })
+    .select()
+    .single();
+  if (error) {
+    logger.error("SUPABASE", "Taslak görev oluşturulamadı", { table: "tasks", action: "insert", planId, dayNumber, error });
+    throw error;
+  }
+  return data;
 }
 
 // GÜVENLİK NOTU: updateTasksBulk / insertTasks fonksiyonları buradan

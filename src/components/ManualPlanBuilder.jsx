@@ -38,6 +38,7 @@ import { parseFileWithGemini } from "../services/fileParseService";
 import { buildIcsCalendar, downloadIcsFile } from "../utils/icsExport";
 import ImportFormatModal from "./ImportFormatModal";
 import ExportFormatModal from "./ExportFormatModal";
+import { WidgetAddButton, WidgetList } from "./TaskWidgets";
 
 const PrintablePlan = lazy(() => import("./PrintablePlan"));
 
@@ -271,6 +272,11 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
         estimated_cost: t.estimated_cost ?? null,
         map_search_query: t.map_search_query ?? null,
         is_completed: t.is_completed ?? false,
+        // is_completed İLE AYNI ilke: DB'den YÜKLENEN widget'lar burada
+        // YOLCU olarak taşınır — taşınmazsa "Değişiklikleri Kaydet"
+        // (replacePlanContents, delete-all+insert-all) kullanıcının PlanBoard'da
+        // eklediği widget'ları SESSİZCE SİLERDİ.
+        widgets: t.widgets ?? [],
       });
     }
     return grouped;
@@ -1453,6 +1459,11 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                         placeholder="Görev başlığı..."
                         className="flex-1 min-w-0 bg-transparent outline-none text-[13.5px] font-semibold text-[var(--text-primary)] placeholder:text-[var(--placeholder)]"
                       />
+                      {/* PlanBoard/TaskCard.jsx İLE AYNI widget kütüphanesi —
+                          burada eklenen widget'lar Kaydet'e kadar yalnızca
+                          builder'ın YEREL state'inde yaşar, tıpkı diğer tüm
+                          görev alanları gibi. */}
+                      <WidgetAddButton onAdd={(w) => updateTask(t.localId, { widgets: [...(t.widgets || []), w] })} />
                       <button onClick={() => removeTask(t.localId)} aria-label="Görevi sil" className="shrink-0 w-11 h-11 md:w-7 md:h-7 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-[#FF6E92] transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -1488,6 +1499,15 @@ export default function ManualPlanBuilder({ open, category, editingPlan, onClose
                         })}
                       </div>
                     </div>
+
+                    {/* Eklenen widget'ların canlı önizlemesi — silinebilir/
+                        düzenlenebilir neon pill/kart satırı (bkz.
+                        TaskWidgets.jsx). */}
+                    {(t.widgets || []).length > 0 && (
+                      <div className="pl-0 sm:pl-6">
+                        <WidgetList widgets={t.widgets || []} onChange={(next) => updateTask(t.localId, { widgets: next })} />
+                      </div>
+                    )}
                   </div>
                   );
                 })}

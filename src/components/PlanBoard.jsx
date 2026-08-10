@@ -1,8 +1,9 @@
-import { useState, useMemo, memo } from "react";
+import { useState, useMemo, useRef, memo } from "react";
 import { MONO_FONT, categoryOf } from "../constants";
 import Accordion from "./Accordion";
 import TaskCard from "./TaskCard";
 import RoutineDetailModal from "./RoutineDetailModal";
+import DayBatchWidgetModal from "./DayBatchWidgetModal";
 import { routineEmoji, routineMicroLabel } from "../utils/routineText";
 import { isRoutineChecked, setRoutineChecked } from "../utils/routineCheckin";
 
@@ -108,6 +109,7 @@ export default function PlanBoard({
   nextWeekError,
   onToggleTask,
   onUpdateTaskWidgets,
+  onBatchApplyWidgets,
   onLoadNextWeek,
   onStartPomodoro,
   onPrint,
@@ -116,6 +118,8 @@ export default function PlanBoard({
 }) {
   const [activeDay, setActiveDay] = useState(null);
   const [detailRoutine, setDetailRoutine] = useState(null);
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const batchBtnRef = useRef(null);
 
   // Yüklü (AI/DB) günleri gün no → gün verisi eşlemesine çevir + takvim
   // hücrelerini üret. `weeks`/`plan.total_days` değişmediği sürece (ör. yalnızca
@@ -215,6 +219,26 @@ export default function PlanBoard({
             >
               🖨️ PDF / Yazdır
             </button>
+            {onBatchApplyWidgets && (
+              <>
+                <button
+                  ref={batchBtnRef}
+                  onClick={() => setBatchModalOpen((v) => !v)}
+                  className="flex items-center gap-1.5 rounded-lg px-2.5 h-8 text-[11.5px] font-semibold transition-colors"
+                  style={{ background: "rgba(16,185,129,0.16)", color: "#10B981", border: "1px solid rgba(16,185,129,0.4)" }}
+                >
+                  ✨ Günlük Widget / Şablon Ekle
+                </button>
+                <DayBatchWidgetModal
+                  anchorRef={batchBtnRef}
+                  open={batchModalOpen}
+                  onClose={() => setBatchModalOpen(false)}
+                  calendar={calendar}
+                  activeDayNumber={effectiveActiveDay}
+                  onApply={onBatchApplyWidgets}
+                />
+              </>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 mb-1">

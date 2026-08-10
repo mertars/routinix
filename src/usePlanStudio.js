@@ -18,6 +18,7 @@ import {
   saveManualPlanToSupabase,
   setTaskCompleted as setTaskCompletedSvc,
   setTaskWidgets as setTaskWidgetsSvc,
+  createDraftTask as createDraftTaskSvc,
   fetchUserPlans,
   fetchPlanDetail,
   deletePlan as deletePlanSvc,
@@ -27,6 +28,7 @@ import { updateManualPlanInSupabase } from "./services/planEditService";
 import { setHapticsEnabled } from "./lib/haptics";
 import logger from "./utils/logger";
 import { runWhenIdle } from "./utils/idle";
+import { createWidget } from "./utils/taskWidgets";
 
 // Yalnızca `taskId`'nin ait olduğu hafta/gün nesnesini yeniden oluşturup
 // içindeki tek görevi `patch` ile güncelleyen SAF (pure) yardımcı —
@@ -49,6 +51,28 @@ function patchTaskInWeeks(weeks, taskId, patch) {
     return weeks.map((ww) => (ww === w ? nextWeek : ww));
   }
   return weeks;
+}
+
+// Yeni oluşturulan bir görev satırını (bkz. batchApplyWidgets'ın boş günler
+// için oluşturduğu taslak görev) doğru hafta/gün nesnesine EKLEYEN SAF
+// yardımcı. Hedef hafta YOKSA (normalde erişilmez — batchApplyWidgets
+// yalnızca zaten yüklü/kilitsiz günleri hedefler) hiçbir şey yapmadan
+// weeks'i AYNEN döner.
+function addTaskToWeeks(weeks, weekNumber, dayNumber, newTask) {
+  const weekIdx = weeks.findIndex((w) => w.weekNumber === weekNumber);
+  if (weekIdx === -1) return weeks;
+  const week = weeks[weekIdx];
+  const dayIdx = week.days.findIndex((d) => d.dayNumber === dayNumber);
+  let nextDays;
+  if (dayIdx === -1) {
+    nextDays = [...week.days, { dayNumber, tasks: [newTask] }].sort((a, b) => a.dayNumber - b.dayNumber);
+  } else {
+    nextDays = week.days.slice();
+    nextDays[dayIdx] = { ...nextDays[dayIdx], tasks: [...nextDays[dayIdx].tasks, newTask] };
+  }
+  const nextWeeks = weeks.slice();
+  nextWeeks[weekIdx] = { ...week, days: nextDays };
+  return nextWeeks;
 }
 
 // DB'den gelen düz tasks satırlarını haftalara/günlere gruplar.
@@ -419,6 +443,85 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     });
   }, []);
 
+  // ---- Toplu Widget Atama (Day Batch Selector) — DayBatchWidgetModal.jsx'ten
+  // çağrılır. `dayNumbers`: hedef gün numaraları (kilitsiz/erişilebilir
+  // olduğu ÇAĞIRAN tarafından garanti edilir). `widgetTypes`: taskWidgets.js
+  // kataloğundan seçilen tür anahtarları (ör. ["time","calorie"]).
+  //
+  // İKİ AYRI hedef kitle: (a) o gün ZATEN görevi olan günler — HER görevine
+  // seçilen widget'ların TAZE birer kopyası (varsa MEVCUT widget'ların
+  // YANINA, üzerine YAZMADAN) eklenir; (b) hiç görevi OLMAYAN günler — TEK,
+  // minimal bir "taslak" görev oluşturulup widget'lar ONA eklenir (bkz.
+  // planService.createDraftTask).
+  //
+  // STRICTMODE NOTU: hesaplama (hangi gün boş/dolu, hangi görev hangi
+  // widget'ı alacak) setWeeks'İN İÇİNDEKİ bir updater fonksiyonu YERİNE
+  // BURADA, dıştaki `weeks`'ten SAF olarak yapılır — updater fonksiyonları
+  // React 18 StrictMode'da (geliştirmede) İKİ KEZ çağrılabilir; içeride DB
+  // yazması TETİKLEYEN bir yan etki (affectedTaskUpdates.push) olsaydı bu
+  // ÇİFT widget eklenmesine/çift DB yazmasına yol açardı.
+  const batchApplyWidgets = useCallback(
+    (dayNumbers, widgetTypes) => {
+      if (!Array.isArray(dayNumbers) || dayNumbers.length === 0 || !Array.isArray(widgetTypes) || widgetTypes.length === 0) return;
+
+      const affectedTaskUpdates = []; // {taskId, widgets}
+      const emptyDayNumbers = [];
+      let nextWeeks = weeks;
+
+      for (const dayNum of dayNumbers) {
+        let dayFound = null;
+        for (const w of nextWeeks) {
+          const day = w.days.find((d) => d.dayNumber === dayNum);
+          if (day) {
+            dayFound = day;
+            break;
+          }
+        }
+        if (!dayFound || dayFound.tasks.length === 0) {
+          emptyDayNumbers.push(dayNum);
+          continue;
+        }
+        for (const task of dayFound.tasks) {
+          const freshWidgets = widgetTypes.map(createWidget).filter(Boolean);
+          const nextTaskWidgets = [...(task.widgets || []), ...freshWidgets];
+          affectedTaskUpdates.push({ taskId: task.id, widgets: nextTaskWidgets });
+          nextWeeks = patchTaskInWeeks(nextWeeks, task.id, { widgets: nextTaskWidgets });
+        }
+      }
+
+      if (nextWeeks !== weeks) {
+        startTransition(() => setWeeks(nextWeeks));
+      }
+
+      if (affectedTaskUpdates.length > 0) {
+        runWhenIdle(() => {
+          for (const { taskId, widgets } of affectedTaskUpdates) {
+            setTaskWidgetsSvc(taskId, widgets).catch((err) => logger.error("TASK", "Toplu widget kaydı başarısız", { taskId, error: err?.message }));
+          }
+        });
+      }
+
+      // Boş günler için taslak görev — GERÇEK bir insert (id gerektiği için
+      // idle'a ERTELENEMEZ, ama kullanıcının akışını BLOKLAMAZ: buton
+      // hemen tepki verir, taslaklar arka planda tek tek eklenir).
+      if (emptyDayNumbers.length > 0 && dbPlan?.id && user?.id) {
+        (async () => {
+          for (const dayNum of emptyDayNumbers) {
+            try {
+              const widgets = widgetTypes.map(createWidget).filter(Boolean);
+              const weekNumber = Math.max(1, Math.ceil(dayNum / 7));
+              const row = await createDraftTaskSvc(dbPlan.id, user.id, weekNumber, dayNum, widgets);
+              setWeeks((prev) => addTaskToWeeks(prev, weekNumber, dayNum, row));
+            } catch (err) {
+              logger.error("TASK", "Taslak görev oluşturulamadı", { dayNum, error: err?.message });
+            }
+          }
+        })();
+      }
+    },
+    [weeks, dbPlan, user]
+  );
+
   // ---- Kayıtlı bir planı yeniden aç ----
   const openSavedPlan = useCallback(async (planId) => {
     setStage(STAGE_LOADING);
@@ -550,7 +653,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
     // setter/aksiyon
     setGoal, setExtraNote, setMenuOpen, setRemindersOn, setHapticsOn,
     handleCategoryChange, startOnboarding, setAnswer, goNextQuestion, goPrevQuestion, finalizeAndGenerate,
-    loadNextWeek, toggleTask, updateTaskWidgets, openSavedPlan, deletePlan, startNewPlan, resetToIntro, startFromTemplate,
+    loadNextWeek, toggleTask, updateTaskWidgets, batchApplyWidgets, openSavedPlan, deletePlan, startNewPlan, resetToIntro, startFromTemplate,
     applyCoachAction, sendCoachMessage,
     openManualBuilder, closeManualBuilder, saveManualPlan,
   };
