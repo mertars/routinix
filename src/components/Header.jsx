@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Timer, BarChart3, Users2, Menu, X, Play, Pause, Maximize2 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useMusic } from "../context/MusicContext";
