@@ -371,8 +371,15 @@ export default function App() {
           bu satır yalnızca ONU doldurur. `100vh` DEĞİL bu yüzden `100dvh`
           sorunu (iOS Safari adres çubuğu) burada da otomatik çözülür — dvh
           birimi hiç kullanılmadan, üst kapsayıcının GERÇEK (fixed) boyutuna
-          bağlanarak. Masaüstünde (md:) eski min-h-screen/doğal akış korunur. */}
-      <div className="relative z-10 flex flex-col text-[var(--text-primary)] h-full md:h-auto md:min-h-screen">
+          bağlanarak. Masaüstünde (md:) eski min-h-screen/doğal akış korunur —
+          TEK istisna: `onIntroLike` iken `lg:h-screen lg:overflow-hidden`
+          eklenir (ana ekranın masaüstünde scroll'suz tek ekrana sığması
+          için, bkz. CategoryIntro.jsx'in kendi lg: notu). Bu SADECE
+          intro/loading/error aşamalarında devrede — Plan Board (STAGE_PLAN)
+          ve Wizard'ın masaüstü doğal sayfa kaydırması BİREBİR korunur. */}
+      <div
+        className={`relative z-10 flex flex-col text-[var(--text-primary)] h-full md:h-auto md:min-h-screen ${onIntroLike ? "lg:h-screen lg:overflow-hidden" : ""}`}
+      >
         {/* Misafir şeridi — Header'ın (sticky top-0 z-20) hemen ÜSTÜNDE DOM
             sırasıyla, kendisi de sticky top-0 z-30: art arda gelen sticky
             elemanlar tarayıcıda üst üste istiflenir, Header'ın piksel
@@ -440,7 +447,7 @@ export default function App() {
           // sayfa akışına (overflow-visible) döner, değişiklik YOK.
           className={`flex-1 min-h-0 w-full mx-auto ${
             onIntroLike
-              ? "max-w-7xl px-4 md:px-6 pt-4 md:pt-8 pb-4 md:pb-10 flex flex-col"
+              ? "max-w-7xl px-4 md:px-6 pt-4 md:pt-8 pb-4 md:pb-10 lg:pt-5 lg:pb-5 flex flex-col lg:overflow-hidden"
               : stage === STAGE_PLAN
                 ? "max-w-7xl px-4 md:px-8 pt-6 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] overflow-y-auto md:overflow-visible"
                 : "max-w-xl px-5 pt-6 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] overflow-y-auto md:overflow-visible"

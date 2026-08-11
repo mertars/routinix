@@ -94,8 +94,19 @@ export default function CategoryIntro({
   // `px-4 md:px-6 pt-4 md:pt-8 pb-4 md:pb-10` veriyor — üstüne bir p-3 daha
   // eklemek dikeyde tam bu turun amacına (taşmadan sığdırma) ters, yatayda
   // da chip şeritlerinin edge-to-edge kaydırma hizasını bozardı.
+  // NOT (masaüstü no-scroll): md: (768-1023px, tablet) BİLEREK eski
+  // serbest-akış davranışını (overflow-visible/justify-normal) korur —
+  // yalnızca lg: (1024px+, gerçek masaüstü) yeniden mobildeki gibi
+  // "yüksekliğe sığdır, taşma yok" moduna döner. Bu, lg: kuralının CSS
+  // kaynak sırasında md:'den SONRA gelmesiyle çalışır (Tailwind breakpoint
+  // sıralaması) — aynı özgüllükte SONRAKİ kural kazanır. `lg:h-full` (SABİT
+  // `lg:h-screen` DEĞİL): app.jsx'teki üst kapsayıcı zaten yalnızca
+  // `onIntroLike` iken `lg:h-screen lg:overflow-hidden` oluyor — bu bileşen
+  // o ÖNCEDEN doğru boyutlandırılmış kapsayıcının içinde `h-full` ile onu
+  // doldurur; burada AYRICA `h-screen` yazılırsa Header/GuestBanner
+  // yüksekliği İKİ KEZ sayılır, taşma daha da KÖTÜLEŞİRDİ.
   return (
-    <div className="relative flex flex-col h-full max-h-full overflow-hidden justify-between gap-2 [@media(max-height:700px)]:gap-1 md:h-auto md:max-h-none md:overflow-visible md:justify-normal md:gap-8 animate-[fadeIn_0.35s_ease]">
+    <div className="relative flex flex-col h-full max-h-full overflow-hidden justify-between gap-2 [@media(max-height:700px)]:gap-1 md:h-auto md:max-h-none md:overflow-visible md:justify-normal md:gap-8 lg:h-full lg:max-h-full lg:overflow-hidden lg:justify-between lg:gap-4 animate-[fadeIn_0.35s_ease]">
       {/* ÜST GRUP: kayıtlı planlar (kompakt strip) + hero başlık */}
       <div className="shrink-0 flex flex-col gap-2.5 [@media(max-height:700px)]:gap-1.5 md:gap-6">
         {savedPlans.length > 0 && (
@@ -144,7 +155,7 @@ export default function CategoryIntro({
       <div className="shrink-0 py-2 [@media(max-height:700px)]:py-1 md:py-0">
         <div
           data-tour-id="tour-category-cards"
-          className="relative w-full max-w-4xl mx-auto grid grid-cols-2 auto-rows-fr gap-2.5 md:gap-5"
+          className="relative w-full max-w-7xl mx-auto grid grid-cols-2 auto-rows-fr gap-2.5 md:gap-5"
         >
           {CATEGORY_KEYS.map((key) => {
             const c = CATEGORIES[key];
