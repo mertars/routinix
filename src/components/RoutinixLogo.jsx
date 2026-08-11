@@ -13,10 +13,16 @@
 // `prefers-reduced-motion: reduce` kullanıcılarında animasyonu otomatik
 // durdurur (Tailwind yerleşik davranışı, bkz. CategoryIntro.jsx'teki AYNI
 // desen).
-export default function RoutinixLogo({ size = 36, animated = true, className = "" }) {
-  const radius = `${size * 0.28}px`;
+//
+// `round`: uygulama İÇİNDE (Header.jsx) her zaman `false` — app'in genel
+// "yuvarlatılmış kare" tasarım dili (kartlar/butonlar) ile tutarlı kalır.
+// `true` YALNIZCA profil fotoğrafı export'ları için — sosyal medya
+// platformları (X/Discord/TikTok vb.) avatarları daireye kırptığından,
+// köşeleri kırpılınca çarpıklaşan kare yerine baştan tam daire üretilir.
+export default function RoutinixLogo({ size = 36, animated = true, round = false, className = "" }) {
+  const radius = round ? "50%" : `${size * 0.28}px`;
   const borderWidth = Math.max(1.5, size * 0.06);
-  const innerRadius = `${Math.max(0, size * 0.28 - borderWidth)}px`;
+  const innerRadius = round ? "50%" : `${Math.max(0, size * 0.28 - borderWidth)}px`;
 
   return (
     <div className={`relative shrink-0 ${className}`} style={{ width: `${size}px`, height: `${size}px` }}>
@@ -29,6 +35,7 @@ export default function RoutinixLogo({ size = 36, animated = true, className = "
 
       <div className="absolute inset-0 overflow-hidden" style={{ borderRadius: radius }}>
         <div
+          data-testid="logo-sweep"
           className={animated ? "absolute motion-safe:animate-spin" : "absolute"}
           style={{
             inset: "-50%",
