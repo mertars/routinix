@@ -305,7 +305,6 @@ const HeroZone = memo(function HeroZone({
   breakMin,
   adjustDuration,
   isFocusMode,
-  onClose,
 }) {
   return (
     <div className="flex flex-col items-center w-full h-full justify-between md:justify-normal">
@@ -331,19 +330,21 @@ const HeroZone = memo(function HeroZone({
       <div className="w-full grid transition-[grid-template-rows] duration-500 ease-out" style={{ gridTemplateRows: isFocusMode ? "0fr" : "1fr" }}>
         <div className="overflow-hidden min-h-0">
           <div className={`flex flex-col items-center gap-3 sm:gap-5 pt-4 sm:pt-7 pb-4 sm:pb-7 transition-opacity duration-300 ${isFocusMode ? "opacity-0" : "opacity-100"}`}>
-            {/* Kapatma (X) — mobilde üst bardan BURAYA taşındı (kronometre
-                halkasının hemen altı, görev rozetinin hemen üstü): üst
-                barda Görevler/Spotify/Odak Modu/Kapat rozetleri dar
-                ekranlarda ekran dışına taşıyordu (bildirilen hata). Aynı
-                `onClose` — konum değişti, davranış aynı. Masaüstünde
-                (md:hidden) bu buton YOK, üst bardaki ORİJİNAL X kullanılmaya
-                devam ediyor (bkz. üst bar, hidden md:flex). */}
+            {/* Müzik (Spotify) tetikleyicisi — üst bardan BURAYA taşındı:
+                kronometre halkasının hemen altı, görev seçim rozetinin
+                hemen üstü, ortalanmış tek bir buton. Üst barda iki ayrı
+                Spotify kısayolu (masaüstü metin + mobil ikon) olması hem
+                gereksiz tekrardı hem dar ekranlarda taşmaya katkıda
+                bulunuyordu. Tıklanınca AYNI global paneli DOĞRUDAN açar/
+                kapatır (bkz. openSpotifyPanel — zaten çift-yönlü toggle,
+                aradan bir menü/yönlendirme geçmiyor). */}
             <button
-              onClick={onClose}
-              aria-label="Kapat"
-              className="md:hidden w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 dark:text-white/45 dark:hover:text-white bg-black/[0.04] dark:bg-white/[0.04] transition-all active:scale-95"
+              onClick={onOpenSpotify}
+              aria-label="Müzik Oynatıcıyı Aç"
+              className="w-11 h-11 rounded-full flex items-center justify-center transition-all active:scale-95"
+              style={{ background: "rgba(29,185,84,0.14)", color: "#1DB954", border: "1px solid rgba(29,185,84,0.4)", boxShadow: "0 0 16px -6px #1DB954" }}
             >
-              <X className="w-4 h-4" />
+              <Music2 className="w-[18px] h-[18px]" strokeWidth={2.25} />
             </button>
             <SelectedTaskBadge selectedTask={selectedTask} accent={accent} onOpen={onOpenTaskDrawer} />
             <DurationSteppers workMin={workMin} breakMin={breakMin} running={running} adjustDuration={adjustDuration} />
@@ -501,7 +502,6 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
     adjustDuration,
     isFocusMode,
     onOpenTaskDrawer,
-    onClose,
   };
 
   // NOT: `open` false iken artık `return null` YAPILMIYOR — CountdownDisplay
@@ -525,14 +525,13 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
           <h2 className="text-[17px] font-bold text-gray-900 dark:text-white whitespace-nowrap">Focus Studio</h2>
         </div>
         <div className="flex items-center gap-2">
-          {/* Görevler ve Planlar + Spotify — Odak Modu'nda gizlenir. Spotify
-              butonu GlobalMusicPlayer.jsx'i (App kökünde, bu bileşenin
-              DIŞINDA render edilir — sabit/fixed konumlandığı için bir
-              buton'a "relative" ile bağlı olmasına gerek yok) açar/kapatır;
-              gerçek panel/oynatıcı state'i global MusicContext'te YAŞAR,
-              Focus Studio kapansa da kaybolmaz. Mobilde AYNI tetikleyici
-              artık Duraklat/Başlat'ın yanında da var (bkz. ControlButtons)
-              — bu üst bar butonu masaüstünde ek bir kısayol. */}
+          {/* Görevler ve Planlar — Odak Modu'nda gizlenir. NOT: Spotify
+              tetikleyicisi ÜST BARDAN TAMAMEN KALDIRILDI — artık HeroZone
+              içinde, kronometre halkasının hemen altında, ortalanmış tek
+              bir buton olarak yaşıyor (bkz. aşağıdaki HeroZone). Üst barda
+              iki ayrı (masaüstü metin + mobil ikon) Spotify tetikleyicisi
+              olması hem gereksiz tekrardı hem de mobilde dar ekranlarda
+              butonların taşmasına (bildirilen hata) katkıda bulunuyordu. */}
           <div className={`hidden md:flex items-center gap-2 transition-opacity duration-300 ${isFocusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
             <button
               onClick={onOpenTaskDrawer}
@@ -541,14 +540,6 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
             >
               <ClipboardList className="w-3.5 h-3.5" strokeWidth={2.25} />
               Görevler ve Planlar
-            </button>
-            <button
-              onClick={openSpotifyPanel}
-              className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[12px] font-bold whitespace-nowrap transition-all"
-              style={{ background: music.panelOpen ? "#1DB9541f" : "rgba(var(--overlay-rgb),0.04)", color: "#1DB954" }}
-            >
-              <Music2 className="w-3.5 h-3.5" strokeWidth={2.25} />
-              Spotify
             </button>
           </div>
 
@@ -562,26 +553,6 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
             style={{ background: `color-mix(in srgb, ${BRAND_ACCENT} 10%, transparent)`, color: BRAND_ACCENT }}
           >
             <ClipboardList className="w-4 h-4" strokeWidth={2.25} />
-          </button>
-
-          {/* Mobilde yuvarlak Spotify tetikleyicisi — ÜST BARDA, ekranı
-              kaydırmadan HER ZAMAN erişilebilir (eskiden mobilde üst barda
-              hiç Spotify kısayolu yoktu — yalnızca Duraklat/Başlat'ın
-              yanındaki kontrol grubunda ve aşağıda kaydırma gerektirebilen
-              FocusMusicControlCard'da vardı, bkz. HeroZone). Tıklanınca AYNI
-              global mini paneli açar (music.openPanel — artık mobilde
-              kompakt/yatay format, bkz. GlobalMusicPlayer.jsx). Masaüstünde
-              zaten üstteki "Spotify" metin butonu var (hidden md:flex
-              grubu) — bu yalnızca md:hidden. */}
-          <button
-            onClick={openSpotifyPanel}
-            aria-label="Spotify'ı Aç"
-            className={`md:hidden w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
-              isFocusMode ? "opacity-0 pointer-events-none scale-95" : "opacity-100 scale-100"
-            }`}
-            style={{ background: music.panelOpen ? "rgba(29,185,84,0.22)" : "rgba(29,185,84,0.12)", color: "#1DB954" }}
-          >
-            <Music2 className="w-4 h-4" strokeWidth={2.25} />
           </button>
 
           <button
@@ -598,14 +569,15 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
           >
             💡 {isFocusMode ? "Işıkları Aç" : "Odak Modu"}
           </button>
-          {/* MOBİLDE KALDIRILDI (bildirilen hata: üst bar dar ekranlarda
-              taşıyordu) — aynı kapatma eylemi artık HeroZone içinde,
-              kronometre halkasının altında (bkz. yukarıdaki yeni buton).
-              Masaüstünde (md:flex) ORİJİNAL konumunda, davranış DEĞİŞMEDİ. */}
+          {/* Kapatma (X) — HER ZAMAN üst barın sağ ucunda (mobil dahil).
+              Üst bar zaten `flex items-center justify-between` ile
+              butonları sıkıştırmadan sığdırıyor; taşma asıl sebebi buradaki
+              buton DEĞİL, artık kaldırılan Spotify tetikleyicisiydi (bkz.
+              yukarı). */}
           <button
             onClick={onClose}
             aria-label="Kapat"
-            className={`hidden md:flex w-9 h-9 rounded-full items-center justify-center text-gray-500 hover:text-gray-900 dark:text-white/45 dark:hover:text-white bg-black/[0.04] dark:bg-white/[0.04] transition-all duration-300 ${
+            className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 dark:text-white/45 dark:hover:text-white bg-black/[0.04] dark:bg-white/[0.04] transition-all duration-300 ${
               isFocusMode ? "opacity-0 pointer-events-none scale-95" : "opacity-100 scale-100"
             }`}
           >

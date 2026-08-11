@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, LogIn, LogOut, RefreshCw, CircleUserRound } from "lucide-react";
+import { X } from "lucide-react";
 import { useMusic, SPOTIFY_PRESET_PLAYLISTS } from "../context/MusicContext";
 
 const SPOTIFY_PLAYLIST_URL_RE = /playlist\/([a-zA-Z0-9]+)/;
@@ -35,17 +35,14 @@ export default function GlobalMusicPlayer() {
   const tint = SPOTIFY_TINT;
 
   return (
-    // MOBİL FIX: eskiden `right-6 top-20 bottom-8` HER ekran boyutunda
-    // uygulanıyordu — mobilde bu, neredeyse tam ekran yüksekliğinde DİKEY
-    // bir panel demekti. Spotify'ın embed iframe'i (aşağıdaki mount noktası)
-    // kendi içeriğine göre KOMPAKT/yatay bir yükseklikte (~152px) render
-    // oluyor; kalan devasa boşluk (arkadaki koyu kutunun İÇİNDE, iframe'in
-    // KENDİSİ beyaz) "altı tamamen beyaz" olarak görülüyordu. Mobilde artık
-    // `top-20` (Focus Studio üst barının hemen altı) + yükseklik TAMAMEN
-    // İÇERİK-GÜDÜMLÜ (bottom-anchor YOK) — küçük, yatay bir mini-panel.
-    // Masaüstü (md:) davranışı BİREBİR korunuyor (right-6/bottom-8/w-420px).
+    // MOBİL FORMAT: masaüstündeki gibi TAM DİKEY kart — `left-0 right-0
+    // w-[92%] max-w-md mx-auto` ile ORTALANMIŞ, sabit genişlikte bir modal
+    // (eskiden `left-4 right-4` kenar boşluklu/gerilmiş bir şeritti). Kenar
+    // boşluğu (left/right) DEĞİL genişlik (w-[92%]) + otomatik yatay margin
+    // (mx-auto) merkezliyor. Masaüstü (md:) davranışı BİREBİR korunuyor
+    // (right-6/bottom-8/w-420px, sağdan kayan panel).
     <div
-      className={`fixed left-4 right-4 top-20 z-[95] md:left-auto md:right-6 md:bottom-8 md:w-[420px] md:max-w-[calc(100vw-3rem)] transition-all duration-300 ease-out ${
+      className={`fixed left-0 right-0 top-20 z-[95] w-[92%] max-w-md mx-auto md:left-auto md:right-6 md:w-[420px] md:max-w-[calc(100vw-3rem)] md:mx-0 md:bottom-8 transition-all duration-300 ease-out ${
         m.panelOpen ? "translate-x-0 opacity-100 pointer-events-auto" : "translate-x-10 opacity-0 pointer-events-none"
       }`}
       aria-hidden={!m.panelOpen}
@@ -90,17 +87,16 @@ export default function GlobalMusicPlayer() {
               display:none'lı bir iframe'i Page Visibility API üzerinden
               "hidden" sayıp arkadaki oynatmayı durdurabilir.
               YÜKSEKLİK NOTU: burası bir ÇALMA LİSTESİ embed'i (spotify:
-              playlist:..., bkz. MusicContext.jsx) — Spotify'ın tek şarkı/
-              bölüm için kullandığı ultra-kompakt 152px "bar" formatı bir
-              PLAYLIST için yetersiz kalıp içeriği (kapak+başlık+şarkı
-              listesi) kırpıyor, bu da bildirilen "dikeyde patlamış/altı
-              beyaz" görünümün asıl nedeniydi. Spotify'ın resmi playlist
-              embed'i ~352px'te kapak+başlık+kontroller+şarkı listesini TAM
-              gösterir (web'deki orijinal kart formatı) — mobilde artık bu
-              yükseklik kullanılıyor. Masaüstünde (md:) eski flex-1
-              davranışı aynen korunuyor. */}
+              playlist:..., bkz. MusicContext.jsx, width:"100%" height:"100%"
+              + theme:"0" ile oluşturuluyor) — Spotify'ın tek şarkı/bölüm
+              için kullandığı ultra-kompakt "bar" formatı bir PLAYLIST için
+              yetersiz kalıp içeriği (kapak+başlık+şarkı listesi) kırpıyordu.
+              Spotify'ın resmi playlist embed'i 380px'te (masaüstündeki AYNI
+              kart formatı) kapak+başlık+kontroller+şarkı listesini kenarlardan
+              kırpılmadan TAM gösterir — mobilde artık bu yükseklik kullanılıyor.
+              Masaüstünde (md:) eski flex-1 davranışı aynen korunuyor. */}
           <div
-            className="relative w-full max-w-full h-[352px] shrink-0 md:flex-1 md:h-auto md:min-h-0 rounded-xl overflow-hidden border"
+            className="relative w-full max-w-full h-[380px] shrink-0 md:flex-1 md:h-auto md:min-h-0 rounded-xl overflow-hidden border"
             style={{ borderColor: `${tint}33` }}
           >
             <div ref={m.spotifyMountRef} className="absolute inset-0" />
@@ -137,32 +133,13 @@ function SpotifyControls() {
   };
 
   return (
+    // Hesap bağlama (OAuth "Spotify Hesabını Bağla") satırı BİLEREK KALDIRILDI:
+    // bu, harici bir Spotify yönlendirmesiydi ve butona basar basmaz doğrudan
+    // oynatıcının açılması gereken bir akışta gereksiz bir ara adımdı. Çalma
+    // (aşağıdaki embed) zaten hesap bağlamadan da çalışıyor — connectSpotify/
+    // spotifyProfile context'te (MusicContext.jsx) DOKUNULMADAN duruyor,
+    // yalnızca bu panelin UI'ından çıkarıldı.
     <div className="shrink-0 flex flex-col gap-2 mb-3">
-      {/* Hesap satırı — kişisel kütüphaneye erişim İÇİN OAuth (bkz.
-          MusicContext.jsx dosya başı yorumu: gerçek çalma yine bu
-          bileşenin altındaki AYNI Embed oynatıcı üzerinden olur). */}
-      {m.spotifyAuthStatus === "ready" && m.spotifyProfile ? (
-        <div className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 bg-white/[0.04] border border-white/10">
-          <div className="flex items-center gap-2 min-w-0">
-            <CircleUserRound className="w-4 h-4 shrink-0 text-emerald-400" />
-            <span className="text-[11.5px] font-semibold text-white/80 truncate">{m.spotifyProfile.displayName}</span>
-          </div>
-          <button onClick={m.disconnectSpotify} className="shrink-0 flex items-center gap-1 text-[11px] font-semibold text-white/40 hover:text-white/70 transition-colors">
-            <LogOut className="w-3 h-3" /> Çıkış
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={m.connectSpotify}
-          disabled={m.spotifyAuthStatus === "connecting"}
-          className="flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-[12px] font-bold transition-colors bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 disabled:opacity-60"
-        >
-          {m.spotifyAuthStatus === "connecting" ? <RefreshCw className="w-3.5 h-3.5 motion-safe:animate-spin" /> : <LogIn className="w-3.5 h-3.5" />}
-          {m.spotifyAuthStatus === "connecting" ? "Bağlanıyor..." : "Spotify Hesabını Bağla"}
-        </button>
-      )}
-      {m.spotifyAuthStatus === "error" && m.spotifyAuthError && <p className="text-[10.5px] text-rose-400 px-0.5">{m.spotifyAuthError}</p>}
-
       <div className="flex items-center gap-1.5">
         <select
           value={isKnownPlaylist ? m.spotifyPlaylistId : "custom"}
