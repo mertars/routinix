@@ -338,11 +338,15 @@ const HeroZone = memo(function HeroZone({
 
       <ControlButtons running={running} toggleRunning={toggleRunning} resetTimer={resetTimer} accent={accent} onOpenSpotify={onOpenSpotify} />
 
-      {/* Müzik kontrol kartı — Odak Modu'nda BİLE gizlenmez (diğer "ekstra"
-          UI'ların aksine): müzik, tam da minimal/dikkat dağıtmayan Odak
-          Modu'nda en çok işe yarayan kontrol — kullanıcı burada kalmaya
-          devam etsin diye ayrı bir panele gitmesine gerek KALMASIN. */}
-      <div className="pt-4 sm:pt-6 pb-2 w-full flex justify-center">
+      {/* Müzik kontrol kartı — MASAÜSTÜNDE Odak Modu'nda BİLE gizlenmez
+          (müzik, minimal/dikkat dağıtmayan Odak Modu'nda en çok işe yarayan
+          kontrol). MOBİLDE artık `hidden`: bu kart, çalma başlamadan önce
+          yalnızca "Odak için müzik başlat" yazan boş bir buton gösteriyordu
+          (üst bardaki YENİ yuvarlak Spotify tetikleyicisiyle birebir aynı
+          işi yapan, ekranın EN ALTINDA — kısa cihazlarda kaydırma
+          gerektiren — gereksiz bir tekrar). Masaüstünde davranış BİREBİR
+          korunuyor. */}
+      <div className="hidden md:flex pt-4 sm:pt-6 pb-2 w-full justify-center">
         <FocusMusicControlCard />
       </div>
     </div>
@@ -542,6 +546,26 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
             style={{ background: `color-mix(in srgb, ${BRAND_ACCENT} 10%, transparent)`, color: BRAND_ACCENT }}
           >
             <ClipboardList className="w-4 h-4" strokeWidth={2.25} />
+          </button>
+
+          {/* Mobilde yuvarlak Spotify tetikleyicisi — ÜST BARDA, ekranı
+              kaydırmadan HER ZAMAN erişilebilir (eskiden mobilde üst barda
+              hiç Spotify kısayolu yoktu — yalnızca Duraklat/Başlat'ın
+              yanındaki kontrol grubunda ve aşağıda kaydırma gerektirebilen
+              FocusMusicControlCard'da vardı, bkz. HeroZone). Tıklanınca AYNI
+              global mini paneli açar (music.openPanel — artık mobilde
+              kompakt/yatay format, bkz. GlobalMusicPlayer.jsx). Masaüstünde
+              zaten üstteki "Spotify" metin butonu var (hidden md:flex
+              grubu) — bu yalnızca md:hidden. */}
+          <button
+            onClick={openSpotifyPanel}
+            aria-label="Spotify'ı Aç"
+            className={`md:hidden w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
+              isFocusMode ? "opacity-0 pointer-events-none scale-95" : "opacity-100 scale-100"
+            }`}
+            style={{ background: music.panelOpen ? "rgba(29,185,84,0.22)" : "rgba(29,185,84,0.12)", color: "#1DB954" }}
+          >
+            <Music2 className="w-4 h-4" strokeWidth={2.25} />
           </button>
 
           <button

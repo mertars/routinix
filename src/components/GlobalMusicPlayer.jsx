@@ -35,8 +35,17 @@ export default function GlobalMusicPlayer() {
   const tint = SPOTIFY_TINT;
 
   return (
+    // MOBİL FIX: eskiden `right-6 top-20 bottom-8` HER ekran boyutunda
+    // uygulanıyordu — mobilde bu, neredeyse tam ekran yüksekliğinde DİKEY
+    // bir panel demekti. Spotify'ın embed iframe'i (aşağıdaki mount noktası)
+    // kendi içeriğine göre KOMPAKT/yatay bir yükseklikte (~152px) render
+    // oluyor; kalan devasa boşluk (arkadaki koyu kutunun İÇİNDE, iframe'in
+    // KENDİSİ beyaz) "altı tamamen beyaz" olarak görülüyordu. Mobilde artık
+    // `top-20` (Focus Studio üst barının hemen altı) + yükseklik TAMAMEN
+    // İÇERİK-GÜDÜMLÜ (bottom-anchor YOK) — küçük, yatay bir mini-panel.
+    // Masaüstü (md:) davranışı BİREBİR korunuyor (right-6/bottom-8/w-420px).
     <div
-      className={`fixed right-6 top-20 bottom-8 z-[95] w-[420px] max-w-[calc(100vw-3rem)] transition-all duration-300 ease-out ${
+      className={`fixed left-4 right-4 top-20 z-[95] md:left-auto md:right-6 md:bottom-8 md:w-[420px] md:max-w-[calc(100vw-3rem)] transition-all duration-300 ease-out ${
         m.panelOpen ? "translate-x-0 opacity-100 pointer-events-auto" : "translate-x-10 opacity-0 pointer-events-none"
       }`}
       aria-hidden={!m.panelOpen}
@@ -44,7 +53,7 @@ export default function GlobalMusicPlayer() {
       {/* Dış kutu — dönen conic-gradient ışıklı kenarlık. İç kutu (p-[2px]
           boşluk BIRAKARAK) üstüne oturuyor, geriye yalnızca 2px'lik dönen
           bir "ışık halkası" görünür kalıyor. */}
-      <div className="relative h-full w-full rounded-[30px] p-[2px] overflow-hidden" style={{ boxShadow: `0 24px 70px -20px ${tint}55` }}>
+      <div className="relative w-full rounded-[30px] p-[2px] overflow-hidden md:h-full" style={{ boxShadow: `0 24px 70px -20px ${tint}55` }}>
         <div
           className={`absolute ${m.panelOpen ? "motion-safe:animate-[spin_4s_linear_infinite]" : ""}`}
           style={{
@@ -56,9 +65,11 @@ export default function GlobalMusicPlayer() {
             willChange: m.panelOpen ? "transform" : "auto",
           }}
         />
-        <div className={`relative h-full w-full rounded-[28px] bg-slate-950/90 p-6 flex flex-col overflow-hidden ${m.panelOpen ? "backdrop-blur-2xl" : ""}`}>
+        <div
+          className={`relative w-full rounded-[28px] bg-slate-950/90 p-4 md:h-full md:p-6 flex flex-col overflow-hidden ${m.panelOpen ? "backdrop-blur-2xl" : ""}`}
+        >
           {/* Üst başlık: kapat */}
-          <div className="shrink-0 flex items-center justify-between gap-2 mb-4">
+          <div className="shrink-0 flex items-center justify-between gap-2 mb-3 md:mb-4">
             <span className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold" style={{ background: `${tint}26`, color: tint }}>
               🎵 Spotify
             </span>
@@ -77,12 +88,17 @@ export default function GlobalMusicPlayer() {
           {/* Oynatıcı alanı — mount noktası HER ZAMAN DOM'da (bkz.
               MusicContext.jsx). display:none KULLANILMAZ — bazı tarayıcılar
               display:none'lı bir iframe'i Page Visibility API üzerinden
-              "hidden" sayıp arkadaki oynatmayı durdurabilir. */}
-          <div className="relative flex-1 min-h-0 rounded-2xl overflow-hidden border" style={{ borderColor: `${tint}33` }}>
+              "hidden" sayıp arkadaki oynatmayı durdurabilir. Mobilde SABİT
+              kompakt yükseklik (~152px, Spotify'ın "compact" embed
+              boyutuyla eşleşir) — `flex-1` DEĞİL, çünkü artık ebeveyn
+              içerik-güdümlü/auto-height (yukarıdaki nota bkz.), flex-1'in
+              dayanacağı bir üst sınır kalmazdı. Masaüstünde (md:) eski
+              flex-1 davranışı aynen korunuyor. */}
+          <div className="relative h-[152px] shrink-0 md:flex-1 md:h-auto md:min-h-0 rounded-2xl overflow-hidden border" style={{ borderColor: `${tint}33` }}>
             <div ref={m.spotifyMountRef} className="absolute inset-0" />
           </div>
 
-          <p className="mt-3 shrink-0 text-[11px] leading-relaxed text-white/35">
+          <p className="hidden md:block mt-3 shrink-0 text-[11px] leading-relaxed text-white/35">
             Spotify'ın kendi oynatıcısı — kontrolü doğrudan burada ya da üst bardaki mini widget'tan yap.
           </p>
         </div>
