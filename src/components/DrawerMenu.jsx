@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { X, Plus, Trash2, LogOut, Repeat2, Compass, ListChecks, Users2, BarChart3, Timer, FolderOpen, HelpCircle, Target } from "lucide-react";
+import { X, Plus, Trash2, LogOut, Repeat2, Compass, ListChecks, Users2, BarChart3, Timer, FolderOpen, HelpCircle, Target, ChefHat } from "lucide-react";
 import { FEATURE_FLAGS } from "../constants";
 
 // 2 sütunlu bento tuşu — "Orta Grid Menü Tuşları" bölümü için. "Siyah Cam"
@@ -57,6 +57,7 @@ function DrawerMenu({
   onOpenProfile,
   onOpenTour,
   onOpenSpotlight,
+  onOpenNutritionArchitect,
 }) {
   if (!open) return null;
 
@@ -74,6 +75,14 @@ function DrawerMenu({
     { key: "community", icon: <Users2 className="w-4 h-4" strokeWidth={2.25} />, color: "#8B5CF6", label: "Routinix Nexus", onClick: onOpenCommunity, always: true },
     { key: "rhythm", icon: <BarChart3 className="w-4 h-4" strokeWidth={2.25} />, color: "#8B5CF6", label: "Ritim & Gün Sonu", onClick: onOpenRhythm, always: false },
     { key: "pomodoro", icon: <Timer className="w-4 h-4" strokeWidth={2.25} />, color: "#F0827A", label: "Pomodoro & Focus", onClick: onOpenPomodoro, always: true },
+    {
+      key: "nutrition",
+      icon: <ChefHat className="w-4 h-4" strokeWidth={2.25} />,
+      color: "#F4406B",
+      label: "Beslenme & Antrenman Mimarı",
+      onClick: onOpenNutritionArchitect,
+      always: true,
+    },
     { key: "plans", icon: <FolderOpen className="w-4 h-4" strokeWidth={2.25} />, color: "#64748B", label: "Planlarım", onClick: onOpenPlans, always: false },
     { key: "tour", icon: <HelpCircle className="w-4 h-4" strokeWidth={2.25} />, color: "#10B981", label: "Nasıl Kullanılır?", onClick: onOpenTour, always: true },
     // Header'ın (🎯) tetikleyicisinin YENİ yeri — bkz. onboarding/SpotlightMenu.jsx

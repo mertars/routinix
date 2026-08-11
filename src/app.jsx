@@ -55,6 +55,7 @@ const PomodoroStudio = lazy(() => import("./components/PomodoroStudio"));
 const OnboardingWizard = lazy(() => import("./components/OnboardingWizard"));
 const ManualPlanBuilder = lazy(() => import("./components/ManualPlanBuilder"));
 const RhythmStudio = lazy(() => import("./components/RhythmStudio"));
+const NutritionArchitectStudio = lazy(() => import("./components/NutritionArchitectStudio"));
 const CommunityHub = lazy(() => import("./components/CommunityHub"));
 const NexusProfileOverlay = lazy(() => import("./components/community/NexusProfileOverlay"));
 const OnboardingTour = lazy(() => import("./components/OnboardingTour"));
@@ -84,6 +85,7 @@ export default function App() {
   const [pomodoroOpen, setPomodoroOpen] = useState(false);
   const [pomodoroInitialTask, setPomodoroInitialTask] = useState(null);
   const [rhythmOpen, setRhythmOpen] = useState(false);
+  const [nutritionArchitectOpen, setNutritionArchitectOpen] = useState(false);
   const [communityOpen, setCommunityOpen] = useState(false);
   const [nexusProfileOpen, setNexusProfileOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
@@ -149,7 +151,19 @@ export default function App() {
   // halde kullanıcı hiç GÖRMEDİĞİ bu animasyon GPU'yu meşgul etmeyi sürdürür
   // (ısınmanın asıl kaynağı genelde panelin kendi CSS'i değil, budur).
   const anyOverlayOpen =
-    authOpen || logoutConfirmOpen || deleteOpen || taskDrawerOpen || routinesOpen || hubOpen || plansOpen || pomodoroOpen || rhythmOpen || communityOpen || printOpen || tourOpen;
+    authOpen ||
+    logoutConfirmOpen ||
+    deleteOpen ||
+    taskDrawerOpen ||
+    routinesOpen ||
+    hubOpen ||
+    plansOpen ||
+    pomodoroOpen ||
+    rhythmOpen ||
+    nutritionArchitectOpen ||
+    communityOpen ||
+    printOpen ||
+    tourOpen;
 
   // Bugün / Rutinler / Şablon Keşfet / Planlarım / Pomodoro panellerinden aynı
   // anda yalnızca biri açık olur; tetiklendiklerinde hamburger menüsü de kapanır
@@ -165,6 +179,7 @@ export default function App() {
     setPlansOpen(false);
     setPomodoroOpen(false);
     setRhythmOpen(false);
+    setNutritionArchitectOpen(false);
     setCommunityOpen(false);
   }, []);
   const toggleTaskDrawer = useCallback(() => {
@@ -203,6 +218,12 @@ export default function App() {
     ps.setMenuOpen(false);
     setRhythmOpen(next);
   }, [rhythmOpen, closeAllPanels, ps.setMenuOpen]);
+  const toggleNutritionArchitect = useCallback(() => {
+    const next = !nutritionArchitectOpen;
+    closeAllPanels();
+    ps.setMenuOpen(false);
+    setNutritionArchitectOpen(next);
+  }, [nutritionArchitectOpen, closeAllPanels, ps.setMenuOpen]);
   const toggleCommunity = useCallback(() => {
     const next = !communityOpen;
     closeAllPanels();
@@ -389,6 +410,7 @@ export default function App() {
           onOpenRhythm={toggleRhythm}
           onOpenCommunity={toggleCommunity}
           onOpenPomodoro={togglePomodoro}
+          onOpenNutritionArchitect={toggleNutritionArchitect}
           onOpenProfile={openNexusProfile}
           onOpenTour={openTour}
           onOpenSpotlight={toggleSpotlight}
@@ -627,6 +649,17 @@ export default function App() {
       {rhythmOpen && (
         <Suspense fallback={<OverlayFallback z={90} />}>
           <RhythmStudio open={rhythmOpen} userId={auth.user?.id} onClose={() => setRhythmOpen(false)} />
+        </Suspense>
+      )}
+
+      {/* 🍽️ Beslenme & Antrenman Mimarı (ROUTINIX_CORE_ARCHITECT_v2) — fiziksel
+          verilerden (kilo/boy/yağ oranı/aktivite/hedef/uyanış-uyku/bütçe/
+          alerji) TDEE/makro bazlı kişiye özel öğün+antrenman veri mimarisi
+          üretir (bkz. api/_lib/nutritionPrompt.js). Diğer stüdyolarla AYNI
+          koşullu mount deseni. */}
+      {nutritionArchitectOpen && (
+        <Suspense fallback={<OverlayFallback z={90} />}>
+          <NutritionArchitectStudio open={nutritionArchitectOpen} onClose={() => setNutritionArchitectOpen(false)} />
         </Suspense>
       )}
 

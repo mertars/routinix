@@ -94,3 +94,11 @@ export async function createEnrichedPlan(payload) {
 export async function fetchNextWeekTasks(payload) {
   return callGeneratePlan("next_week", payload, `${payload?.targetWeekNumber || "?"}. hafta üretimi`);
 }
+
+// ROUTINIX_CORE_ARCHITECT_v2 — Sistem & Beslenme Mimarı.
+// payload: { weight_kg, height_cm, body_fat_pct?, activity_level, goal,
+//            wake_time?, sleep_time?, budget_level?, allergies? }
+// Dönüş: { system_stats, meals, liquid_calorie_module, workout, system_rules }
+export async function generateNutritionArchitecture(payload) {
+  return callGeneratePlan("nutrition_architect", payload, "Beslenme & Antrenman Mimarisi üretimi");
+}

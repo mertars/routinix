@@ -70,6 +70,120 @@ const FILE_PARSE_SCHEMA = {
   required: ["title", "days"],
 };
 
+// ROUTINIX_CORE_ARCHITECT_v2 — "Sistem & Beslenme Mimarı" çıktı şeması.
+// Kullanıcının fiziksel verilerinden (kilo/boy/yağ oranı/aktivite/hedef/
+// uyanış-uyku/bütçe/alerji) MİLİMETRİK kişiye özel bir veri mimarisi
+// üretir; UI (NutritionArchitectStudio.jsx) bunu DOĞRUDAN render eder,
+// serbest metin ayrıştırmaya gerek kalmaz — bu yüzden `responseSchema`
+// ile Structured Output ZORUNLU (file.parse ile AYNI gerekçe).
+const NUTRITION_ARCHITECT_SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    system_stats: {
+      type: SchemaType.OBJECT,
+      properties: {
+        daily_calorie_target: { type: SchemaType.INTEGER },
+        protein_g: { type: SchemaType.INTEGER },
+        carbs_g: { type: SchemaType.INTEGER },
+        fat_g: { type: SchemaType.INTEGER },
+        fiber_g: { type: SchemaType.INTEGER },
+        bmr_kcal: { type: SchemaType.INTEGER },
+        activity_kcal: { type: SchemaType.INTEGER },
+        // İşaretli tamsayı: kilo alımında pozitif (ör. 350), kilo
+        // vermede negatif (ör. -500) — UI işarete göre "Surplus"/"Deficit" etiketler.
+        surplus_deficit_kcal: { type: SchemaType.INTEGER },
+      },
+      required: ["daily_calorie_target", "protein_g", "carbs_g", "fat_g", "fiber_g", "bmr_kcal", "activity_kcal", "surplus_deficit_kcal"],
+    },
+    meals: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          name: { type: SchemaType.STRING },
+          target_time: { type: SchemaType.STRING },
+          items: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                food: { type: SchemaType.STRING },
+                amount: { type: SchemaType.STRING },
+                protein_g: { type: SchemaType.NUMBER },
+                carbs_g: { type: SchemaType.NUMBER },
+                fat_g: { type: SchemaType.NUMBER },
+                kcal: { type: SchemaType.INTEGER },
+              },
+              required: ["food", "amount", "protein_g", "carbs_g", "fat_g", "kcal"],
+            },
+          },
+          // Tam olarak 2 alternatif — bkz. nutritionPrompt.js system instruction.
+          swaps: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                food: { type: SchemaType.STRING },
+                amount: { type: SchemaType.STRING },
+              },
+              required: ["food", "amount"],
+            },
+          },
+        },
+        required: ["name", "target_time", "items", "swaps"],
+      },
+    },
+    // Yalnızca "kilo alma/bulk" hedefinde ve/veya iştahsız/ektomorf
+    // profilde applicable=true — aksi halde applicable=false, diğer
+    // alanlar boş string/0 gelebilir (UI applicable=false'ta kartı hiç göstermez).
+    liquid_calorie_module: {
+      type: SchemaType.OBJECT,
+      properties: {
+        applicable: { type: SchemaType.BOOLEAN },
+        formula_name: { type: SchemaType.STRING },
+        ingredients: { type: SchemaType.STRING },
+        consumption_timing: { type: SchemaType.STRING },
+        total_kcal: { type: SchemaType.INTEGER },
+      },
+      required: ["applicable", "formula_name", "ingredients", "consumption_timing", "total_kcal"],
+    },
+    workout: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          daily_focus: { type: SchemaType.STRING },
+          exercises: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                name: { type: SchemaType.STRING },
+                sets: { type: SchemaType.INTEGER },
+                reps: { type: SchemaType.STRING },
+                rpe: { type: SchemaType.STRING },
+                rest_sec: { type: SchemaType.INTEGER },
+                overload_strategy: { type: SchemaType.STRING },
+              },
+              required: ["name", "sets", "reps", "rpe", "rest_sec", "overload_strategy"],
+            },
+          },
+        },
+        required: ["daily_focus", "exercises"],
+      },
+    },
+    system_rules: {
+      type: SchemaType.OBJECT,
+      properties: {
+        plateau_rule: { type: SchemaType.STRING },
+        digestion_rule: { type: SchemaType.STRING },
+      },
+      required: ["plateau_rule", "digestion_rule"],
+    },
+  },
+  required: ["system_stats", "meals", "liquid_calorie_module", "workout", "system_rules"],
+};
+
 const ROUTES = {
   // AI Koç serbest metin — hem basit sınıflandırma hem karmaşık mutasyon
   // (plan küçültme/görev silme) AYNI çağrıda kararlaştırılıyor, bu yüzden
@@ -97,6 +211,12 @@ const ROUTES = {
   // hatasıyla başarısız olmaz. maxOutputTokens plan.create ile aynı mertebede
   // (kaynak dosya çok günlü/kalabalık bir plan içerebilir).
   "file.parse": { model: FLASH_LITE, maxOutputTokens: 8192, responseSchema: FILE_PARSE_SCHEMA },
+
+  // ROUTINIX_CORE_ARCHITECT_v2 — kişiye özel beslenme+antrenman veri
+  // mimarisi (bkz. nutritionPrompt.js). Çıktı file.parse mertebesinde
+  // (birden çok öğün kartı + swap + antrenman günleri) olabildiğinden aynı
+  // maxOutputTokens tavanı kullanıldı.
+  "nutrition.architect": { model: FLASH_LITE, maxOutputTokens: 8192, responseSchema: NUTRITION_ARCHITECT_SCHEMA },
 };
 
 let cachedClient = null;

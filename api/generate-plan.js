@@ -1,5 +1,6 @@
 import { getUserFromRequest } from "./_lib/supabaseAdmin.js";
 import { generateOnboardingQuestions, createEnrichedPlan, fetchNextWeekTasks } from "./_lib/planPrompt.js";
+import { generateNutritionArchitecture } from "./_lib/nutritionPrompt.js";
 import { checkPlanRateLimit, logApiRequest } from "./_lib/planRateLimit.js";
 import { classifyGeminiError } from "./_lib/aiErrors.js";
 
@@ -76,6 +77,11 @@ export default async function handler(req, res) {
       data = await createEnrichedPlan(payload);
     } else if (action === "next_week") {
       data = await fetchNextWeekTasks(payload);
+    } else if (action === "nutrition_architect") {
+      // ROUTINIX_CORE_ARCHITECT_v2 — Sistem & Beslenme Mimarı. Diğer
+      // action'larla AYNI auth/rate-limit/log altyapısını paylaşır, ayrı
+      // bir endpoint AÇILMADI (auth/limit mantığını tekrar etmemek için).
+      data = await generateNutritionArchitecture(payload);
     } else {
       return res.status(400).json({ ok: false, message: `Bilinmeyen action: ${action}` });
     }

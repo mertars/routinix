@@ -63,7 +63,9 @@ function taskFieldGuide(category) {
 
 // Verilen system instruction ile modeli çalıştırıp katı JSON'ı parse eder.
 // operation: geminiRouter.js'teki ROUTES anahtarlarından biri.
-async function runJson(operation, systemInstruction, userPrompt, label = "AI isteği") {
+// export EDİLDİ: nutritionPrompt.js de (ROUTINIX_CORE_ARCHITECT_v2) AYNI
+// çağrı/parse mantığını kullanıyor — burada tekrar yazmak yerine paylaşılıyor.
+export async function runJson(operation, systemInstruction, userPrompt, label = "AI isteği") {
   const model = getRoutedModel(operation, systemInstruction);
 
   let text;
