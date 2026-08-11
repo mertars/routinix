@@ -3,6 +3,7 @@ import { Timer, BarChart3, Users2, Menu, X, Play, Pause, Maximize2, LogOut } fro
 import { useTheme } from "../context/ThemeContext";
 import { useMusic } from "../context/MusicContext";
 import { FEATURE_FLAGS } from "../constants";
+import RoutinixLogo from "./RoutinixLogo";
 
 // Üst bar mini müzik widget'ı — büyük, ışıltılı MusicSidePanel kapatıldığında
 // müziği hızlıca yönetmek için (bkz. GlobalMusicPlayer.jsx, aynı useMusic()
@@ -202,27 +203,7 @@ function Header({
           aria-label="Ana Sayfa'ya dön"
           className="flex items-center gap-2.5 transition-transform duration-150 active:scale-95"
         >
-          {/* Geometrik çerçeveli "R" logosu */}
-          <div
-            className="relative w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{
-              background: "linear-gradient(135deg, rgba(178,107,255,0.22), rgba(244,64,107,0.18))",
-              border: "1px solid rgba(178,107,255,0.45)",
-              boxShadow: "0 0 14px -4px rgba(178,107,255,0.6)",
-            }}
-          >
-            <span
-              className="text-[17px] font-black leading-none"
-              style={{
-                background: "linear-gradient(135deg, #C99CFF, #FF6E92)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              R
-            </span>
-          </div>
+          <RoutinixLogo size={36} />
           <span className="font-bold tracking-tight text-[16px] text-[var(--text-primary)]">Routinix</span>
         </button>
 
