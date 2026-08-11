@@ -270,6 +270,21 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
           >
             {cat.emoji} {cat.label} · {template.total_days} gün
           </span>
+          {/* Bot/AI tarafından üretilmiş deneme şablonu belirteci — TemplateCard.jsx
+              ile AYNI metin/stil, kart → detay geçişinde tutarlı okunur. */}
+          {template.author?.is_bot && (
+            <span
+              className="absolute top-3 left-3 text-[9.5px] font-bold uppercase tracking-[0.02em] px-2.5 py-1 rounded-full border flex items-center gap-1 whitespace-nowrap"
+              style={{
+                background: "rgba(8,13,26,0.85)",
+                borderColor: "rgba(250,204,21,0.55)",
+                color: "#FDE047",
+                boxShadow: "0 0 10px -2px rgba(34,211,238,0.55)",
+              }}
+            >
+              🤖 AI / Bot Test Şablonu
+            </span>
+          )}
         </CoverPattern>
 
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-6 py-5 flex flex-col gap-5">
@@ -289,6 +304,19 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
                   {t}
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Bot şablonu bilgilendirme notu — başlık/etiketlerin ALTINDA,
+              ama aksiyon butonlarının (Beğen/Paylaş/Planlarıma Ekle)
+              ÜSTÜNDE: kaydırmadan görünür, gizlenmiyor. */}
+          {template.author?.is_bot && (
+            <div
+              className="flex items-start gap-2 rounded-xl px-3.5 py-2.5 border text-[11.5px] font-medium leading-relaxed"
+              style={{ background: "rgba(250,204,21,0.08)", borderColor: "rgba(250,204,21,0.35)", color: "#FDE047" }}
+            >
+              <span className="shrink-0">🤖</span>
+              <span>Bu şablon Nexus botları tarafından deneme ve test amaçlı otomatik oluşturulmuştur.</span>
             </div>
           )}
 

@@ -41,12 +41,36 @@ function TemplateCardImpl({ template, onOpen, onOpenAuthor }) {
       {/* Kapak — gerçek fotoğraf (bkz. CoverPattern.jsx), sabit yükseklik (kart
           genişliğine göre ORANTISIZ büyümesin diye aspect-ratio değil h-40) */}
       <CoverPattern coverId={template.cover_url} className="w-full h-40 shrink-0">
-        <span
-          className="absolute top-3 left-3 text-[10px] font-bold uppercase tracking-[0.06em] px-2.5 py-1 rounded-full border"
-          style={{ background: "rgba(8,13,26,0.75)", borderColor: `${cat.accent}55`, color: cat.accent }}
-        >
-          {cat.emoji} {cat.label}
-        </span>
+        {/* Kategori + bot rozeti AYNI flex-wrap şeridinde (iki AYRI absolute
+            span DEĞİL): dar kartlarda (grid min genişliği 280px) kategori
+            etiketi uzun olduğunda (ör. "Yazılım & Mühendislik") iki rozet
+            aynı satırda üst üste binip birbirini kırpıyordu — flex-wrap
+            sığmayanı otomatik alt satıra düşürüyor, kırpma/çakışma olmuyor. */}
+        <div className="absolute top-3 left-3 right-3 flex flex-wrap items-start gap-1.5">
+          <span
+            className="text-[10px] font-bold uppercase tracking-[0.06em] px-2.5 py-1 rounded-full border whitespace-nowrap"
+            style={{ background: "rgba(8,13,26,0.75)", borderColor: `${cat.accent}55`, color: cat.accent }}
+          >
+            {cat.emoji} {cat.label}
+          </span>
+          {/* Bot/AI tarafından üretilmiş deneme şablonu belirteci — eskiden
+              yazar adının yanındaki küçük BadgeCheck ikonu "onaylı hesap" gibi
+              okunuyordu (yanlış sinyal); bu, kartın kendisinde net ve
+              kaçırılamayacak bir "bu test içeriği" uyarısı. */}
+          {author?.is_bot && (
+            <span
+              className="text-[9px] font-bold uppercase tracking-[0.02em] px-2.5 py-1 rounded-full border flex items-center gap-1 whitespace-nowrap"
+              style={{
+                background: "rgba(8,13,26,0.85)",
+                borderColor: "rgba(250,204,21,0.55)",
+                color: "#FDE047",
+                boxShadow: "0 0 10px -2px rgba(34,211,238,0.55)",
+              }}
+            >
+              🤖 AI / Bot Test Şablonu
+            </span>
+          )}
+        </div>
         {(routineCount > 0 || focusMin > 0) && (
           <span className="absolute bottom-2.5 right-2.5 text-[9.5px] font-bold px-2 py-0.5 rounded-full border border-white/15 bg-black/75 text-slate-200">
             ⚡ {routineCount} Rutin • ⏱️ {focusHoursLabel(focusMin)} Odak

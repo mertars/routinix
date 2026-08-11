@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, memo } from "react";
+import { Pencil, Printer, Sparkles } from "lucide-react";
 import { MONO_FONT, categoryOf } from "../constants";
 import Accordion from "./Accordion";
 import TaskCard from "./TaskCard";
@@ -216,37 +217,48 @@ export default function PlanBoard({
     <div className="w-full animate-[fadeIn_0.4s_ease]">
       {/* Başlık + genel ilerleme — tam genişlik, grid'in üstünde (RhythmStudio'nun
           tarih şeridiyle aynı desen: gezinme/özet üstte, çalışma alanı altta grid). */}
-      <div data-tour-id="tour-plan-area" className="glass rounded-2xl p-4 md:p-5 mb-6" style={{ borderColor: `${accent}33` }}>
-        <div className="flex items-center justify-between mb-3">
+      <div data-tour-id="tour-plan-area" className="glass rounded-2xl p-3 sm:p-5 mb-6" style={{ borderColor: `${accent}33` }}>
+        {/* Aksiyon barı — mobilde (<640px) 3 buton + "‹ Ana Sayfa" tek satıra
+            sığmayıp ekrandan taşıyordu. `flex-wrap` çift güvence sağlıyor
+            (gerekirse 2 satıra pürüzsüzce döker), asıl fix ise butonların
+            kendisinin mobilde ikon-ağırlıklı/kompakt olması (kısa etiket,
+            text-xs, px-2.5 py-1.5, w-4 h-4 ikon) — sm: üstünde eski tam
+            etiket/boyutlara geri döner. */}
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
           <button onClick={onBack} className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
             ‹ Ana Sayfa
           </button>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center flex-wrap justify-end gap-2 sm:gap-1.5">
             {onEditPlan && (
               <button
                 onClick={() => onEditPlan(plan.id)}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 h-8 text-[11.5px] font-semibold transition-colors"
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 sm:py-0 h-8 text-xs sm:text-[11.5px] font-semibold transition-colors"
                 style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}44` }}
               >
-                ✏️ Düzenle
+                <Pencil className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+                Düzenle
               </button>
             )}
             <button
               onClick={onPrint}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 h-8 text-[11.5px] font-semibold transition-colors"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 sm:py-0 h-8 text-xs sm:text-[11.5px] font-semibold transition-colors"
               style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}44` }}
             >
-              🖨️ PDF / Yazdır
+              <Printer className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+              <span className="sm:hidden">PDF</span>
+              <span className="hidden sm:inline">PDF / Yazdır</span>
             </button>
             {onBatchApplyWidgets && (
               <>
                 <button
                   ref={batchBtnRef}
                   onClick={() => setBatchModalOpen((v) => !v)}
-                  className="flex items-center gap-1.5 rounded-lg px-2.5 h-8 text-[11.5px] font-semibold transition-colors"
+                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 sm:py-0 h-8 text-xs sm:text-[11.5px] font-semibold transition-colors"
                   style={{ background: "rgba(16,185,129,0.16)", color: "#10B981", border: "1px solid rgba(16,185,129,0.4)" }}
                 >
-                  ✨ Günlük Widget / Şablon Ekle
+                  <Sparkles className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+                  <span className="sm:hidden">+ Widget</span>
+                  <span className="hidden sm:inline">Günlük Widget / Şablon Ekle</span>
                 </button>
                 <DayBatchWidgetModal
                   anchorRef={batchBtnRef}
