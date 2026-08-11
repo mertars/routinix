@@ -224,7 +224,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
     <div className="fixed inset-0 z-[100] flex flex-col text-[var(--text-primary)]">
       <NexusBackground />
       <div className="relative z-10 flex flex-col h-full">
-        <div className="shrink-0 px-4 sm:px-6 lg:px-8 pt-5 pb-3 flex items-center justify-between gap-2 border-b border-[var(--border-default)]">
+        <div className="shrink-0 px-4 sm:px-6 lg:px-8 pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-3 flex items-center justify-between gap-2 border-b border-[var(--border-default)]">
           <h2 className="text-[17px] font-bold">Routinix Nexus</h2>
           <div className="flex items-center gap-2">
             <button

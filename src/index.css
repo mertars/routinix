@@ -178,6 +178,27 @@ body {
   overflow-x: hidden;
 }
 
+/* MOBİL INPUT ZOOM GÜVENLİK AĞI — iOS Safari/PWA, font-size 16px'in
+   ALTINDAKİ bir input/textarea/select'e dokununca sayfayı otomatik
+   yakınlaştırır. Uygulama genelinde onlarca bileşende tek tek `text-base`
+   uygulamak yerine (yeni bir input eklendiğinde unutulmaya açık), TEK bir
+   global kural HİÇBİR form elemanının bu eşiğin altına düşmemesini garanti
+   eder — yalnızca <768px'te (masaüstünde küçük input fontu istenen yerlerde
+   sorun değil, zoom riski yalnızca dokunmatik/mobilde var). `!important`
+   BİLEREK: bu tek amaçlı bir güvenlik ağı, bileşen bazlı `text-xs`/`text-sm`
+   gibi UTILITY sınıfların normal cascade'de KAZANMASI (ve zoom'u geri
+   getirmesi) riskini ortadan kaldırır. index.html'deki viewport meta'sındaki
+   `user-scalable=no, maximum-scale=1.0` bunun TAMAMLAYICISI — ikisi birlikte
+   zoom'u tamamen engeller (isteğe bağlı pinch-zoom da kapanır, bilerek).
+*/
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* Özel Neon Scrollbar — "Bugünün Görevleri" (TodayPopover) ve Pomodoro
    Studio'nun sol Görev/Plan paneli (TaskListPanel) için. Fonksiyonel
    overflow/touch özellikleri BURADA, sınıfın kendi içinde tanımlı (ayrı

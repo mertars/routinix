@@ -74,7 +74,12 @@ export default async function handler(req, res) {
     if (action === "onboarding_questions") {
       data = await generateOnboardingQuestions(payload);
     } else if (action === "create_plan") {
-      data = await createEnrichedPlan(payload);
+      // userId BURADA, JWT ile doğrulanmış `user.id`'den eklenir — client'ın
+      // payload içinde göndermiş olabileceği herhangi bir alan varsa (yok
+      // ama savunmacı davranmak ucuz) spread SIRASI gereği HER ZAMAN ezilir.
+      // createEnrichedPlan bunu (varsa) kayıtlı biyometrik profili prompt
+      // bağlamına eklemek için kullanır (bkz. api/_lib/biometricContext.js).
+      data = await createEnrichedPlan({ ...payload, userId: user.id });
     } else if (action === "next_week") {
       data = await fetchNextWeekTasks(payload);
     } else if (action === "nutrition_architect") {

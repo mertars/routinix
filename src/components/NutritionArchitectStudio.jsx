@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { X, ChefHat, Dumbbell, Flame, Info, Droplet, Shuffle, RotateCcw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, ChefHat, Dumbbell, Flame, Info, Droplet, Shuffle, RotateCcw, Printer } from "lucide-react";
 import { MONO_FONT } from "../constants";
 import { generateNutritionArchitecture } from "../services/aiPipelineService";
+import { fetchBiometricProfile, saveBiometricProfile } from "../services/biometricProfileService";
 import logger from "../utils/logger";
 
 // ROUTINIX_CORE_ARCHITECT_v2 — "Sistem & Beslenme Mimarı" stüdyosu.
@@ -24,6 +25,12 @@ const GOAL_OPTIONS = [
   { value: "bulk", label: "Kilo Alma (Bulk)" },
   { value: "cut", label: "Kilo Verme (Cut)" },
   { value: "maintain", label: "Koruma" },
+];
+
+const GENDER_OPTIONS = [
+  { value: "belirtilmedi", label: "Belirtmek istemiyorum" },
+  { value: "erkek", label: "Erkek" },
+  { value: "kadin", label: "Kadın" },
 ];
 
 const BUDGET_OPTIONS = [
@@ -213,6 +220,144 @@ function SystemRulesWidget({ data: d }) {
   );
 }
 
+// Baskı/PDF şablonu — PlanBoard'un PrintablePlan.jsx'i ile AYNI global
+// `.print-root`/`.print-*` CSS'ini (bkz. GlobalStyles.jsx @media print)
+// KULLANIR, yeni bir stil sistemi İCAT EDİLMEDİ. Ekranda `.print-root {
+// display:none }` sayesinde tamamen gizli, `window.print()` tetiklenince
+// (bkz. "PDF Olarak İndir" butonu) görünür olur.
+function PrintableNutritionPlan({ data }) {
+  const widgets = data?.selected_widgets || [];
+  const today = new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+  return (
+    <div className="print-root print-root-nutrition">
+      <div className="print-header">
+        <div className="print-logo">R</div>
+        <div>
+          <div className="print-title">Routinix Beslenme & Antrenman Planı</div>
+          <div className="print-subtitle">Beslenme & Antrenman Mimarı</div>
+        </div>
+      </div>
+
+      {widgets.map((w, i) => {
+        const d = w.data || {};
+        if (w.widget_type === "macro_tracker") {
+          return (
+            <div key={i} className="print-day">
+              <div className="print-day-title">Kalori & Makro Hedefleri</div>
+              <div className="print-task">
+                <span className="print-check" />
+                <span>Günlük Kalori Hedefi — {d.target_calories} kcal</span>
+              </div>
+              <div className="print-task">
+                <span className="print-check" />
+                <span>
+                  Protein {d.protein_g}g · Karbonhidrat {d.carb_g}g · Yağ {d.fat_g}g
+                </span>
+              </div>
+              {d.water_target_l > 0 && (
+                <div className="print-task">
+                  <span className="print-check" />
+                  <span>Su Hedefi — {d.water_target_l}L</span>
+                </div>
+              )}
+            </div>
+          );
+        }
+        if (w.widget_type === "meal_plan_card") {
+          return (d.meals || []).map((meal, j) => (
+            <div key={`${i}-${j}`} className="print-day">
+              <div className="print-day-title">
+                {meal.name} — {meal.time}
+                {meal.calories > 0 ? ` · ${meal.calories} kcal` : ""}
+              </div>
+              {(meal.ingredients || []).map((it, k) => (
+                <div key={k} className="print-task">
+                  <span className="print-check" />
+                  <span>
+                    {it.food} · {it.amount}
+                    {(it.protein > 0 || it.carb > 0 || it.fat > 0) && (
+                      <span className="print-task-detail">
+                        {" "}
+                        — P{it.protein || 0} K{it.carb || 0} Y{it.fat || 0}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              ))}
+              {(meal.smart_swap || []).map((sw, k) => (
+                <div key={`swap-${k}`} className="print-task">
+                  <span className="print-check" />
+                  <span>
+                    Smart Swap — {sw.option}: <span className="print-task-detail">{sw.desc}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          ));
+        }
+        if (w.widget_type === "liquid_calorie_shake") {
+          return (
+            <div key={i} className="print-day">
+              <div className="print-day-title">{d.shake_name || "İştah & Likit Kalori Modülü"}</div>
+              <div className="print-task">
+                <span className="print-check" />
+                <span>
+                  {(d.recipe_items || []).join(" · ")}
+                  {d.total_calories > 0 ? ` — ${d.total_calories} kcal` : ""}
+                </span>
+              </div>
+              {d.prep_time_mins > 0 && (
+                <div className="print-task">
+                  <span className="print-check" />
+                  <span>Hazırlık süresi — {d.prep_time_mins} dk</span>
+                </div>
+              )}
+            </div>
+          );
+        }
+        if (w.widget_type === "workout_logger") {
+          return (
+            <div key={i} className="print-day">
+              <div className="print-day-title">{d.workout_title}</div>
+              {(d.exercises || []).map((ex, k) => (
+                <div key={k} className="print-task">
+                  <span className="print-check" />
+                  <span>
+                    {ex.name} — {ex.sets}×{ex.reps}, RPE {ex.rpe}, {ex.rest_seconds}sn dinlenme
+                    <span className="print-task-detail"> — {ex.overload}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+        }
+        if (w.widget_type === "system_rules") {
+          return (
+            <div key={i} className="print-day">
+              <div className="print-day-title">Sistem Kuralları</div>
+              {d.plateau_rule && (
+                <div className="print-task">
+                  <span className="print-check" />
+                  <span>Kilo Durması (Plateau) — {d.plateau_rule}</span>
+                </div>
+              )}
+              {d.timing_rule && (
+                <div className="print-task">
+                  <span className="print-check" />
+                  <span>Antrenman Beslenme Zamanlaması — {d.timing_rule}</span>
+                </div>
+              )}
+            </div>
+          );
+        }
+        return null;
+      })}
+
+      <div className="print-footer">Routinix · Beslenme & Antrenman Mimarı · {today}</div>
+    </div>
+  );
+}
+
 const WIDGET_RENDERERS = {
   macro_tracker: MacroTrackerWidget,
   meal_plan_card: MealPlanCardWidget,
@@ -238,11 +383,17 @@ function ArchitectureResult({ data }) {
   );
 }
 
-export default function NutritionArchitectStudio({ open, onClose }) {
+export default function NutritionArchitectStudio({ open, userId, onClose }) {
   const [stage, setStage] = useState("form"); // form | loading | result | error
   const [errorMsg, setErrorMsg] = useState("");
   const [result, setResult] = useState(null);
+  // Profil ilk kez DB'den yüklenene kadar (ya da misafirse HİÇ) formu
+  // gösterme — aksi halde kullanıcı boş formu 1 kare görüp hemen ardından
+  // dolduğunu görür (rahatsız edici "flash of empty content").
+  const [profileLoading, setProfileLoading] = useState(!!userId);
 
+  const [age, setAge] = useState("");
+  const [gender, setGender] = useState("belirtilmedi");
   const [weightKg, setWeightKg] = useState("");
   const [heightCm, setHeightCm] = useState("");
   const [bodyFatPct, setBodyFatPct] = useState("");
@@ -253,31 +404,121 @@ export default function NutritionArchitectStudio({ open, onClose }) {
   const [budgetLevel, setBudgetLevel] = useState("orta");
   const [allergiesText, setAllergiesText] = useState("");
 
+  // VERİTABANI KALICILIĞI: açılışta kayıtlı biyometrik profili çek, formu
+  // ONUNLA doldur — sayfa yenilense/uygulamadan çıkılsa da kullanıcı
+  // verilerini yeniden girmek ZORUNDA kalmaz. Misafir oturumda (userId
+  // yok) sessizce atlanır, form boş/varsayılan kalır — hata GÖSTERİLMEZ.
+  useEffect(() => {
+    if (!open || !userId) {
+      setProfileLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setProfileLoading(true);
+    fetchBiometricProfile(userId)
+      .then((p) => {
+        if (cancelled || !p) return;
+        if (p.age != null) setAge(String(p.age));
+        if (p.gender) setGender(p.gender);
+        if (p.weight_kg != null) setWeightKg(String(p.weight_kg));
+        if (p.height_cm != null) setHeightCm(String(p.height_cm));
+        if (p.body_fat_pct != null) setBodyFatPct(String(p.body_fat_pct));
+        if (p.activity_level) setActivityLevel(p.activity_level);
+        if (p.goal) setGoal(p.goal);
+        if (p.wake_time) setWakeTime(p.wake_time);
+        if (p.sleep_time) setSleepTime(p.sleep_time);
+        if (p.budget_level) setBudgetLevel(p.budget_level);
+        if (Array.isArray(p.allergies) && p.allergies.length) setAllergiesText(p.allergies.join(", "));
+      })
+      .catch((err) => logger.error("NUTRITION_ARCHITECT", "Profil yüklenemedi", { error: err?.message }))
+      .finally(() => !cancelled && setProfileLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [open, userId]);
+
   if (!open) return null;
 
   const canSubmit = weightKg && heightCm && Number(weightKg) > 0 && Number(heightCm) > 0;
+
+  const buildProfilePayload = () => ({
+    age: age ? Number(age) : null,
+    gender,
+    weight_kg: Number(weightKg),
+    height_cm: Number(heightCm),
+    body_fat_pct: bodyFatPct ? Number(bodyFatPct) : null,
+    activity_level: activityLevel,
+    goal,
+    wake_time: wakeTime,
+    sleep_time: sleepTime,
+    budget_level: budgetLevel,
+    allergies: allergiesText
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  });
+
+  // PlanBoard'un PrintablePlan.jsx'i app kökünde KOŞULSUZ mount edilir (bkz.
+  // app.jsx) — yani aktif bir plan varken bu Beslenme stüdyosu açılırsa DOM'da
+  // AYNI ANDA iki `.print-root` bulunur. @media print CSS'i (GlobalStyles.jsx)
+  // `.print-root` sınıfının HER örneğini görünür/absolute-positioned yapar,
+  // bu yüzden ayrım yapmazsak ikisi üst üste basılır. Çözüm: yazdırma anında
+  // bizim `.print-root-nutrition` DIŞINDAKİ tüm `.print-root` öğelerini
+  // geçici olarak `display:none` yapıp dialog kapanınca geri al.
+  const handlePrintNutrition = () => {
+    // NOT: .print-root kuralı @media print içinde `display:block !important`
+    // kullanır — bu, inline style.display="none" ile EZİLEMEZ (stylesheet
+    // !important her zaman inline stile karşı kazanır). Bu yüzden gizleme
+    // inline style yerine, GlobalStyles.jsx'te tanımlı, daha özgül
+    // `.print-root.print-suppress { display:none !important }` class'ıyla
+    // yapılır (bkz. o dosyadaki açıklama).
+    const others = Array.from(document.querySelectorAll(".print-root:not(.print-root-nutrition)"));
+    others.forEach((el) => el.classList.add("print-suppress"));
+    const restore = () => {
+      others.forEach((el) => el.classList.remove("print-suppress"));
+      window.removeEventListener("afterprint", restore);
+    };
+    window.addEventListener("afterprint", restore);
+    window.print();
+    // Bazı tarayıcılar/WebView'ler (özellikle iOS Safari) afterprint'i hiç
+    // tetiklemeyebilir — yine de bir güvenlik ağı olarak geri alınır. Süre
+    // kasıtlı olarak uzun tutuldu: senkron print() uygulayan tarayıcılarda
+    // (Chrome/Firefox masaüstü) zaten dialog kapanana kadar JS duraklar, bu
+    // yüzden bu zamanlayıcı yalnızca ASENKRON davranan tarayıcılarda devreye
+    // girer ve kullanıcı dialog'u erken kapatmadan önce tetiklenmemelidir.
+    setTimeout(restore, 8000);
+  };
 
   const handleGenerate = async () => {
     if (!canSubmit || stage === "loading") return;
     setStage("loading");
     setErrorMsg("");
+    const profilePayload = buildProfilePayload();
+    // Girdi alanları AI çağrısından ÖNCE/PARALEL kaydedilir — üretim
+    // başarısız olsa bile kullanıcının doldurduğu veriler KAYBOLMAZ.
+    // Misafir oturumda (userId yok) sessizce atlanır (fire-and-forget,
+    // hata olsa da üretim akışını KESMEZ — bkz. .catch).
+    if (userId) {
+      saveBiometricProfile(userId, profilePayload).catch((err) =>
+        logger.error("NUTRITION_ARCHITECT", "Profil (girdi) kaydedilemedi", { error: err?.message })
+      );
+    }
     try {
-      const data = await generateNutritionArchitecture({
-        weight_kg: Number(weightKg),
-        height_cm: Number(heightCm),
-        body_fat_pct: bodyFatPct ? Number(bodyFatPct) : undefined,
-        activity_level: activityLevel,
-        goal,
-        wake_time: wakeTime,
-        sleep_time: sleepTime,
-        budget_level: budgetLevel,
-        allergies: allergiesText
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      });
+      const data = await generateNutritionArchitecture(profilePayload);
       setResult(data);
       setStage("result");
+      // Üretim BAŞARILI olunca — hesaplanan günlük kalori/makro hedeflerini
+      // (macro_tracker widget'ından) profile GERİ yaz, "Günlük Kalori/Makro
+      // hedefleri" de kalıcı profilin bir parçası olsun.
+      const macro = data?.selected_widgets?.find((w) => w.widget_type === "macro_tracker")?.data;
+      if (userId && macro) {
+        saveBiometricProfile(userId, {
+          daily_calorie_target: macro.target_calories ?? null,
+          protein_g: macro.protein_g ?? null,
+          carb_g: macro.carb_g ?? null,
+          fat_g: macro.fat_g ?? null,
+        }).catch((err) => logger.error("NUTRITION_ARCHITECT", "Profil (hedefler) kaydedilemedi", { error: err?.message }));
+      }
     } catch (err) {
       logger.error("NUTRITION_ARCHITECT", "Üretim başarısız", { error: err?.message });
       setErrorMsg(err?.message || "Bir sorun oluştu, tekrar dener misin?");
@@ -287,20 +528,40 @@ export default function NutritionArchitectStudio({ open, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[90] flex flex-col" style={{ background: "var(--bg-app)" }}>
-      <div className="shrink-0 px-4 sm:px-6 lg:px-8 pt-5 pb-3 flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5">
+      <div className="shrink-0 px-4 sm:px-6 lg:px-8 pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-3 flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5">
         <div className="flex items-center gap-2.5">
           <ChefHat className="w-5 h-5 shrink-0" style={{ color: ACCENT }} strokeWidth={2.25} />
           <h2 className="text-[17px] font-bold text-[var(--text-primary)] whitespace-nowrap">Beslenme & Antrenman Mimarı</h2>
         </div>
         <div className="flex items-center gap-2">
           {stage === "result" && (
-            <button
-              onClick={() => setStage("form")}
-              className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[11.5px] font-bold transition-colors"
-              style={{ background: ACCENT_SOFT, color: ACCENT }}
-            >
-              <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.25} /> Yeniden Oluştur
-            </button>
+            <>
+              {/* PDF Olarak İndir — window.print() tetikler; aşağıdaki
+                  gizli .print-root bloğu (PlanBoard'un PrintablePlan.jsx'i
+                  ile AYNI global @media print CSS'i, bkz. GlobalStyles.jsx)
+                  yalnızca baskı sırasında görünür olur. Aynı anda DOM'da
+                  PlanBoard'un KENDİ .print-root'u da (aktif bir plan varsa
+                  boş olsa bile) bulunabildiği için, iki blok üst üste
+                  basılmasın diye print sırasında ondan farklı TÜM
+                  .print-root öğeleri geçici olarak gizlenir.*/}
+              <button
+                onClick={() => handlePrintNutrition()}
+                aria-label="PDF Olarak İndir"
+                className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[11.5px] font-bold transition-colors"
+                style={{ background: "rgba(56,189,248,0.14)", color: "#38BDF8" }}
+              >
+                <Printer className="w-3.5 h-3.5 shrink-0" strokeWidth={2.25} />
+                <span className="hidden sm:inline">PDF Olarak İndir</span>
+              </button>
+              <button
+                onClick={() => setStage("form")}
+                className="flex items-center gap-1.5 rounded-full px-3 h-9 text-[11.5px] font-bold transition-colors"
+                style={{ background: ACCENT_SOFT, color: ACCENT }}
+              >
+                <RotateCcw className="w-3.5 h-3.5 shrink-0" strokeWidth={2.25} />
+                <span className="hidden sm:inline">Yeniden Oluştur</span>
+              </button>
+            </>
           )}
           <button
             onClick={onClose}
@@ -315,12 +576,35 @@ export default function NutritionArchitectStudio({ open, onClose }) {
 
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pb-mobile-safe">
-          {stage === "form" && (
+          {stage === "form" && profileLoading && (
+            <div className="flex flex-col items-center text-center gap-3 pt-16">
+              <div className="relative w-10 h-10 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border-2 opacity-20" style={{ borderColor: ACCENT }} />
+                <div className="absolute inset-0 rounded-full border-2 border-transparent motion-safe:animate-spin" style={{ borderTopColor: ACCENT, animationDuration: "0.9s" }} />
+              </div>
+              <p className="text-[12.5px] font-semibold text-[var(--text-faint)]">Kayıtlı profilin yükleniyor...</p>
+            </div>
+          )}
+
+          {stage === "form" && !profileLoading && (
             <div className="flex flex-col gap-5">
               <p className="text-[12.5px] text-[var(--text-muted)] leading-relaxed">
                 Fiziksel verilerini gir — sana özel, milimetrik hesaplanmış kalori/makro hedefi, öğün planı (alternatifleriyle) ve antrenman programı üretelim.
+                {userId && " Girdiklerin hesabına kaydedilir, tekrar açtığında hazır bulursun."}
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <Field label="Yaş">
+                  <input type="number" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} placeholder="28" className={inputCls} />
+                </Field>
+                <Field label="Cinsiyet">
+                  <select value={gender} onChange={(e) => setGender(e.target.value)} className={selectCls}>
+                    {GENDER_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
                 <Field label="Kilo (kg)">
                   <input type="number" inputMode="decimal" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} placeholder="75" className={inputCls} />
                 </Field>
@@ -402,6 +686,8 @@ export default function NutritionArchitectStudio({ open, onClose }) {
           {stage === "result" && result && <ArchitectureResult data={result} />}
         </div>
       </div>
+
+      {stage === "result" && result && <PrintableNutritionPlan data={result} />}
     </div>
   );
 }

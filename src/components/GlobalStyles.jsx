@@ -547,6 +547,18 @@ export default function GlobalStyles() {
           padding: 0;
           font-family: Georgia, "Times New Roman", serif;
         }
+        /* Aynı anda birden fazla .print-root DOM'da olabilir (ör. PlanBoard'un
+           PrintablePlan.jsx'i kök seviyede her zaman mount edilir; Beslenme
+           Mimarı'nın PrintableNutritionPlan'ı da açıkken kendi bloğunu ekler).
+           .print-root üstteki kural !important ile display:block yaptığı için
+           inline style.display="none" bunu EZEMEZ (stylesheet !important her
+           zaman inline stile karşı kazanır) — bu yüzden bastırma AYNI ÖZGÜLLÜK
+           SINIFINDA (iki class, 0,2,0) ayrı bir kuralla yapılır; bu, tek class'lı
+           (0,1,0) yukarıdaki kuralı kaynak sırasından bağımsız olarak yener.
+           İlgili yazdırma butonları (bkz. NutritionArchitectStudio.jsx
+           handlePrintNutrition) yazdırma anında istenmeyen .print-root'lara bu
+           class'ı ekler, sonra kaldırır. */
+        .print-root.print-suppress { display: none !important; }
         @page { margin: 18mm 16mm; }
         .print-root * { visibility: visible; color: #1a1a1a !important; background: transparent !important; box-shadow: none !important; }
         .print-header { border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }

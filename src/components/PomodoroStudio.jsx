@@ -566,8 +566,13 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
       className="fixed inset-0 h-[100dvh] z-[90] flex flex-col transition-colors duration-700"
       style={{ display: open ? "flex" : "none", background: isFocusMode ? "var(--pomo-bg-focus)" : "var(--pomo-bg)" }}
     >
-      {/* Üst bar */}
-      <div className="shrink-0 px-4 md:px-8 pt-4 sm:pt-5 pb-2.5 sm:pb-3 flex items-center justify-between gap-2">
+      {/* Üst bar — PomodoroStudio kendi `fixed inset-0` katmanında, App
+          kökündeki Header'ın (kendi safe-area düzeltmesi var) ARKASINDA/
+          ÜSTÜNDE render edilir — bu üst barın çentik/durum çubuğu payı
+          KENDİ başına gerekir, Header'ınkinden miras almaz. */}
+      <div
+        className="shrink-0 px-4 md:px-8 pt-[calc(1rem+env(safe-area-inset-top,0px))] sm:pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-2.5 sm:pb-3 flex items-center justify-between gap-2"
+      >
         <div className={`flex items-center gap-2.5 transition-opacity duration-300 ${isFocusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
           <TimerIcon className="w-5 h-5 shrink-0" style={{ color: accent }} strokeWidth={2.25} />
           <h2 className="text-[17px] font-bold text-gray-900 dark:text-white whitespace-nowrap">Focus Studio</h2>
@@ -640,7 +645,7 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
           `h-full justify-between`i (bkz. tanımı) bu konteynerin GERÇEK
           yüksekliğe sahip olmasına bağlı, bu yüzden bu satır flex-1 min-h-0
           İLE BİRLİKTE çalışıyor. */}
-      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center px-4 sm:px-6 py-3 sm:py-4">
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center px-4 sm:px-6 pt-3 sm:pt-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
         <HeroZone {...heroProps} />
       </div>
 

@@ -1,6 +1,7 @@
 import { wrapGeminiError } from "./aiErrors.js";
 import { getRoutedModel } from "./geminiRouter.js";
 import { hydratePlanTemplate, hydrateWeekTemplate } from "./planHydration.js";
+import { fetchBiometricContextText } from "./biometricContext.js";
 
 // AI plan üretim pipeline'ının SUNUCU TARAFI portu. Eskiden bu dosyanın
 // içeriği src/services/aiPipelineService.js'te idi ve VITE_GEMINI_API_KEY ile
@@ -169,7 +170,13 @@ Yanıtın SADECE ve KESİNLİKLE aşağıdaki JSON yapısında olmalı, şema d�
 }
 "tasks" dizisindeki her elemanın SIRASI/uzunluğu için yukarıdaki task şeması geçerli (nesne DEĞİL, dizi). first_week_tasks, total_days 7'den küçükse tam olarak total_days kadar gün; değilse tam olarak 7 gün (day 1..7) içermeli. Dinlenme günleri de bir gündür (fitness'ta boş bırakma, "dinlenme" görevi ver). week_topics dizisinin eleman sayısı, total_days'ten hesapladığın toplam hafta sayısına eşit olmalı.`;
 
-  const userPrompt = `${describeUserInput(userInput)}\n\nYukarıdaki bilgilere göre planın toplam süresini (total_days), tüm planın haftalık iskeletini (week_topics), genel rutinlerini ve 1. haftasının detayını üret.`;
+  // Kullanıcının kayıtlı biyometrik profili (varsa) — Beslenme & Antrenman
+  // Mimarı'ndan bağımsız olarak, GENEL plan üretiminde de otomatik bağlam
+  // olarak kullanılır (bkz. biometricContext.js dosya başı yorumu — fail-open,
+  // DB'de satır yoksa/erişilemezse bu satır boş string döner, hiçbir şey değişmez).
+  const biometricContext = await fetchBiometricContextText(userInput.userId);
+
+  const userPrompt = `${describeUserInput(userInput)}${biometricContext}\n\nYukarıdaki bilgilere göre planın toplam süresini (total_days), tüm planın haftalık iskeletini (week_topics), genel rutinlerini ve 1. haftasının detayını üret.`;
 
   const rawParsed = await runJson("plan.create", systemInstruction, userPrompt, "Plan oluşturma");
   if (!rawParsed?.plan_title || !Array.isArray(rawParsed?.first_week_tasks)) {

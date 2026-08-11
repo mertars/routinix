@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Timer, BarChart3, Users2, Menu, X, Play, Pause, Maximize2 } from "lucide-react";
+import { Timer, BarChart3, Users2, Menu, X, Play, Pause, Maximize2, LogOut } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useMusic } from "../context/MusicContext";
 import { FEATURE_FLAGS } from "../constants";
@@ -317,19 +317,26 @@ function Header({
           </div>
 
           {user ? (
+            // Mobilde İKON-ONLY (bildirilen hata: "kaybolan Çıkış Yap butonu"
+            // — R logosu + marka adı solda, TaskManagementDropdown/Ritim/
+            // Nexus/Pomodoro grubu `hidden md:flex` olsa da bu buton + tema
+            // + hamburger dar ekranlarda sıkışıp taşabiliyordu). sm: ve
+            // üzerinde eski avatar+"Çıkış" metni geri döner.
             <button
               onClick={onSignOut}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 h-9 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              aria-label="Çıkış Yap"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 sm:px-2.5 w-9 sm:w-auto h-9 justify-center text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
               style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}
               title={user.email}
             >
               <span
-                className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                className="hidden sm:flex w-5 h-5 rounded-full items-center justify-center text-[10px] font-bold shrink-0"
                 style={{ background: modeAccentSoft, color: modeAccent }}
               >
                 {(user.email || "?").charAt(0).toUpperCase()}
               </span>
-              Çıkış
+              <LogOut className="w-4 h-4 sm:hidden" strokeWidth={2.25} />
+              <span className="hidden sm:inline">Çıkış</span>
             </button>
           ) : (
             <button

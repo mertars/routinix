@@ -424,7 +424,7 @@ export default function RhythmStudio({ open, userId, onClose }) {
   return (
     <div className="fixed inset-0 z-[90] flex flex-col" style={{ background: "var(--bg-app)" }}>
       {/* Üst bar */}
-      <div className="shrink-0 px-4 sm:px-6 lg:px-8 pt-5 pb-3 flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5">
+      <div className="shrink-0 px-4 sm:px-6 lg:px-8 pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-3 flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5">
         <div className="flex items-center gap-2.5">
           <Moon className="w-5 h-5 shrink-0" style={{ color: ACCENT }} strokeWidth={2.25} />
           <h2 className="text-[17px] font-bold text-[var(--text-primary)] whitespace-nowrap">Ritim & Gün Sonu</h2>

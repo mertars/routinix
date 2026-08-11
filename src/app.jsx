@@ -349,20 +349,30 @@ export default function App() {
   }
 
   return (
-    <div className="w-full" style={{ background: "var(--bg-app)" }}>
+    // PWA KABUK SABİTLEMESİ (mobil): eskiden bu dış kapsayıcı `w-full`
+    // (normal akış) idi ve sayfa YÜKSEKLİĞİ içeriğe göre büyüyüp tarayıcının
+    // KENDİSİ (document/body) kayıyordu — Ana Ekrana Ekle (standalone PWA)
+    // modunda bu, alt sayfalar arası geçişte (adres çubuğu/gesture bar
+    // olmadığından) görünür bir "atma/zıplama" (sayfa kaydırma pozisyonunun
+    // sıfırlanması, üstte/altta kısa bir boşluk/beyaz alan yanıp sönmesi)
+    // olarak görülüyordu. Artık mobilde TÜM UYGULAMA `fixed inset-0
+    // overflow-hidden` — kabuk (BackgroundScene/Header/DrawerMenu) HİÇBİR
+    // ZAMAN kaymaz; kaydırma yalnızca aşağıdaki `<main>`in KENDİ
+    // `overflow-y-auto` alanında olur (bkz. main'in className'i). Masaüstü
+    // (md:) davranışı BİREBİR korunuyor (normal akış, sayfa kendisi kayar).
+    <div className="fixed inset-0 w-full overflow-hidden md:relative md:inset-auto md:min-h-screen md:overflow-visible" style={{ background: "var(--bg-app)" }}>
       {/* Atmosferik animasyonlu dağ/topoğrafya + neon şerit arka planı (içeriğin
           arkasında) — ambient glow rengi aktif kategoriye göre (intro'da seçili
           sekme, plan içindeyken planın kendi kategorisi) yumuşakça değişir. */}
       <BackgroundScene category={ps.category} suspended={anyOverlayOpen} />
 
-      {/* Mobilde intro tek ekrana kilitli (h-100dvh, scroll yok); md'den itibaren serbest. */}
-      <div
-        className={`relative z-10 flex flex-col text-[var(--text-primary)] ${
-          onIntroLike
-            ? "h-[100dvh] overflow-hidden md:h-auto md:min-h-screen md:overflow-visible"
-            : "min-h-[100dvh]"
-        }`}
-      >
+      {/* Kabuğun kendisi artık HER zaman (yalnızca onIntroLike değil) mobilde
+          `h-full` — üst kapsayıcı zaten `fixed inset-0`/100dvh'e eşdeğer,
+          bu satır yalnızca ONU doldurur. `100vh` DEĞİL bu yüzden `100dvh`
+          sorunu (iOS Safari adres çubuğu) burada da otomatik çözülür — dvh
+          birimi hiç kullanılmadan, üst kapsayıcının GERÇEK (fixed) boyutuna
+          bağlanarak. Masaüstünde (md:) eski min-h-screen/doğal akış korunur. */}
+      <div className="relative z-10 flex flex-col text-[var(--text-primary)] h-full md:h-auto md:min-h-screen">
         {/* Misafir şeridi — Header'ın (sticky top-0 z-20) hemen ÜSTÜNDE DOM
             sırasıyla, kendisi de sticky top-0 z-30: art arda gelen sticky
             elemanlar tarayıcıda üst üste istiflenir, Header'ın piksel
@@ -418,12 +428,22 @@ export default function App() {
         />
 
         <main
+          // KAYDIRMA YÖNLENDİRMESİ (PWA sabit kabuk): onIntroLike hariç TÜM
+          // aşamalar (Plan Board, Wizard, Loading/Error) artık kaydırmasını
+          // BURADA (kendi overflow-y-auto'sunda) yapıyor — üst kapsayıcı
+          // artık mobilde `fixed inset-0 overflow-hidden` olduğundan (bkz.
+          // yukarısı), eskiden güvendiği doğal body/document kaydırması
+          // artık YOK. onIntroLike'ın KENDİ overflow-y-auto'su ZATEN var
+          // (CategoryIntro'nun kök elemanı) — burada AYRICA eklenirse iç
+          // içe/tuzağa düşüren ÇİFT kaydırma bölgesi oluşurdu, o yüzden
+          // BİLEREK dışarıda bırakıldı. Masaüstünde (md:) hepsi normal
+          // sayfa akışına (overflow-visible) döner, değişiklik YOK.
           className={`flex-1 min-h-0 w-full mx-auto ${
             onIntroLike
               ? "max-w-7xl px-4 md:px-6 pt-4 md:pt-8 pb-4 md:pb-10 flex flex-col"
               : stage === STAGE_PLAN
-                ? "max-w-7xl px-4 md:px-8 pt-6 pb-16"
-                : "max-w-xl px-5 pt-6 pb-16"
+                ? "max-w-7xl px-4 md:px-8 pt-6 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] overflow-y-auto md:overflow-visible"
+                : "max-w-xl px-5 pt-6 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] overflow-y-auto md:overflow-visible"
           }`}
         >
           {/* Plan oluşturma/görüntüleme akışının TAMAMI (intro/soru/hazır plan)
@@ -659,7 +679,7 @@ export default function App() {
           koşullu mount deseni. */}
       {nutritionArchitectOpen && (
         <Suspense fallback={<OverlayFallback z={90} />}>
-          <NutritionArchitectStudio open={nutritionArchitectOpen} onClose={() => setNutritionArchitectOpen(false)} />
+          <NutritionArchitectStudio open={nutritionArchitectOpen} userId={auth.user?.id} onClose={() => setNutritionArchitectOpen(false)} />
         </Suspense>
       )}
 

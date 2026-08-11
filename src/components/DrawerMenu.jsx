@@ -94,11 +94,22 @@ function DrawerMenu({
     <>
       <div className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm animate-[fadeIn_0.2s_ease]" onClick={onClose} />
       <div
-        className="blur-cap-mobile fixed top-0 right-0 z-50 h-full w-[86%] max-w-[340px] flex flex-col drawer-panel no-scrollbar"
+        // KÖK NEDEN (bildirilen "kaybolan Çıkış Yap butonu"): `h-full`
+        // (height:100%) bir `position:fixed` elemanda, iOS Safari'nin adres
+        // çubuğu/gesture bar'ı GÖRÜNÜRKEN gerçek görünür viewport'tan DAHA
+        // UZUN render olabiliyor — panelin altındaki "Çıkış Yap" bölümü
+        // (kaydırılabilir orta gövdenin DIŞINDA, sabit bir alt footer)
+        // görünür alanın altına taşıp erişilemez/görünmez oluyordu. `h-full`
+        // yerine `h-[100dvh]` — dinamik viewport birimi, gerçek görünür
+        // yüksekliğe her zaman eşit.
+        className="blur-cap-mobile fixed top-0 right-0 z-50 h-[100dvh] w-[86%] max-w-[340px] flex flex-col drawer-panel no-scrollbar"
         style={{ background: "rgba(var(--glass-rgb), var(--alpha-modal))", borderLeft: "1px solid var(--modal-border)" }}
       >
         {/* Profil satırı */}
-        <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-3 border-b border-slate-200 dark:border-white/10">
+        <div
+          className="flex items-start justify-between gap-2 px-4 pb-3 border-b border-slate-200 dark:border-white/10"
+          style={{ paddingTop: "calc(1rem + env(safe-area-inset-top, 0px))" }}
+        >
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 mb-2.5">
               <div
@@ -146,8 +157,12 @@ function DrawerMenu({
           </div>
         </div>
 
-        {/* En alt aksiyon alanı */}
-        <div className="px-4 py-4 border-t border-slate-200 dark:border-white/10 flex flex-col gap-2.5">
+        {/* En alt aksiyon alanı — "Çıkış Yap" burada, home-indicator/gesture
+            bar alanının ALTINDA kalmasın diye gerçek safe-area payı. */}
+        <div
+          className="px-4 pt-4 border-t border-slate-200 dark:border-white/10 flex flex-col gap-2.5"
+          style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+        >
           <div className="grid grid-cols-2 gap-2.5">
             <button
               onClick={go(onNewPlan)}

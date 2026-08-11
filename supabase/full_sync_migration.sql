@@ -636,8 +636,59 @@ grant select on public.template_stats to anon, authenticated;
 grant select on public.profile_stats to anon, authenticated;
 
 -- =====================================================================
--- 16) PostgREST şema önbelleğini yenile — yeni sütun/tablo/fonksiyonların
+-- 16) user_biometric_profiles — Beslenme & Antrenman Mimarı'nın (bkz.
+--     NutritionArchitectStudio.jsx) biyometrik/hedef giriş formunun DB
+--     kalıcılığı. Kullanıcı başına TEK satır (user_id PRIMARY KEY, ayrı bir
+--     `id` sütunu YOK) — upsert(onConflict: "user_id") ile hem ilk kayıt
+--     hem güncelleme AYNI çağrıyla yapılır (bkz. src/services/
+--     biometricProfileService.js). Bu tablo yukarıdaki hiçbir DROP bloğuna
+--     DAHİL DEĞİL (mevcut plan/routine/task tablolarından TAMAMEN bağımsız).
+--
+--     GÜVENLİK: SELECT/INSERT/UPDATE hepsi "auth.uid() = user_id" — client
+--     (anon key + kullanıcı JWT'si) yalnızca KENDİ satırını okuyup
+--     yazabilir; DELETE policy'si BİLEREK YOK (silme akışı yok, gerekirse
+--     alanlar boşaltılıp update edilir). AI plan üretimi (api/_lib/
+--     biometricContext.js) bu tabloyu service_role ile okur — RLS'i bypass
+--     eder, ayrı bir policy gerekmez.
+-- =====================================================================
+create table if not exists public.user_biometric_profiles (
+  user_id               uuid primary key references auth.users (id) on delete cascade,
+  age                   int check (age is null or (age between 10 and 100)),
+  gender                text check (gender is null or gender in ('erkek', 'kadin', 'belirtilmedi')),
+  height_cm             numeric check (height_cm is null or (height_cm between 50 and 260)),
+  weight_kg             numeric check (weight_kg is null or (weight_kg between 20 and 400)),
+  body_fat_pct          numeric,
+  activity_level        text, -- sedentary | light | moderate | active | very_active
+  goal                  text, -- bulk | cut | maintain
+  daily_calorie_target  int,
+  protein_g             int,
+  carb_g                int,
+  fat_g                 int,
+  wake_time             text,
+  sleep_time            text,
+  budget_level          text,
+  allergies             text[] not null default '{}',
+  updated_at            timestamptz not null default now()
+);
+
+alter table public.user_biometric_profiles enable row level security;
+
+drop policy if exists "user_biometric_profiles_select_own" on public.user_biometric_profiles;
+create policy "user_biometric_profiles_select_own" on public.user_biometric_profiles
+  for select using (auth.uid() = user_id);
+drop policy if exists "user_biometric_profiles_insert_own" on public.user_biometric_profiles;
+create policy "user_biometric_profiles_insert_own" on public.user_biometric_profiles
+  for insert with check (auth.uid() = user_id);
+drop policy if exists "user_biometric_profiles_update_own" on public.user_biometric_profiles;
+create policy "user_biometric_profiles_update_own" on public.user_biometric_profiles
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+-- Bilerek YOK: delete policy'si — bkz. yukarıdaki dosya başı notu.
+
+-- =====================================================================
+-- 17) PostgREST şema önbelleğini yenile — yeni sütun/tablo/fonksiyonların
 --     REST API'de ANINDA görünür olması için (aksi halde önbellek süresi
---     dolana kadar "column does not exist" hataları görülebilir).
+--     dolana kadar "column does not exist" hataları görülebilir). Bu script
+--     içindeki EN SON komut olmalı (üstteki tüm tablo/kolon değişiklikleri
+--     bittikten sonra çalışmalı).
 -- =====================================================================
 NOTIFY pgrst, 'reload schema';
