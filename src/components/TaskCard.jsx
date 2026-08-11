@@ -1,6 +1,5 @@
 import { memo, useState } from "react";
-import { ChevronRight, Play, MapPin } from "lucide-react";
-import FocusSidePanel from "./FocusSidePanel";
+import { ChevronRight, Lightbulb, Clock, Flag, Wallet, Play, MapPin } from "lucide-react";
 import { WidgetAddButton, WidgetList } from "./TaskWidgets";
 
 const PRIORITY_STYLE = {
@@ -8,6 +7,22 @@ const PRIORITY_STYLE = {
   Orta: { color: "var(--amber-accent)", bg: "rgba(240,179,126,0.14)" },
   Düşük: { color: "#6FCF97", bg: "rgba(111,207,151,0.14)" },
 };
+
+// Backend (bkz. api/_lib/planPrompt.js WHY_IT_WORKS_RULE) her görevin
+// description'ının SONUNA, tek tip "Neden Bu Görev?: " işaretiyle başlayan
+// ayrı bir cümle olarak stratejik gerekçe gömer — şema/tuple şekli DEĞİŞMEDİ,
+// tek bir string alanın İÇİNDE bir konvansiyon. Burada bu işaretten ayrıştırıp
+// "ana açıklama" + "gerekçe"yi ayrı, rozetli bölümler olarak gösteriyoruz.
+// İşaret yoksa (eski planlar, ya da model kuralı atladıysa) `why` boş kalır,
+// tüm metin `main`'e düşer — GERİYE DÖNÜK UYUMLU, hiçbir şey kaybolmaz.
+const WHY_MARKER = "Neden Bu Görev?:";
+
+function parseTaskDetail(detail) {
+  if (!detail) return { main: "", why: "" };
+  const idx = detail.indexOf(WHY_MARKER);
+  if (idx === -1) return { main: detail.trim(), why: "" };
+  return { main: detail.slice(0, idx).trim(), why: detail.slice(idx + WHY_MARKER.length).trim() };
+}
 
 function openInMaps(query) {
   const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
@@ -21,45 +36,35 @@ function estimatePomodoros(durationMin) {
   return Math.max(1, Math.round(durationMin / 25));
 }
 
-// "Mikro-Arayüz": görev kartı artık tek satır — görev adı ve bir Başlat
-// butonundan ibaret; Pomodoro rozeti YALNIZCA `showPomodoro` (odak/çalışma
-// kategorisi) true olduğunda ve süre verisi varsa görünür — tatil/fitness/genel
-// rutin gibi zamanlama gerektirmeyen içeriklerde tamamen gizlenir, zorunlu
-// değildir. Etiket/açıklama/bütçe gibi detaylar varsayılan olarak GİZLİ; satıra
-// dokununca (checkbox/Başlat HARİÇ) mobilde alttan açılan Bottom Sheet,
-// masaüstünde sağdan süzülen Drawer ile açılır (bkz. FocusSidePanel.jsx).
+// "Mikro-Arayüz": görev kartı tek satır — görev adı ve bir Başlat butonundan
+// ibaret; Pomodoro rozeti YALNIZCA `showPomodoro` (odak/çalışma kategorisi)
+// true olduğunda ve süre verisi varsa görünür. Etiket/açıklama/bütçe gibi
+// detaylar varsayılan olarak GİZLİ; başlığa dokununca kartın KENDİ İÇİNDE,
+// tam altında AÇILAN bir inline accordion ile gösterilir (ESKİDEN ayrı bir
+// fixed-position FocusSidePanel/Drawer-Bottom-Sheet kullanılıyordu — bu,
+// listenin akışı DIŞINDA bir overlay olduğundan "ekranın en altına yapışan,
+// kartla ilişkisi belirsiz panel" hissi veriyordu; artık detay DOĞRUDAN
+// tıklanan kartın gövdesinin bir parçası, aynı `rounded-2xl` sınır içinde).
 // Sert çerçeve YOK — yalnızca arka plan ton farkıyla (bg-white/5 eşleniği) ayrışır.
 function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onStartPomodoro, onUpdateWidgets }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const pr = task.priority ? PRIORITY_STYLE[task.priority] : null;
   const pomodoros = showPomodoro ? estimatePomodoros(task.duration_min) : null;
   const hasDetails = Boolean(task.detail || task.duration_min || pr || task.estimated_cost || (isVacation && task.map_search_query));
+  const { main, why } = parseTaskDetail(task.detail);
   // Önceliğe göre renklendirilir; öncelik yoksa planın kategori aksanına düşer.
   const stripColor = pr?.color || accent;
   const widgets = task.widgets || [];
 
   return (
-    <>
-      {/* Widget-Based Task System: kart artık "Bento" bir kapsayıcı — GERÇEK
-          bir kenarlık (border) taşır (bkz. spesifikasyon: "bg-slate-900/80
-          border border-slate-800 rounded-2xl p-4"). Sabit slate rengi YERİNE
-          bilerek var(--bg-card)/var(--border-default) tema token'ları
-          kullanıldı — bu ekran (PlanBoard/TaskCard) uygulamanın GERİ KALANI
-          gibi tam açık/koyu tema desteğine sahip (Focus Studio'nun aksine,
-          bkz. o dosyanın "BİLEREK sabit koyu" notu); sabit slate-900 burada
-          açık temayı KIRARDI. Koyu temada zaten neredeyse AYNI görünüyor
-          (--bg-card koyu değeri #101319 ~ slate-900). Widget YOKSA (mevcut
-          planların ezici çoğunluğu) kart eskisi kadar KOMPAKT kalır —
-          alt widget satırı yalnızca 1+ widget varken render edilir.
-          Görev başlığının yanındaki "+" tetikleyicisi ise HER ZAMAN görünür. */}
-      <div
-        className="task-card rounded-2xl card-glow flex flex-col overflow-hidden"
-        style={{
-          background: task.is_completed ? "rgba(var(--overlay-rgb),0.03)" : "rgba(var(--overlay-rgb),0.05)",
-          border: "1px solid var(--border-default)",
-        }}
-      >
-        <div className="flex items-center gap-3.5 pl-0 pr-3 py-3.5">
+    <div
+      className="task-card rounded-2xl card-glow flex flex-col overflow-hidden"
+      style={{
+        background: task.is_completed ? "rgba(var(--overlay-rgb),0.03)" : "rgba(var(--overlay-rgb),0.05)",
+        border: "1px solid var(--border-default)",
+      }}
+    >
+      <div className="flex items-center gap-3.5 pl-0 pr-3 py-3.5">
         <div className="self-stretch w-[3px] shrink-0 rounded-r-full" style={{ background: task.is_completed ? "var(--border-strong)" : stripColor }} />
 
         <button
@@ -80,10 +85,17 @@ function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onSt
 
         <div className="flex-1 min-w-0 flex flex-col gap-1">
           <div className="flex items-center gap-1">
+            {/* Tek tetikleyici: tıklama anında AÇIK/KAPALI durumunu tersine
+                çevirir (önceden yalnızca `true`'ya sabitliyordu, kapatmak için
+                ayrı bir X/backdrop'a muhtaçtı — artık aynı buton hem açar hem
+                kapatır, gecikme/çoklu-tıklama hissi yaratan ekstra dolaylama
+                YOK). disabled tek koşul (`!hasDetails`) — rakip/iç içe başka
+                bir onClick handler'ı bu butonun ÜZERİNDE YOK. */}
             <button
-              onClick={() => hasDetails && setDetailOpen(true)}
+              onClick={() => hasDetails && setDetailOpen((v) => !v)}
               className="flex-1 min-w-0 flex items-center gap-2 text-left"
               disabled={!hasDetails}
+              aria-expanded={detailOpen}
             >
               <span
                 className="flex-1 min-w-0 truncate text-[14px] font-bold"
@@ -96,7 +108,12 @@ function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onSt
                   🍅×{pomodoros}
                 </span>
               ) : null}
-              {hasDetails && <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-faint)" }} />}
+              {hasDetails && (
+                <ChevronRight
+                  className="w-3.5 h-3.5 shrink-0 transition-transform duration-200"
+                  style={{ color: "var(--text-faint)", transform: detailOpen ? "rotate(90deg)" : "none" }}
+                />
+              )}
             </button>
             {/* Widget Ekle — başlığın YANINDA (spesifikasyon), ayrı bir
                 <button> olduğu için üstteki başlık butonunun İÇİNE değil
@@ -104,12 +121,8 @@ function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onSt
             {onUpdateWidgets && <WidgetAddButton onAdd={(w) => onUpdateWidgets(task.id, [...widgets, w])} />}
           </div>
 
-          {/* Gezi görevlerinde bütçe — ÖNCEDEN yalnızca detay çekmecesinde
-              görünüyordu (FocusSidePanel, aşağıda), kullanıcı karta dokunmadan
-              göremiyordu. Artık kartın kendisinde, ikinci/küçük bir satırda —
-              ana satırı (checkbox/başlık/Pomodoro/play) kalabalıklaştırmadan.
-              Harita butonu BURADAN kaldırıldı — artık sağdaki aksiyon
-              grubunda (play ile yan yana), bkz. aşağısı. */}
+          {/* Gezi görevlerinde bütçe — kartın kendisinde, ikinci/küçük bir
+              satırda; ana satırı (checkbox/başlık/Pomodoro/play) kalabalıklaştırmadan. */}
           {isVacation && task.estimated_cost && (
             <div className="flex items-center gap-1.5 flex-wrap">
               <span
@@ -123,14 +136,9 @@ function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onSt
         </div>
 
         {/* Harita aksiyonu — kompakt ikon buton, sağdaki aksiyon grubunda
-            (Play'in solunda). `soft`/`accent` planın kategori temasından
-            gelir (gezi kategorisinin aksanı zaten yeşilimsi, #2ED9A3) —
-            projedeki HER yerde kullanılan aynı tema token deseni, sabit bir
-            Tailwind rengi (ör. emerald-500) YAZILMADI ki açık/koyu tema ve
-            diğer kategori aksanlarıyla tutarlı kalsın. Başlık butonunun
-            DIŞINDA bağımsız bir kardeş eleman olduğundan tıklanınca detay
-            çekmecesini açmaz; yine de stopPropagation defensif olarak
-            eklendi (checkbox/play'deki AYNI desen). */}
+            (Play'in solunda). Başlık butonunun DIŞINDA bağımsız bir kardeş
+            eleman olduğundan tıklanınca accordion'u açıp kapatmaz; yine de
+            stopPropagation defensif olarak eklendi (checkbox/play'deki AYNI desen). */}
         {isVacation && task.map_search_query && (
           <a
             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(task.map_search_query)}`}
@@ -160,53 +168,90 @@ function TaskCard({ task, accent, soft, isVacation, showPomodoro, onToggle, onSt
             <Play className="w-3.5 h-3.5" fill="currentColor" strokeWidth={0} />
           </button>
         )}
-        </div>
-
-        {widgets.length > 0 && onUpdateWidgets && (
-          <div className="pl-[55px] pr-3 pb-3.5">
-            <WidgetList widgets={widgets} onChange={(next) => onUpdateWidgets(task.id, next)} />
-          </div>
-        )}
       </div>
 
+      {/* Görev Açıklama Kartı — INLINE accordion, tıklanan kartın KENDİ
+          gövdesinin bir parçası (ayrı bir fixed overlay/drawer DEĞİL).
+          `grid-template-rows: 0fr → 1fr` tekniği: içeriğin gerçek yüksekliği
+          ÖNCEDEN bilinmese de (metin uzunluğu değişken) pürüzsüz açılıp
+          kapanmasını sağlar — sabit bir `max-height` tahmini gerekmez, ani
+          zıplama/kırpılma olmaz. İç `overflow-hidden` sarmalayıcı, kapalıyken
+          (0fr) içeriğin taşmasını gizler. */}
       {hasDetails && (
-        <FocusSidePanel open={detailOpen} onClose={() => setDetailOpen(false)} side="right" title={task.title}>
-          <div className="flex flex-col gap-4">
-            {task.detail && <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{task.detail}</p>}
+        <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: detailOpen ? "1fr" : "0fr" }}>
+          <div className="overflow-hidden">
+            <div
+              className="mx-3 mb-3.5 rounded-xl backdrop-blur-md p-3.5 flex flex-col gap-3"
+              style={{ background: "rgba(var(--overlay-rgb),0.06)", border: "1px solid var(--border-default)" }}
+            >
+              {why && (
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 mt-0.5 rounded-md flex items-center justify-center shrink-0" style={{ background: soft, color: accent }}>
+                    <Lightbulb className="w-3 h-3" strokeWidth={2.5} />
+                  </span>
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="text-[10.5px] font-bold uppercase tracking-wide" style={{ color: accent }}>
+                      Neden Bu Görev?
+                    </span>
+                    <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      {why}
+                    </p>
+                  </div>
+                </div>
+              )}
 
-            {(task.duration_min || pr || task.estimated_cost) && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {task.duration_min ? (
-                  <span className="text-[10.5px] font-semibold px-2 py-1 rounded-full" style={{ background: "var(--disabled-bg)", color: "#9BB0C0" }}>
-                    ⏱ {task.duration_min} dk
-                  </span>
-                ) : null}
-                {pr && (
-                  <span className="text-[10.5px] font-semibold px-2 py-1 rounded-full" style={{ background: pr.bg, color: pr.color }}>
-                    {task.priority}
-                  </span>
-                )}
-                {task.estimated_cost && (
-                  <span className="text-[10.5px] font-semibold px-2 py-1 rounded-full" style={{ background: "var(--disabled-bg)", color: "var(--amber-accent)" }}>
-                    💰 {task.estimated_cost}
-                  </span>
-                )}
-              </div>
-            )}
+              {main && (
+                <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                  {main}
+                </p>
+              )}
 
-            {isVacation && task.map_search_query && (
-              <button
-                onClick={() => openInMaps(task.map_search_query)}
-                className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[12.5px] font-semibold transition-colors"
-                style={{ background: soft, color: accent }}
-              >
-                📍 Konumu Haritada Aç
-              </button>
-            )}
+              {(task.duration_min || pr || task.estimated_cost) && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {task.duration_min ? (
+                    <span
+                      className="inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-1 rounded-full"
+                      style={{ background: "var(--disabled-bg)", color: "#9BB0C0" }}
+                    >
+                      <Clock className="w-2.5 h-2.5" strokeWidth={2.5} /> {task.duration_min} dk
+                    </span>
+                  ) : null}
+                  {pr && (
+                    <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-1 rounded-full" style={{ background: pr.bg, color: pr.color }}>
+                      <Flag className="w-2.5 h-2.5" strokeWidth={2.5} /> {task.priority}
+                    </span>
+                  )}
+                  {task.estimated_cost && (
+                    <span
+                      className="inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-1 rounded-full"
+                      style={{ background: "var(--disabled-bg)", color: "var(--amber-accent)" }}
+                    >
+                      <Wallet className="w-2.5 h-2.5" strokeWidth={2.5} /> {task.estimated_cost}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {isVacation && task.map_search_query && (
+                <button
+                  onClick={() => openInMaps(task.map_search_query)}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[12.5px] font-semibold transition-colors"
+                  style={{ background: soft, color: accent }}
+                >
+                  <MapPin className="w-3.5 h-3.5" strokeWidth={2.25} /> Konumu Haritada Aç
+                </button>
+              )}
+            </div>
           </div>
-        </FocusSidePanel>
+        </div>
       )}
-    </>
+
+      {widgets.length > 0 && onUpdateWidgets && (
+        <div className="pl-[55px] pr-3 pb-3.5">
+          <WidgetList widgets={widgets} onChange={(next) => onUpdateWidgets(task.id, next)} />
+        </div>
+      )}
+    </div>
   );
 }
 

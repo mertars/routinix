@@ -49,17 +49,25 @@ function personaFor(category) {
 // SESSİZCE ÇÖPE ATIYORDU (UI'da da hiç gösterilmiyordu, bkz. TaskCard.jsx).
 // Artık bu bilgi description'ın İÇİNE gömülüyor — hem israf kalkıyor hem
 // kullanıcı bu bilgiyi GERÇEKTEN görüyor (önceden hiç görmüyordu).
+// ZORUNLU NEDENSELLİK KURALI: her görevin description'ı, SABİT bir işaret
+// ifadesiyle ("Neden Bu Görev?: ") biten ayrı bir cümleyle KAPANMALI —
+// bu tek tip işaret sayesinde frontend (bkz. TaskCard.jsx parseTaskDetail)
+// description'ı "ana açıklama" + "stratejik gerekçe" olarak ikiye ayırıp
+// AYRI, rozetli bir bölümde gösterebiliyor (şema/tuple şekli DEĞİŞMEDİ —
+// tek bir string alanın İÇİNE gömülü, geriye dönük uyumlu bir konvansiyon).
+const WHY_IT_WORKS_RULE = `ZORUNLU KURAL — NEDENSELLİK ("Neden Bu Görev?"): description alanının EN SONUNA, ayrı bir cümle olarak, TAM OLARAK "Neden Bu Görev?: " ifadesiyle (bu birebir metinle, başka bir kalıpla DEĞİL) başlayan, somut ve o SPESİFİK göreve özel bir stratejik gerekçe ekle — genel/soyut bir cümle YAZMA, bu görevin kullanıcının HEDEFİNE tam olarak nasıl katkı sağladığını açıkla (örn. "Neden Bu Görev?: Bu antrenman sonrası öğün kas protein sentezini maksimuma çıkarır ve glikojen depolarını %80 daha hızlı doldurur."). Bu kural İSTİSNASIZ HER görev için geçerli.`;
+
 function taskFieldGuide(category) {
   if (category === "vacation") {
-    return `Token tasarrufu için her günün "tasks" alanı NESNE DİZİSİ DEĞİL, tam olarak şu SIRADA 5 elemanlı bir dizi-içinde-dizi olmalı: [title, description, duration_min, estimated_cost, map_search_query]. title: aktivite/mekan adı. description: kısa açıklama. duration_min: tahmini süre (dakika). estimated_cost: örn. "250 TL" ya da "Ücretsiz". map_search_query: Google Maps'te aratıldığında doğru sonucu verecek somut bir sorgu (mekan adı + şehir).`;
+    return `Token tasarrufu için her günün "tasks" alanı NESNE DİZİSİ DEĞİL, tam olarak şu SIRADA 5 elemanlı bir dizi-içinde-dizi olmalı: [title, description, duration_min, estimated_cost, map_search_query]. title: aktivite/mekan adı. description: kısa açıklama. duration_min: tahmini süre (dakika). estimated_cost: örn. "250 TL" ya da "Ücretsiz". map_search_query: Google Maps'te aratıldığında doğru sonucu verecek somut bir sorgu (mekan adı + şehir).\n\n${WHY_IT_WORKS_RULE}`;
   }
   if (category === "fitness") {
-    return `Token tasarrufu için her günün "tasks" alanı NESNE DİZİSİ DEĞİL, tam olarak şu SIRADA 4 elemanlı bir dizi-içinde-dizi olmalı: [title, description, duration_min, priority]. title: egzersiz/aktivite adı. description: kısa form/biyomekanik ipucu — set sayısını, tekrar aralığını (örn. "8-12") VE hedef RPE/RIR'ı (örn. "RPE 8") DOĞAL bir cümleye göm, ayrı alan AÇMA (örn. "3x10, RPE 8 - dirsekleri sabit tut, kontrollü indir"). duration_min: tahmini süre (dakika). priority: "Yüksek"|"Orta"|"Düşük" (egzersizin programdaki önemine göre).`;
+    return `Token tasarrufu için her günün "tasks" alanı NESNE DİZİSİ DEĞİL, tam olarak şu SIRADA 4 elemanlı bir dizi-içinde-dizi olmalı: [title, description, duration_min, priority]. title: egzersiz/aktivite adı. description: kısa form/biyomekanik ipucu — set sayısını, tekrar aralığını (örn. "8-12") VE hedef RPE/RIR'ı (örn. "RPE 8") DOĞAL bir cümleye göm, ayrı alan AÇMA (örn. "3x10, RPE 8 - dirsekleri sabit tut, kontrollü indir"). duration_min: tahmini süre (dakika). priority: "Yüksek"|"Orta"|"Düşük" (egzersizin programdaki önemine göre).\n\n${WHY_IT_WORKS_RULE}`;
   }
   if (category === "software") {
-    return `Token tasarrufu için her günün "tasks" alanı NESNE DİZİSİ DEĞİL, tam olarak şu SIRADA 4 elemanlı bir dizi-içinde-dizi olmalı: [title, description, duration_min, priority]. title: görev başlığı. description: hangi prensip/desen/kavramın (SOLID/Async/Memory vb.) pekiştirildiğini DOĞAL bir cümle içinde belirt, ayrı alan AÇMA (örn. "Repository pattern ile SOLID - SRP prensibini pekiştirir"). duration_min: tahmini süre (dakika). priority: "Yüksek"|"Orta"|"Düşük".`;
+    return `Token tasarrufu için her günün "tasks" alanı NESNE DİZİSİ DEĞİL, tam olarak şu SIRADA 4 elemanlı bir dizi-içinde-dizi olmalı: [title, description, duration_min, priority]. title: görev başlığı. description: hangi prensip/desen/kavramın (SOLID/Async/Memory vb.) pekiştirildiğini DOĞAL bir cümle içinde belirt, ayrı alan AÇMA (örn. "Repository pattern ile SOLID - SRP prensibini pekiştirir"). duration_min: tahmini süre (dakika). priority: "Yüksek"|"Orta"|"Düşük".\n\n${WHY_IT_WORKS_RULE}`;
   }
-  return `Token tasarrufu için her günün "tasks" alanı NESNE DİZİSİ DEĞİL, tam olarak şu SIRADA 4 elemanlı bir dizi-içinde-dizi olmalı: [title, description, duration_min, priority]. title: görev başlığı. description: kısa açıklama. duration_min: tahmini süre (dakika). priority: "Yüksek"|"Orta"|"Düşük".`;
+  return `Token tasarrufu için her günün "tasks" alanı NESNE DİZİSİ DEĞİL, tam olarak şu SIRADA 4 elemanlı bir dizi-içinde-dizi olmalı: [title, description, duration_min, priority]. title: görev başlığı. description: kısa açıklama. duration_min: tahmini süre (dakika). priority: "Yüksek"|"Orta"|"Düşük".\n\n${WHY_IT_WORKS_RULE}`;
 }
 
 // Verilen system instruction ile modeli çalıştırıp katı JSON'ı parse eder.
