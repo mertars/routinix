@@ -305,6 +305,7 @@ const HeroZone = memo(function HeroZone({
   breakMin,
   adjustDuration,
   isFocusMode,
+  onClose,
 }) {
   return (
     <div className="flex flex-col items-center w-full h-full justify-between md:justify-normal">
@@ -330,6 +331,20 @@ const HeroZone = memo(function HeroZone({
       <div className="w-full grid transition-[grid-template-rows] duration-500 ease-out" style={{ gridTemplateRows: isFocusMode ? "0fr" : "1fr" }}>
         <div className="overflow-hidden min-h-0">
           <div className={`flex flex-col items-center gap-3 sm:gap-5 pt-4 sm:pt-7 pb-4 sm:pb-7 transition-opacity duration-300 ${isFocusMode ? "opacity-0" : "opacity-100"}`}>
+            {/* Kapatma (X) — mobilde üst bardan BURAYA taşındı (kronometre
+                halkasının hemen altı, görev rozetinin hemen üstü): üst
+                barda Görevler/Spotify/Odak Modu/Kapat rozetleri dar
+                ekranlarda ekran dışına taşıyordu (bildirilen hata). Aynı
+                `onClose` — konum değişti, davranış aynı. Masaüstünde
+                (md:hidden) bu buton YOK, üst bardaki ORİJİNAL X kullanılmaya
+                devam ediyor (bkz. üst bar, hidden md:flex). */}
+            <button
+              onClick={onClose}
+              aria-label="Kapat"
+              className="md:hidden w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 dark:text-white/45 dark:hover:text-white bg-black/[0.04] dark:bg-white/[0.04] transition-all active:scale-95"
+            >
+              <X className="w-4 h-4" />
+            </button>
             <SelectedTaskBadge selectedTask={selectedTask} accent={accent} onOpen={onOpenTaskDrawer} />
             <DurationSteppers workMin={workMin} breakMin={breakMin} running={running} adjustDuration={adjustDuration} />
           </div>
@@ -486,6 +501,7 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
     adjustDuration,
     isFocusMode,
     onOpenTaskDrawer,
+    onClose,
   };
 
   // NOT: `open` false iken artık `return null` YAPILMIYOR — CountdownDisplay
@@ -582,10 +598,14 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
           >
             💡 {isFocusMode ? "Işıkları Aç" : "Odak Modu"}
           </button>
+          {/* MOBİLDE KALDIRILDI (bildirilen hata: üst bar dar ekranlarda
+              taşıyordu) — aynı kapatma eylemi artık HeroZone içinde,
+              kronometre halkasının altında (bkz. yukarıdaki yeni buton).
+              Masaüstünde (md:flex) ORİJİNAL konumunda, davranış DEĞİŞMEDİ. */}
           <button
             onClick={onClose}
             aria-label="Kapat"
-            className={`w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 dark:text-white/45 dark:hover:text-white bg-black/[0.04] dark:bg-white/[0.04] transition-all duration-300 ${
+            className={`hidden md:flex w-9 h-9 rounded-full items-center justify-center text-gray-500 hover:text-gray-900 dark:text-white/45 dark:hover:text-white bg-black/[0.04] dark:bg-white/[0.04] transition-all duration-300 ${
               isFocusMode ? "opacity-0 pointer-events-none scale-95" : "opacity-100 scale-100"
             }`}
           >

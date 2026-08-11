@@ -242,9 +242,16 @@ export function MusicProvider({ children }) {
       // spotifyPlaylistIdRef.current (KAPANMA/closure DEĞİL) — script yüklenip
       // bu callback tetiklenene kadar geçen sürede kullanıcı FARKLI bir liste
       // seçmiş olabilir (canlı testte YAKALANAN gerçek bir yarış durumu).
+      // `theme: "0"` — Spotify IFrame API'nin KENDİ koyu tema seçeneği (statik
+      // embed URL'lerindeki `?theme=0` query param'ının SDK karşılığı).
+      // BİLEREK YOK'tan BURAYA eklendi: bu seçenek olmadan embed'in kendi
+      // arka planı AÇIK/beyaz temada render olabiliyordu — uygulamanın
+      // sabit koyu Focus Studio zeminiyle birleşince "altı tamamen beyaz"
+      // olarak bildirilen hatanın bir parçası buydu (diğer parçası, aşağıda
+      // GlobalMusicPlayer.jsx'te düzeltilen kapsayıcı yüksekliğiydi).
       IFrameAPI.createController(
         spotifyMountRef.current,
-        { uri: `spotify:playlist:${spotifyPlaylistIdRef.current}`, width: "100%", height: "100%" },
+        { uri: `spotify:playlist:${spotifyPlaylistIdRef.current}`, width: "100%", height: "100%", theme: "0" },
         (controller) => {
           spotifyControllerRef.current = controller;
           setSpotifyReady(true);

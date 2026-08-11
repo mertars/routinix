@@ -88,13 +88,21 @@ export default function GlobalMusicPlayer() {
           {/* Oynatıcı alanı — mount noktası HER ZAMAN DOM'da (bkz.
               MusicContext.jsx). display:none KULLANILMAZ — bazı tarayıcılar
               display:none'lı bir iframe'i Page Visibility API üzerinden
-              "hidden" sayıp arkadaki oynatmayı durdurabilir. Mobilde SABİT
-              kompakt yükseklik (~152px, Spotify'ın "compact" embed
-              boyutuyla eşleşir) — `flex-1` DEĞİL, çünkü artık ebeveyn
-              içerik-güdümlü/auto-height (yukarıdaki nota bkz.), flex-1'in
-              dayanacağı bir üst sınır kalmazdı. Masaüstünde (md:) eski
-              flex-1 davranışı aynen korunuyor. */}
-          <div className="relative h-[152px] shrink-0 md:flex-1 md:h-auto md:min-h-0 rounded-2xl overflow-hidden border" style={{ borderColor: `${tint}33` }}>
+              "hidden" sayıp arkadaki oynatmayı durdurabilir.
+              YÜKSEKLİK NOTU: burası bir ÇALMA LİSTESİ embed'i (spotify:
+              playlist:..., bkz. MusicContext.jsx) — Spotify'ın tek şarkı/
+              bölüm için kullandığı ultra-kompakt 152px "bar" formatı bir
+              PLAYLIST için yetersiz kalıp içeriği (kapak+başlık+şarkı
+              listesi) kırpıyor, bu da bildirilen "dikeyde patlamış/altı
+              beyaz" görünümün asıl nedeniydi. Spotify'ın resmi playlist
+              embed'i ~352px'te kapak+başlık+kontroller+şarkı listesini TAM
+              gösterir (web'deki orijinal kart formatı) — mobilde artık bu
+              yükseklik kullanılıyor. Masaüstünde (md:) eski flex-1
+              davranışı aynen korunuyor. */}
+          <div
+            className="relative w-full max-w-full h-[352px] shrink-0 md:flex-1 md:h-auto md:min-h-0 rounded-xl overflow-hidden border"
+            style={{ borderColor: `${tint}33` }}
+          >
             <div ref={m.spotifyMountRef} className="absolute inset-0" />
           </div>
 
