@@ -76,6 +76,10 @@ create table if not exists public.routines (
   created_at timestamptz not null default now()
 );
 
+-- Rutin Kartları sürükle-bırak sıralaması (bkz. routine_sort_order.sql).
+-- Aşağıdaki index bu sütunu kullandığı için ALTER, index'ten ÖNCE gelmeli.
+alter table public.routines add column if not exists sort_order int;
+
 create index if not exists routines_plan_id_idx on public.routines (plan_id);
 create index if not exists routines_user_id_idx on public.routines (user_id);
 create index if not exists routines_plan_sort_idx on public.routines (plan_id, sort_order);
@@ -121,8 +125,6 @@ alter table public.tasks add column if not exists estimated_cost text;
 alter table public.tasks add column if not exists map_search_query text;
 -- ManualPlanBuilder.jsx sürükle-bırak sıralaması (bkz. task_sort_order.sql).
 alter table public.tasks add column if not exists sort_order int;
--- Rutin Kartları sürükle-bırak sıralaması (bkz. routine_sort_order.sql).
-alter table public.routines add column if not exists sort_order int;
 
 create index if not exists tasks_plan_id_idx on public.tasks (plan_id);
 create index if not exists tasks_user_id_idx on public.tasks (user_id);
