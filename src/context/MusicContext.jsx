@@ -111,6 +111,14 @@ export function MusicProvider({ children }) {
     setPanelOpen(true);
   }, []);
   const closePanel = useCallback(() => setPanelOpen(false), []);
+  // Paneli AÇMADAN yalnızca Spotify script/controller kurulumunu tetikler —
+  // PomodoroStudio'nun "Müzik Oynatıcı" mini modalı (Spotify markalı
+  // panel/playlist seçici hiç görünmeden, doğrudan çal/duraklat/ileri-geri
+  // kontrolleriyle açılması) için — bkz. FocusMusicControlCard'ın
+  // `onStartRequest` prop'u.
+  const ensureSpotifyInitialized = useCallback(() => {
+    setSpotifyInitialized(true);
+  }, []);
 
   // ------------------------------------------------------------------
   // Spotify OAuth (PKCE) yaşam döngüsü
@@ -353,6 +361,7 @@ export function MusicProvider({ children }) {
       panelOpen,
       openPanel,
       closePanel,
+      ensureSpotifyInitialized,
       spotifyPlaylistId,
       setSpotifyPlaylistId,
       spotifyInitialized,
@@ -381,6 +390,7 @@ export function MusicProvider({ children }) {
       panelOpen,
       openPanel,
       closePanel,
+      ensureSpotifyInitialized,
       spotifyPlaylistId,
       spotifyInitialized,
       spotifyReady,

@@ -18,7 +18,14 @@ const SPOTIFY_TINT = "#1DB954";
 // PomodoroStudio'nun geri kalanı gibi sabit koyu/neon paletle (dark: varyantı
 // GEREKMEZ — bkz. PomodoroStudio.jsx dosya başı yorumu). YouTube Music
 // kaldırıldığından (bkz. MusicContext.jsx) artık her zaman Spotify.
-export default function FocusMusicControlCard() {
+//
+// onStartRequest (opsiyonel): "Odak için müzik başlat" tıklanınca çağrılır.
+// Varsayılan (prop verilmezse) m.openPanel() — masaüstündeki mevcut kullanım
+// (HeroZone'daki gömülü kart) DAVRANIŞI DEĞİŞMEDEN korunur. Mini Müzik
+// Oynatıcı Modalı (bkz. PomodoroStudio.jsx MiniPlayerModal) bunun yerine
+// m.ensureSpotifyInitialized geçer — Spotify markalı tam panel HİÇ
+// görünmeden, doğrudan bu kartın kendisi (çal/duraklat/ileri-geri) aktif olur.
+export default function FocusMusicControlCard({ onStartRequest }) {
   const m = useMusic();
   // Kaydırma çubuğu sürüklenirken YEREL bir değer tutulur — context'teki
   // GERÇEK pozisyon (Spotify/YouTube'dan periyodik gelir) sürükleme sırasında
@@ -36,7 +43,7 @@ export default function FocusMusicControlCard() {
   if (!m.hasActivePlayer) {
     return (
       <button
-        onClick={() => m.openPanel()}
+        onClick={() => (onStartRequest ? onStartRequest() : m.openPanel())}
         className="w-full max-w-[360px] rounded-2xl px-4 py-3.5 flex items-center gap-3 text-left transition-colors hover:bg-cyan-500/10"
         style={{ background: "rgba(6,182,212,0.06)", border: "1px solid rgba(6,182,212,0.25)" }}
       >

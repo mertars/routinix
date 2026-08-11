@@ -114,6 +114,46 @@ const ControlButtons = memo(function ControlButtons({ running, toggleRunning, re
   );
 });
 
+// Kırmızı "Müzik Oynatıcı" tuşunun açtığı KOMPAKT modal — Spotify markalı
+// panel (GlobalMusicPlayer: "Spotify Hesabını Bağla", playlist seçici,
+// iframe) BURADA HİÇ görünmez. Yalnızca FocusMusicControlCard'ın kendisi
+// (çal/duraklat/ileri-geri, gerekirse önce sessiz "başlat" tetikleyicisi)
+// ortalanmış, hafif kararmış bir arka planla (backdrop tıklanınca kapanır)
+// gösterilir — eskiden ekrana sığmadığı için kaldırılan "direkt müzik
+// oynatıcı"nın bu tuşun ARDINDA yeniden var olma biçimi.
+const MiniPlayerModal = memo(function MiniPlayerModal({ open, onClose, onStartRequest }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[96] flex items-center justify-center px-6" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="blur-cap-mobile relative w-full max-w-[360px] rounded-3xl p-5 animate-[fadeIn_0.2s_ease]"
+        style={{
+          background: "rgba(15,12,14,0.96)",
+          border: "1px solid rgba(255,59,59,0.35)",
+          boxShadow: "0 24px 60px -20px rgba(255,59,59,0.4)",
+        }}
+      >
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <span className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold" style={{ background: "rgba(255,59,59,0.14)", color: "#FF3B3B" }}>
+            🎵 Müzik Oynatıcı
+          </span>
+          <button
+            onClick={onClose}
+            aria-label="Kapat"
+            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white/40 hover:text-white transition-colors"
+            style={{ background: "rgba(255,255,255,0.06)" }}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <FocusMusicControlCard onStartRequest={onStartRequest} />
+      </div>
+    </div>
+  );
+});
+
 // Odaklanma/Mola segmented control — neon geçişli. memo: PomodoroStudio'nun
 // saniyede bir tetiklenmeyen (yalnızca kullanıcı etkileşiminde değişen) state'i
 // için gereksiz yeniden çizimi önler.
@@ -301,6 +341,7 @@ const HeroZone = memo(function HeroZone({
   toggleRunning,
   resetTimer,
   onOpenSpotify,
+  onToggleMiniPlayer,
   workMin,
   breakMin,
   adjustDuration,
@@ -333,13 +374,12 @@ const HeroZone = memo(function HeroZone({
             {/* Müzik Oynatıcı tetikleyicisi — kronometre halkasının hemen
                 altı, görev seçim rozetinin hemen üstü, ortalanmış tek bir
                 buton. KIRMIZI NEON (kontrol satırındaki YEŞİL/Spotify-
-                markalı buttondan BİLEREK farklı renk — ikisi de aynı yeşil
-                daireydi, birbirinden ayırt edilemiyordu; bu artık "Müzik
-                Oynatıcı", diğeri "Spotify" olarak görsel olarak ayrışıyor).
-                Tıklanınca AYNI global paneli DOĞRUDAN açar/kapatır (bkz.
-                openSpotifyPanel — zaten çift-yönlü toggle). */}
+                markalı buttondan BİLEREK farklı renk — "Müzik Oynatıcı" ile
+                "Spotify" görsel olarak ayrışıyor). Tıklanınca GlobalMusicPlayer'ın
+                Spotify markalı panelini DEĞİL, kompakt MiniPlayerModal'ı
+                (çal/duraklat/ileri-geri) açar/kapatır — bkz. toggleMiniPlayer. */}
             <button
-              onClick={onOpenSpotify}
+              onClick={onToggleMiniPlayer}
               aria-label="Müzik Oynatıcıyı Aç"
               className="w-11 h-11 rounded-full flex items-center justify-center transition-all active:scale-95"
               style={{ background: "rgba(255,59,59,0.14)", color: "#FF3B3B", border: "1px solid rgba(255,59,59,0.4)", boxShadow: "0 0 16px -6px #FF3B3B" }}
@@ -398,6 +438,7 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
   const [selectedTask, setSelectedTask] = useState(null);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
+  const [miniPlayerOpen, setMiniPlayerOpen] = useState(false);
   const music = useMusic();
 
   // Süre bittiğinde CountdownDisplay tarafından çağrılır — mod/running
@@ -486,6 +527,12 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
 
   const onOpenTaskDrawer = useCallback(() => setTaskDrawerOpen(true), []);
 
+  // Kırmızı "Müzik Oynatıcı" tuşu — GlobalMusicPlayer'ın Spotify markalı
+  // panelini DEĞİL, kompakt MiniPlayerModal'ı aç/kapat (çift-yönlü toggle,
+  // openSpotifyPanel ile AYNI desen).
+  const toggleMiniPlayer = useCallback(() => setMiniPlayerOpen((v) => !v), []);
+  const closeMiniPlayer = useCallback(() => setMiniPlayerOpen(false), []);
+
   const heroProps = {
     mode,
     switchMode,
@@ -497,6 +544,7 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
     toggleRunning,
     resetTimer,
     onOpenSpotify: openSpotifyPanel,
+    onToggleMiniPlayer: toggleMiniPlayer,
     workMin,
     breakMin,
     adjustDuration,
@@ -603,6 +651,8 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
         selectedTaskId={selectedTask?.id}
         onSelectTask={setSelectedTask}
       />
+
+      <MiniPlayerModal open={miniPlayerOpen} onClose={closeMiniPlayer} onStartRequest={music.ensureSpotifyInitialized} />
     </div>
   );
 }
