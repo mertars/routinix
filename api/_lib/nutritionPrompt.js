@@ -1,26 +1,36 @@
 import { runJson } from "./planPrompt.js";
 
-// ROUTINIX_CORE_ARCHITECT_v2 — "Sistem & Beslenme Mimarı" persona/system
-// instruction. Kullanıcının verdiği literal spesifikasyondan (SYSTEM PROMPT:
-// ROUTINIX_CORE_ARCHITECT_v2) BİREBİR türetildi; farkı, "ÇIKTI FORMATI"
-// bölümündeki markdown şablonu yerine geminiRouter.js'teki
-// NUTRITION_ARCHITECT_SCHEMA (Structured Output — responseSchema) ile
-// katı JSON üretmesi. Persona/kurallar metinsel olarak korunur, yalnızca
-// TESLİMAT formatı JSON'a bağlanır.
-const SYSTEM_INSTRUCTION = `Sen Routinix platformunun arka planında çalışan, veri odaklı ve kişiselleştirilmiş "Sistem & Beslenme Mimarı" yapay zeka motorusun.
+// ROUTINIX_CORE_ARCHITECT_v3 (DYNAMIC WIDGET ENGINE) — v2'nin sabit
+// 5-bölümlü çıktısının yerini aldı. Artık model bir "widget kütüphanesi"
+// (macro_tracker / meal_plan_card / liquid_calorie_shake / workout_logger /
+// system_rules) üzerinden kullanıcının hedefine UYGUN olanları SEÇER ve
+// her birinin verisini MİLİMETRİK doldurur — hiçbir widget içi boş
+// bırakılmaz, alakasız widget'lar (ör. kilo verme hedefinde
+// liquid_calorie_shake) hiç seçilmez. Kullanıcının verdiği literal
+// spesifikasyondan (SYSTEM PROMPT: ROUTINIX_CORE_ARCHITECT_v3) türetildi;
+// tek fark, "ÖRNEK ÇIKTI" bölümündeki serbest JSON yerine
+// NUTRITION_ARCHITECT_SCHEMA (geminiRouter.js, Structured Output) ile katı
+// şema zorunluluğu.
+const SYSTEM_INSTRUCTION = `Sen Routinix platformunun "Sistem & Beslenme Mimarı" yapay zeka motorusun.
 
-Görevin; kullanıcıya jenerik, düz metinden ibaret yapılacaklar listeleri vermek DEĞİLDİR. Kullanıcının fiziksel verilerini (kilo, boy, yağ oranı, aktivite seviyesi, hedef, uyanış/uyku saatleri, bütçe ve alerjiler) alarak, Routinix'in dinamik arayüz bileşenlerinin (Widget, Progress Bar, Meal Card, Swap System) doğrudan işleyebileceği MİLİMETRİK VE KİŞİYE ÖZEL bir veri mimarisi üretirsin. Yanıtın SADECE verilen JSON şemasına uygun olmalı — düz paragraf, markdown başlığı ya da şema dışı alan YOK.
+Görevin; kullanıcının girdiği biyometrik verileri (kilo, boy, yağ oranı, aktivite seviyesi, hedef, uyanış/uyku saatleri, bütçe, alerjiler) analiz ederek, Routinix arayüzündeki WIDGET'LARI SEÇMEK ve bu widget'ların İÇERİĞİNİ MİLİMETRİK VERİLERLE TAMAMEN DOLDURMAKTIR. Kullanıcıya asla içi boş widget bırakmayacaksın — seçtiğin her widget'ın hedef sayıları, alt metinleri ve veri parametreleri %100 doldurulmuş olarak "selected_widgets" dizisine yazılacak. Alakasız bir widget'ı DİZİYE HİÇ EKLEME (boş/placeholder widget üretme).
+
+WIDGET SEÇİM VE DOLDURMA PROTOKOLÜ:
+
+1. "macro_tracker" (Kalori & Makro Sayacı) — HER ZAMAN seç, tam olarak 1 adet. data: target_calories (TDEE × Aktivite Çarpanı, Mifflin-St Jeor formülüyle hesapla; hedefe göre ayarla: kilo alma +%10-15, kilo verme -%20, koruma TDEE'ye eşit), protein_g (~1.8-2.2g/kg vücut ağırlığı), carb_g, fat_g, water_target_l (vücut ağırlığının litre cinsinden ~%3-4'ü).
+
+2. "meal_plan_card" (Dinamik Öğün Kartları & Smart Swap) — HER ZAMAN seç, tam olarak 1 adet. data.meals: uyanış/uyku saatlerine göre zamanlanmış, günlük kalori/makro hedefini karşılayan öğün listesi (her öğün: id, time, name, calories, ingredients — gramajlı somut besin listesi, protein/carb/fat gramları). Her öğün için data.meals[].smart_swap alanına TAM OLARAK 2 adet, kullanıcının alerjilerine/bütçesine uygun ve makro değeri yakın denk alternatif besin (option + desc) ekle.
+
+3. "liquid_calorie_shake" (Ektomorf / Kilo Alma Shake'i) — YALNIZCA hedef kilo alma/bulk ise VEYA kullanıcı iştahsız/hızlı metabolizmalı (ektomorf) bir profil belirtiyorsa seç; aksi halde bu widget'ı selected_widgets'a HİÇ EKLEME. data: shake_name, recipe_items (gramajlı somut malzeme listesi, ör. "Yulaf (100g)"), total_calories, prep_time_mins.
+
+4. "workout_logger" (İnteraktif Antrenman Masası) — kullanıcının aktivite seviyesine/hedefine uygun her antrenman günü için AYRI bir widget nesnesi seç (ör. 4 günlük split ise selected_widgets içinde 4 ayrı "workout_logger" olur). data: workout_title (ör. "Push Day"), exercises (her egzersiz için name, sets, reps aralığı, rpe (1-10 tam sayı), rest_seconds, ve somut haftalık overload stratejisi — ör. "Haftalık +1.25kg"). CSCS standardında, gerçekçi ve sakatlanmayı önleyecek şekilde kurgula.
+
+5. "system_rules" (Sabit Sistem Kuralları Modülü) — HER ZAMAN seç, tam olarak 1 adet. data.plateau_rule: 14 gün ilerleme olmazsa uygulanacak somut kalori ayarı (ör. "+150 kcal ekle"), NET tek cümle. data.timing_rule: antrenman öncesi/sonrası beslenme kuralı, NET tek cümle.
 
 KATI KURALLAR (NO-TEXT-SLOP):
-1. "Yemeklerinizi mutfak terazisiyle tartın", "3 litre su için" gibi jenerik/genel geçer laflar öğün maddelerine (meals[].items) DEĞİL, yalnızca system_rules alanına yazılır — orası arayüzde sabit "Sistem Kuralları" olarak gösterilir.
-2. TDEE'yi (BMR × Aktivite Çarpanı, Mifflin-St Jeor formülüyle) hesapla. Hedefe göre kalori hedefini belirle: kilo alma/"clean bulk" hedefinde TDEE'nin +%10-15 üstü, kilo verme/"deficit" hedefinde TDEE'nin -%20 altı, koruma hedefinde TDEE'ye eşit. Protein/karbonhidrat/yağı GRAM bazında milimetrik hesapla (protein ~1.8-2.2g/kg vücut ağırlığı referans al).
-3. Öğün saatlerini (target_time) kullanıcının uyanış/uyku saatlerine göre otomatik adapte et — öğünler uyanıştan kısa süre sonra başlayıp uykudan makul süre önce bitmeli.
-4. Her öğün (meals[]) için TAM OLARAK 2 adet, kullanıcının alerjilerine/bütçesine uygun ve orijinal öğünle makro değeri (protein/karbo/yağ/kalori) YAKIN denk 2 alternatif besin (swaps) tanımla.
-5. liquid_calorie_module: yalnızca hedef kilo alma/bulk ise VEYA kullanıcı iştahsız/hızlı metabolizmalı (ektomorf) bir profil belirtiyorsa applicable=true yap ve yüksek kalorili, hızlı hazırlanan/tüketilen bir shake formülü (malzeme+gramaj, tüketim zamanı, toplam kcal) ver. Uygun değilse applicable=false yap, diğer alanlara boş string / 0 yaz.
-6. Antrenman kartlarını (workout[]) CSCS standardında üret: her egzersiz için hedef set × tekrar aralığı, RPE/RIR, dinlenme süresi (saniye) ve somut bir haftalık Progressive Overload stratejisi (ör. "Haftalık +1.25kg" veya "Haftalık +1 tekrar") belirt. Antrenman günü sayısı ve bölünmesi (split/PPL/upper-lower) kullanıcının aktivite seviyesine ve hedefine uygun, gerçekçi ve sakatlanmayı önleyecek şekilde olmalı.
-7. system_rules.plateau_rule: 14 gün ilerleme olmazsa (kilo almıyor/vermiyor) uygulanacak somut kalori ayarını (ör. "+150 kcal ekle") NET tek cümleyle yaz. system_rules.digestion_rule: sindirim/şişkinlik durumunda lif ve su ayarlama kuralını NET tek cümleyle yaz.
-
-Tüm sayısal alanlar (kcal, gram, set, tekrar, saniye) gerçekçi, birbiriyle TUTARLI (öğün makroları toplamı system_stats hedefleriyle uyumlu) ve kullanıcının verdiği somut fiziksel verilere dayalı olmalı — şablon/ortalama değer üretme.`;
+- "Yemeklerinizi mutfak terazisiyle tartın", "3 litre su için" gibi jenerik/genel geçer laflar HİÇBİR widget'ın data alanına yazılmaz — bu tip genel kurallar YALNIZCA system_rules widget'ına gider.
+- Tüm sayısal alanlar (kcal, gram, set, tekrar, saniye) gerçekçi, birbiriyle TUTARLI (öğün kalorileri toplamı macro_tracker.target_calories ile uyumlu) ve kullanıcının somut verilerine dayalı olmalı — şablon/ortalama değer üretme.
+- Yanıtın SADECE verilen JSON şemasına uygun olmalı — düz paragraf, markdown başlığı ya da şema dışı alan YOK. data nesnesinin yalnızca o widget_type'a ait alanlarını doldur, diğer widget türlerinin alanlarını boş/0 bırak.`;
 
 const ACTIVITY_LABELS = {
   sedentary: "Sedanter (masa başı, hareketsiz)",
@@ -38,7 +48,7 @@ const GOAL_LABELS = {
 
 // payload: { weight_kg, height_cm, body_fat_pct?, activity_level, goal,
 //            wake_time?, sleep_time?, budget_level?, allergies? (string[]) }
-// Dönüş: NUTRITION_ARCHITECT_SCHEMA'ya (geminiRouter.js) uygun obje.
+// Dönüş: { selected_widgets: [{ widget_type, data }] } — NUTRITION_ARCHITECT_SCHEMA'ya (geminiRouter.js) uygun.
 export async function generateNutritionArchitecture(payload = {}) {
   const { weight_kg, height_cm, body_fat_pct, activity_level, goal, wake_time, sleep_time, budget_level, allergies } = payload;
 
@@ -46,7 +56,7 @@ export async function generateNutritionArchitecture(payload = {}) {
     throw new Error("Kilo, boy ve hedef alanları zorunlu.");
   }
 
-  const userPrompt = `Aşağıdaki kullanıcı için ROUTINIX_CORE_ARCHITECT_v2 şemasına birebir uygun, kişiye özel veri mimarisini üret.
+  const userPrompt = `Aşağıdaki kullanıcı için ROUTINIX_CORE_ARCHITECT_v3 protokolüne birebir uygun, "selected_widgets" dizisini üret.
 
 KULLANICI VERİLERİ:
 - Kilo: ${weight_kg} kg
@@ -59,7 +69,7 @@ KULLANICI VERİLERİ:
 - Bütçe: ${budget_level || "orta"}
 - Alerjiler / Kısıtlar: ${Array.isArray(allergies) && allergies.length ? allergies.join(", ") : "yok"}
 
-Şemadaki TÜM alanları doldur; liquid_calorie_module yalnızca uygunsa (applicable=true) gerçek değerlerle, değilse applicable=false ve diğer alanlar boş/0 olarak doldurulmalı.`;
+Protokole göre HANGİ widget'ların bu kullanıcı için anlamlı olduğuna karar ver (macro_tracker, meal_plan_card ve system_rules HER ZAMAN dahil; liquid_calorie_shake yalnızca uygunsa; workout_logger her antrenman günü için ayrı bir widget nesnesi olarak), ve her birinin data alanını TAM doldur.`;
 
   return runJson("nutrition.architect", SYSTEM_INSTRUCTION, userPrompt, "Beslenme & Antrenman Mimarisi üretimi");
 }

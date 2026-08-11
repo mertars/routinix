@@ -70,118 +70,124 @@ const FILE_PARSE_SCHEMA = {
   required: ["title", "days"],
 };
 
-// ROUTINIX_CORE_ARCHITECT_v2 — "Sistem & Beslenme Mimarı" çıktı şeması.
-// Kullanıcının fiziksel verilerinden (kilo/boy/yağ oranı/aktivite/hedef/
-// uyanış-uyku/bütçe/alerji) MİLİMETRİK kişiye özel bir veri mimarisi
-// üretir; UI (NutritionArchitectStudio.jsx) bunu DOĞRUDAN render eder,
-// serbest metin ayrıştırmaya gerek kalmaz — bu yüzden `responseSchema`
-// ile Structured Output ZORUNLU (file.parse ile AYNI gerekçe).
+// ROUTINIX_CORE_ARCHITECT_v3 (DYNAMIC WIDGET ENGINE) — v2'nin SABİT 5
+// bölümlü şemasının yerini aldı. Artık model kullanıcının hedefine uygun
+// widget'ları KENDİSİ SEÇER ve `selected_widgets` dizisine ekler (ör. kilo
+// verme hedefinde `liquid_calorie_shake` hiç seçilmeyebilir) — UI
+// (NutritionArchitectStudio.jsx) diziyi SIRAYLA `widget_type`'a göre
+// render eder.
+//
+// ŞEMA TASARIM NOTU: Gemini'nin `responseSchema`'sı (bu SDK sürümünde)
+// dizi öğeleri için polimorfik/discriminated-union (oneOf/anyOf) tipi
+// GÜVENİLİR desteklemiyor — bunu denemek riskli (400 hatası ya da sessiz
+// şema ihlali). Bunun yerine TEK, SABİT bir `data` nesnesi tanımlanır; bu
+// nesne 5 widget türünün TÜM alanlarının BİRLEŞİMİni (hepsi opsiyonel)
+// içerir — model yalnızca seçtiği `widget_type`'a ait alanları doldurur,
+// ilgisiz alanları boş/0 bırakır. Şema yine de KATI (her zaman geçerli
+// JSON, alan adları sabit) — yalnızca "hangi alanlar doluysa onu kullan"
+// yorumlaması UI tarafında (bkz. WIDGET_RENDERERS).
+const NUTRITION_WIDGET_TYPES = ["macro_tracker", "meal_plan_card", "liquid_calorie_shake", "workout_logger", "system_rules"];
+
 const NUTRITION_ARCHITECT_SCHEMA = {
   type: SchemaType.OBJECT,
   properties: {
-    system_stats: {
-      type: SchemaType.OBJECT,
-      properties: {
-        daily_calorie_target: { type: SchemaType.INTEGER },
-        protein_g: { type: SchemaType.INTEGER },
-        carbs_g: { type: SchemaType.INTEGER },
-        fat_g: { type: SchemaType.INTEGER },
-        fiber_g: { type: SchemaType.INTEGER },
-        bmr_kcal: { type: SchemaType.INTEGER },
-        activity_kcal: { type: SchemaType.INTEGER },
-        // İşaretli tamsayı: kilo alımında pozitif (ör. 350), kilo
-        // vermede negatif (ör. -500) — UI işarete göre "Surplus"/"Deficit" etiketler.
-        surplus_deficit_kcal: { type: SchemaType.INTEGER },
-      },
-      required: ["daily_calorie_target", "protein_g", "carbs_g", "fat_g", "fiber_g", "bmr_kcal", "activity_kcal", "surplus_deficit_kcal"],
-    },
-    meals: {
+    selected_widgets: {
       type: SchemaType.ARRAY,
       items: {
         type: SchemaType.OBJECT,
         properties: {
-          name: { type: SchemaType.STRING },
-          target_time: { type: SchemaType.STRING },
-          items: {
-            type: SchemaType.ARRAY,
-            items: {
-              type: SchemaType.OBJECT,
-              properties: {
-                food: { type: SchemaType.STRING },
-                amount: { type: SchemaType.STRING },
-                protein_g: { type: SchemaType.NUMBER },
-                carbs_g: { type: SchemaType.NUMBER },
-                fat_g: { type: SchemaType.NUMBER },
-                kcal: { type: SchemaType.INTEGER },
+          widget_type: { type: SchemaType.STRING, format: "enum", enum: NUTRITION_WIDGET_TYPES },
+          data: {
+            type: SchemaType.OBJECT,
+            properties: {
+              // --- macro_tracker ---
+              target_calories: { type: SchemaType.INTEGER },
+              protein_g: { type: SchemaType.INTEGER },
+              carb_g: { type: SchemaType.INTEGER },
+              fat_g: { type: SchemaType.INTEGER },
+              water_target_l: { type: SchemaType.NUMBER },
+
+              // --- meal_plan_card ---
+              meals: {
+                type: SchemaType.ARRAY,
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    id: { type: SchemaType.STRING },
+                    time: { type: SchemaType.STRING },
+                    name: { type: SchemaType.STRING },
+                    calories: { type: SchemaType.INTEGER },
+                    ingredients: {
+                      type: SchemaType.ARRAY,
+                      items: {
+                        type: SchemaType.OBJECT,
+                        properties: {
+                          food: { type: SchemaType.STRING },
+                          amount: { type: SchemaType.STRING },
+                          protein: { type: SchemaType.NUMBER },
+                          carb: { type: SchemaType.NUMBER },
+                          fat: { type: SchemaType.NUMBER },
+                        },
+                        required: ["food", "amount"],
+                      },
+                    },
+                    // Tam olarak 2 alternatif — bkz. nutritionPrompt.js.
+                    smart_swap: {
+                      type: SchemaType.ARRAY,
+                      items: {
+                        type: SchemaType.OBJECT,
+                        properties: {
+                          option: { type: SchemaType.STRING },
+                          desc: { type: SchemaType.STRING },
+                        },
+                        required: ["option", "desc"],
+                      },
+                    },
+                  },
+                  required: ["id", "time", "name", "calories", "ingredients", "smart_swap"],
+                },
               },
-              required: ["food", "amount", "protein_g", "carbs_g", "fat_g", "kcal"],
-            },
-          },
-          // Tam olarak 2 alternatif — bkz. nutritionPrompt.js system instruction.
-          swaps: {
-            type: SchemaType.ARRAY,
-            items: {
-              type: SchemaType.OBJECT,
-              properties: {
-                food: { type: SchemaType.STRING },
-                amount: { type: SchemaType.STRING },
+
+              // --- liquid_calorie_shake ---
+              shake_name: { type: SchemaType.STRING },
+              recipe_items: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+              prep_time_mins: { type: SchemaType.INTEGER },
+
+              // --- workout_logger ---
+              workout_title: { type: SchemaType.STRING },
+              exercises: {
+                type: SchemaType.ARRAY,
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    name: { type: SchemaType.STRING },
+                    sets: { type: SchemaType.INTEGER },
+                    reps: { type: SchemaType.STRING },
+                    rpe: { type: SchemaType.INTEGER },
+                    rest_seconds: { type: SchemaType.INTEGER },
+                    overload: { type: SchemaType.STRING },
+                  },
+                  required: ["name", "sets", "reps", "rpe", "rest_seconds", "overload"],
+                },
               },
-              required: ["food", "amount"],
+
+              // --- system_rules ---
+              plateau_rule: { type: SchemaType.STRING },
+              timing_rule: { type: SchemaType.STRING },
+
+              // Hem macro_tracker HEM liquid_calorie_shake HEM meal_plan_card
+              // "toplam kalori" taşıyabilir — tek bir ortak alan yerine her
+              // widget'ın KENDİ alan adı (target_calories/total_calories)
+              // kullanılır, o yüzden total_calories AYRICA burada:
+              total_calories: { type: SchemaType.INTEGER },
             },
           },
         },
-        required: ["name", "target_time", "items", "swaps"],
+        required: ["widget_type", "data"],
       },
-    },
-    // Yalnızca "kilo alma/bulk" hedefinde ve/veya iştahsız/ektomorf
-    // profilde applicable=true — aksi halde applicable=false, diğer
-    // alanlar boş string/0 gelebilir (UI applicable=false'ta kartı hiç göstermez).
-    liquid_calorie_module: {
-      type: SchemaType.OBJECT,
-      properties: {
-        applicable: { type: SchemaType.BOOLEAN },
-        formula_name: { type: SchemaType.STRING },
-        ingredients: { type: SchemaType.STRING },
-        consumption_timing: { type: SchemaType.STRING },
-        total_kcal: { type: SchemaType.INTEGER },
-      },
-      required: ["applicable", "formula_name", "ingredients", "consumption_timing", "total_kcal"],
-    },
-    workout: {
-      type: SchemaType.ARRAY,
-      items: {
-        type: SchemaType.OBJECT,
-        properties: {
-          daily_focus: { type: SchemaType.STRING },
-          exercises: {
-            type: SchemaType.ARRAY,
-            items: {
-              type: SchemaType.OBJECT,
-              properties: {
-                name: { type: SchemaType.STRING },
-                sets: { type: SchemaType.INTEGER },
-                reps: { type: SchemaType.STRING },
-                rpe: { type: SchemaType.STRING },
-                rest_sec: { type: SchemaType.INTEGER },
-                overload_strategy: { type: SchemaType.STRING },
-              },
-              required: ["name", "sets", "reps", "rpe", "rest_sec", "overload_strategy"],
-            },
-          },
-        },
-        required: ["daily_focus", "exercises"],
-      },
-    },
-    system_rules: {
-      type: SchemaType.OBJECT,
-      properties: {
-        plateau_rule: { type: SchemaType.STRING },
-        digestion_rule: { type: SchemaType.STRING },
-      },
-      required: ["plateau_rule", "digestion_rule"],
     },
   },
-  required: ["system_stats", "meals", "liquid_calorie_module", "workout", "system_rules"],
+  required: ["selected_widgets"],
 };
 
 const ROUTES = {

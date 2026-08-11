@@ -57,163 +57,183 @@ function StatCard({ label, value, unit, big }) {
   );
 }
 
-// Beslenme mimarisi sonucunu render eder — hep 5 bölüm (System Stats /
-// Meal Cards / Liquid Calorie Module / Workout Cards / System Rules),
-// birebir NUTRITION_ARCHITECT_SCHEMA (geminiRouter.js) alanlarına bağlı.
-function ArchitectureResult({ data }) {
-  const s = data.system_stats || {};
-  const meals = data.meals || [];
-  const liquid = data.liquid_calorie_module;
-  const workout = data.workout || [];
-  const rules = data.system_rules || {};
-  const isSurplus = (s.surplus_deficit_kcal || 0) >= 0;
+// --- v3 DYNAMIC WIDGET ENGINE — her widget_type için BAĞIMSIZ bir render
+// fonksiyonu. ArchitectureResult, data.selected_widgets dizisini SIRAYLA
+// gezip WIDGET_RENDERERS[widget_type]'ı çağırır — model bir widget'ı hiç
+// seçmediyse (ör. liquid_calorie_shake) o kart HİÇ render edilmez, model
+// bir günlük antrenman için ayrı ayrı workout_logger seçtiyse her biri
+// kendi kartı olarak sırayla görünür.
 
+function MacroTrackerWidget({ data: d }) {
+  return (
+    <section className="glass rounded-2xl p-4 sm:p-5 flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <Flame className="w-4 h-4" style={{ color: ACCENT }} strokeWidth={2.25} />
+        <h3 className="text-[13.5px] font-bold text-[var(--text-primary)]">Kalori & Makro Sayacı</h3>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <StatCard label="Günlük Kalori Hedefi" value={d.target_calories} unit="kcal" big />
+        <StatCard label="Protein" value={d.protein_g} unit="g" />
+        <StatCard label="Karbonhidrat" value={d.carb_g} unit="g" />
+        <StatCard label="Yağ" value={d.fat_g} unit="g" />
+      </div>
+      {d.water_target_l > 0 && (
+        <span
+          className="self-start flex items-center gap-1.5 text-[11.5px] font-semibold rounded-full px-2.5 py-1"
+          style={{ background: "rgba(56,189,248,0.12)", color: "#38BDF8", fontFamily: MONO_FONT }}
+        >
+          <Droplet className="w-3 h-3" /> Su Hedefi: {d.water_target_l}L
+        </span>
+      )}
+    </section>
+  );
+}
+
+function MealPlanCardWidget({ data: d }) {
+  const meals = d.meals || [];
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center gap-2 px-1">
+        <ChefHat className="w-4 h-4" style={{ color: ACCENT }} strokeWidth={2.25} />
+        <h3 className="text-[13.5px] font-bold text-[var(--text-primary)]">Dinamik Öğün Kartları</h3>
+      </div>
+      {meals.map((meal, i) => (
+        <div key={meal.id || i} className="glass rounded-2xl p-4 sm:p-5 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-[13px] font-bold text-[var(--text-primary)]">{meal.name}</h4>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {meal.calories > 0 && (
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(var(--overlay-rgb),0.06)", color: "var(--text-faint)", fontFamily: MONO_FONT }}>
+                  {meal.calories} kcal
+                </span>
+              )}
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: ACCENT_SOFT, color: ACCENT, fontFamily: MONO_FONT }}>
+                {meal.time}
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {(meal.ingredients || []).map((it, j) => (
+              <div key={j} className="flex items-center justify-between gap-2 text-[12.5px] rounded-lg px-3 py-2" style={{ background: "rgba(var(--overlay-rgb),0.04)" }}>
+                <span className="text-[var(--text-secondary)] font-medium min-w-0 truncate">
+                  {it.food} <span className="text-[var(--text-faint)]">· {it.amount}</span>
+                </span>
+                {(it.protein > 0 || it.carb > 0 || it.fat > 0) && (
+                  <span className="shrink-0 text-[11px] font-semibold" style={{ fontFamily: MONO_FONT, color: "var(--text-faint)" }}>
+                    P{it.protein || 0} K{it.carb || 0} Y{it.fat || 0}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+          {meal.smart_swap?.length > 0 && (
+            <div className="flex flex-col gap-1 pt-2 border-t border-[var(--border-default)]">
+              <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.04em] text-[var(--text-faint)]">
+                <Shuffle className="w-3 h-3 shrink-0" /> Smart Swap
+              </span>
+              {meal.smart_swap.map((sw, k) => (
+                <p key={k} className="text-[11.5px] text-[var(--text-secondary)]">
+                  <b className="text-[var(--text-primary)]">{sw.option}:</b> {sw.desc}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function LiquidCalorieShakeWidget({ data: d }) {
+  return (
+    <section className="rounded-2xl p-4 sm:p-5 flex flex-col gap-2 border" style={{ background: "rgba(56,189,248,0.06)", borderColor: "rgba(56,189,248,0.3)" }}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Droplet className="w-4 h-4 text-sky-400" strokeWidth={2.25} />
+          <h3 className="text-[13.5px] font-bold text-[var(--text-primary)]">{d.shake_name || "İştah & Likit Kalori Modülü"}</h3>
+        </div>
+        {d.total_calories > 0 && (
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-sky-300" style={{ background: "rgba(56,189,248,0.16)", fontFamily: MONO_FONT }}>
+            {d.total_calories} kcal
+          </span>
+        )}
+      </div>
+      {d.recipe_items?.length > 0 && <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">{d.recipe_items.join(" · ")}</p>}
+      {d.prep_time_mins > 0 && <p className="text-[11.5px] font-semibold text-sky-300">⏱ Hazırlık: {d.prep_time_mins} dk</p>}
+    </section>
+  );
+}
+
+function WorkoutLoggerWidget({ data: d }) {
+  return (
+    <section className="glass rounded-2xl p-4 sm:p-5 flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <Dumbbell className="w-4 h-4" style={{ color: ACCENT }} strokeWidth={2.25} />
+        <h4 className="text-[13px] font-bold text-[var(--text-primary)]">{d.workout_title}</h4>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {(d.exercises || []).map((ex, j) => (
+          <div key={j} className="rounded-lg px-3 py-2.5 flex flex-col gap-1" style={{ background: "rgba(var(--overlay-rgb),0.04)" }}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[12.5px] font-bold text-[var(--text-primary)]">{ex.name}</span>
+              <span className="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: ACCENT_SOFT, color: ACCENT, fontFamily: MONO_FONT }}>
+                {ex.sets} × {ex.reps}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold" style={{ fontFamily: MONO_FONT, color: "var(--text-faint)" }}>
+              <span>RPE {ex.rpe}</span>
+              <span>⏱ {ex.rest_seconds}sn dinlenme</span>
+              <span>📈 {ex.overload}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SystemRulesWidget({ data: d }) {
+  return (
+    <section className="rounded-2xl p-4 sm:p-5 flex flex-col gap-3 border border-[var(--border-default)]" style={{ background: "rgba(var(--overlay-rgb),0.03)" }}>
+      <div className="flex items-center gap-2">
+        <Info className="w-4 h-4" style={{ color: "var(--amber-accent)" }} strokeWidth={2.25} />
+        <h3 className="text-[13.5px] font-bold text-[var(--text-primary)]">Sistem Kuralları</h3>
+      </div>
+      {d.plateau_rule && (
+        <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">
+          <b className="text-[var(--text-primary)]">Kilo Durması (Plateau):</b> {d.plateau_rule}
+        </p>
+      )}
+      {d.timing_rule && (
+        <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">
+          <b className="text-[var(--text-primary)]">Antrenman Beslenme Zamanlaması:</b> {d.timing_rule}
+        </p>
+      )}
+    </section>
+  );
+}
+
+const WIDGET_RENDERERS = {
+  macro_tracker: MacroTrackerWidget,
+  meal_plan_card: MealPlanCardWidget,
+  liquid_calorie_shake: LiquidCalorieShakeWidget,
+  workout_logger: WorkoutLoggerWidget,
+  system_rules: SystemRulesWidget,
+};
+
+// Beslenme mimarisi sonucunu render eder — data.selected_widgets dizisini
+// SIRAYLA, her widget_type'a uygun bileşenle render eder (bkz. yukarıdaki
+// WIDGET_RENDERERS). Tanınmayan bir widget_type (teorik olarak — şema
+// enum'la sınırlı, ama savunmacı davranmak ucuz) sessizce atlanır.
+function ArchitectureResult({ data }) {
+  const widgets = data?.selected_widgets || [];
   return (
     <div className="flex flex-col gap-6">
-      {/* 1) METABOLİZMA & MAKRO VERİ KARTLARI */}
-      <section className="glass rounded-2xl p-4 sm:p-5 flex flex-col gap-4">
-        <div className="flex items-center gap-2">
-          <Flame className="w-4 h-4" style={{ color: ACCENT }} strokeWidth={2.25} />
-          <h3 className="text-[13.5px] font-bold text-[var(--text-primary)]">Metabolizma & Makro Veri Kartları</h3>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <StatCard label="Günlük Kalori Hedefi" value={s.daily_calorie_target} unit="kcal" big />
-          <StatCard label="Protein" value={s.protein_g} unit="g" />
-          <StatCard label="Karbonhidrat" value={s.carbs_g} unit="g" />
-          <StatCard label="Yağ" value={s.fat_g} unit="g" />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-[11.5px] font-semibold" style={{ fontFamily: MONO_FONT, color: "var(--text-muted)" }}>
-          <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(var(--overlay-rgb),0.05)" }}>
-            Lif: {s.fiber_g}g
-          </span>
-          <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(var(--overlay-rgb),0.05)" }}>
-            BMR: {s.bmr_kcal} kcal
-          </span>
-          <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(var(--overlay-rgb),0.05)" }}>
-            Aktivite: +{s.activity_kcal} kcal
-          </span>
-          <span
-            className="rounded-full px-2.5 py-1"
-            style={{ background: isSurplus ? "rgba(46,217,163,0.12)" : "rgba(240,130,122,0.12)", color: isSurplus ? "#2ED9A3" : "#F0827A" }}
-          >
-            {isSurplus ? "Surplus" : "Deficit"}: {s.surplus_deficit_kcal > 0 ? "+" : ""}
-            {s.surplus_deficit_kcal} kcal
-          </span>
-        </div>
-      </section>
-
-      {/* 2) DİNAMİK ÖĞÜN KARTLARI */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center gap-2 px-1">
-          <ChefHat className="w-4 h-4" style={{ color: ACCENT }} strokeWidth={2.25} />
-          <h3 className="text-[13.5px] font-bold text-[var(--text-primary)]">Dinamik Öğün Kartları</h3>
-        </div>
-        {meals.map((meal, i) => (
-          <div key={i} className="glass rounded-2xl p-4 sm:p-5 flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="text-[13px] font-bold text-[var(--text-primary)]">{meal.name}</h4>
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: ACCENT_SOFT, color: ACCENT, fontFamily: MONO_FONT }}>
-                {meal.target_time}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {(meal.items || []).map((it, j) => (
-                <div key={j} className="flex items-center justify-between gap-2 text-[12.5px] rounded-lg px-3 py-2" style={{ background: "rgba(var(--overlay-rgb),0.04)" }}>
-                  <span className="text-[var(--text-secondary)] font-medium min-w-0 truncate">
-                    {it.food} <span className="text-[var(--text-faint)]">· {it.amount}</span>
-                  </span>
-                  <span className="shrink-0 text-[11px] font-semibold" style={{ fontFamily: MONO_FONT, color: "var(--text-faint)" }}>
-                    P{it.protein_g} K{it.carbs_g} Y{it.fat_g} · {it.kcal} kcal
-                  </span>
-                </div>
-              ))}
-            </div>
-            {meal.swaps?.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[var(--border-default)]">
-                <Shuffle className="w-3 h-3 shrink-0" style={{ color: "var(--text-faint)" }} />
-                <span className="text-[10px] font-bold uppercase tracking-[0.04em] text-[var(--text-faint)] mr-1">Smart Swap</span>
-                {meal.swaps.map((sw, k) => (
-                  <span key={k} className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-[var(--border-default)] text-[var(--text-secondary)]">
-                    {sw.food} · {sw.amount}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </section>
-
-      {/* 3) İŞTAH & LİKİT KALORİ MODÜLÜ — yalnızca applicable ise */}
-      {liquid?.applicable && (
-        <section
-          className="rounded-2xl p-4 sm:p-5 flex flex-col gap-2 border"
-          style={{ background: "rgba(56,189,248,0.06)", borderColor: "rgba(56,189,248,0.3)" }}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Droplet className="w-4 h-4 text-sky-400" strokeWidth={2.25} />
-              <h3 className="text-[13.5px] font-bold text-[var(--text-primary)]">{liquid.formula_name || "İştah & Likit Kalori Modülü"}</h3>
-            </div>
-            {liquid.total_kcal > 0 && (
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-sky-300" style={{ background: "rgba(56,189,248,0.16)", fontFamily: MONO_FONT }}>
-                {liquid.total_kcal} kcal
-              </span>
-            )}
-          </div>
-          {liquid.ingredients && <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">{liquid.ingredients}</p>}
-          {liquid.consumption_timing && (
-            <p className="text-[11.5px] font-semibold text-sky-300">⏱ Tüketim Zamanı: {liquid.consumption_timing}</p>
-          )}
-        </section>
-      )}
-
-      {/* 4) SPOR PROGRAMI KARTLARI */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center gap-2 px-1">
-          <Dumbbell className="w-4 h-4" style={{ color: ACCENT }} strokeWidth={2.25} />
-          <h3 className="text-[13.5px] font-bold text-[var(--text-primary)]">Spor Programı Kartları</h3>
-        </div>
-        {workout.map((day, i) => (
-          <div key={i} className="glass rounded-2xl p-4 sm:p-5 flex flex-col gap-3">
-            <h4 className="text-[13px] font-bold text-[var(--text-primary)]">{day.daily_focus}</h4>
-            <div className="flex flex-col gap-1.5">
-              {(day.exercises || []).map((ex, j) => (
-                <div key={j} className="rounded-lg px-3 py-2.5 flex flex-col gap-1" style={{ background: "rgba(var(--overlay-rgb),0.04)" }}>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[12.5px] font-bold text-[var(--text-primary)]">{ex.name}</span>
-                    <span className="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: ACCENT_SOFT, color: ACCENT, fontFamily: MONO_FONT }}>
-                      {ex.sets} × {ex.reps}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold" style={{ fontFamily: MONO_FONT, color: "var(--text-faint)" }}>
-                    <span>{ex.rpe}</span>
-                    <span>⏱ {ex.rest_sec}sn dinlenme</span>
-                    <span>📈 {ex.overload_strategy}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </section>
-
-      {/* 5) SİSTEM RULES & TROUBLESHOOTING */}
-      <section className="rounded-2xl p-4 sm:p-5 flex flex-col gap-3 border border-[var(--border-default)]" style={{ background: "rgba(var(--overlay-rgb),0.03)" }}>
-        <div className="flex items-center gap-2">
-          <Info className="w-4 h-4" style={{ color: "var(--amber-accent)" }} strokeWidth={2.25} />
-          <h3 className="text-[13.5px] font-bold text-[var(--text-primary)]">Sistem Kuralları</h3>
-        </div>
-        {rules.plateau_rule && (
-          <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">
-            <b className="text-[var(--text-primary)]">Kilo Durması (Plateau):</b> {rules.plateau_rule}
-          </p>
-        )}
-        {rules.digestion_rule && (
-          <p className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">
-            <b className="text-[var(--text-primary)]">Sindirim / Şişkinlik:</b> {rules.digestion_rule}
-          </p>
-        )}
-      </section>
+      {widgets.map((w, i) => {
+        const Renderer = WIDGET_RENDERERS[w.widget_type];
+        if (!Renderer) return null;
+        return <Renderer key={i} data={w.data || {}} />;
+      })}
     </div>
   );
 }
