@@ -119,9 +119,12 @@ export default function CategoryIntro({
         <DashboardHeader />
       </div>
 
-      {/* ORTA GRUP: odak kartları. Mobilde DAİMA 2 sütun (`grid-cols-2`),
-          büyütülmüş/dolgun kartlar (`p-4`, `min-h-[150px]`). `auto-rows-fr`
-          KRİTİK: 4 kart 2 satıra dizilince (mobil/tablet) satırlardan biri
+      {/* ORTA GRUP: odak kartları. TÜM breakpoint'lerde DAİMA 2 sütun
+          (`grid-cols-2`, masaüstünde de `lg:grid-cols-4`'e GEÇİLMEZ) — 2x2
+          matris orijinal tasarım, ortadaki FAB'ın tam kesişim noktasında
+          durabilmesi de buna bağlı (bkz. aşağıdaki not). Büyütülmüş/dolgun
+          kartlar (`p-4`, `min-h-[150px]`). `auto-rows-fr` KRİTİK: 4 kart 2
+          satıra dizilince satırlardan biri
           (ör. bir kartın tagline'ı 2 satıra sarınca) komşusundan doğal
           olarak uzun olabilir — `auto-rows-fr` olmadan bu, aşağıdaki FAB'ın
           `top-1/2` merkezini satır sınırından kaydırıp kart METNİNİN
@@ -141,7 +144,7 @@ export default function CategoryIntro({
       <div className="shrink-0 py-2 [@media(max-height:700px)]:py-1 md:py-0">
         <div
           data-tour-id="tour-category-cards"
-          className="relative w-full grid grid-cols-2 lg:grid-cols-4 auto-rows-fr gap-2.5 md:gap-5"
+          className="relative w-full max-w-4xl mx-auto grid grid-cols-2 auto-rows-fr gap-2.5 md:gap-5"
         >
           {CATEGORY_KEYS.map((key) => {
             const c = CATEGORIES[key];
