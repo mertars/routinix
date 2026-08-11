@@ -330,19 +330,19 @@ const HeroZone = memo(function HeroZone({
       <div className="w-full grid transition-[grid-template-rows] duration-500 ease-out" style={{ gridTemplateRows: isFocusMode ? "0fr" : "1fr" }}>
         <div className="overflow-hidden min-h-0">
           <div className={`flex flex-col items-center gap-3 sm:gap-5 pt-4 sm:pt-7 pb-4 sm:pb-7 transition-opacity duration-300 ${isFocusMode ? "opacity-0" : "opacity-100"}`}>
-            {/* Müzik (Spotify) tetikleyicisi — üst bardan BURAYA taşındı:
-                kronometre halkasının hemen altı, görev seçim rozetinin
-                hemen üstü, ortalanmış tek bir buton. Üst barda iki ayrı
-                Spotify kısayolu (masaüstü metin + mobil ikon) olması hem
-                gereksiz tekrardı hem dar ekranlarda taşmaya katkıda
-                bulunuyordu. Tıklanınca AYNI global paneli DOĞRUDAN açar/
-                kapatır (bkz. openSpotifyPanel — zaten çift-yönlü toggle,
-                aradan bir menü/yönlendirme geçmiyor). */}
+            {/* Müzik Oynatıcı tetikleyicisi — kronometre halkasının hemen
+                altı, görev seçim rozetinin hemen üstü, ortalanmış tek bir
+                buton. KIRMIZI NEON (kontrol satırındaki YEŞİL/Spotify-
+                markalı buttondan BİLEREK farklı renk — ikisi de aynı yeşil
+                daireydi, birbirinden ayırt edilemiyordu; bu artık "Müzik
+                Oynatıcı", diğeri "Spotify" olarak görsel olarak ayrışıyor).
+                Tıklanınca AYNI global paneli DOĞRUDAN açar/kapatır (bkz.
+                openSpotifyPanel — zaten çift-yönlü toggle). */}
             <button
               onClick={onOpenSpotify}
               aria-label="Müzik Oynatıcıyı Aç"
               className="w-11 h-11 rounded-full flex items-center justify-center transition-all active:scale-95"
-              style={{ background: "rgba(29,185,84,0.14)", color: "#1DB954", border: "1px solid rgba(29,185,84,0.4)", boxShadow: "0 0 16px -6px #1DB954" }}
+              style={{ background: "rgba(255,59,59,0.14)", color: "#FF3B3B", border: "1px solid rgba(255,59,59,0.4)", boxShadow: "0 0 16px -6px #FF3B3B" }}
             >
               <Music2 className="w-[18px] h-[18px]" strokeWidth={2.25} />
             </button>
