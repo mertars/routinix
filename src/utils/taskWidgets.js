@@ -52,7 +52,11 @@ export const WIDGET_CATALOG = [
     category: "metric",
     label: "Set / Tekrar",
     icon: Dumbbell,
-    defaultValue: () => ({ sets: 3, reps: 12, weightKg: null }),
+    // repRange/rpe: AI'ın ürettiği GERÇEK antrenman verisi (bkz.
+    // api/_lib/planPrompt.js taskFieldGuide("fitness") active_widgets) —
+    // sabit "reps" yerine (varsa) tercih edilir, bkz. TaskWidgets.jsx
+    // SetsRepsWidget. İkisi de opsiyonel, elle eklenen widget'larda YOK.
+    defaultValue: () => ({ sets: 3, reps: 12, repRange: null, rpe: null, weightKg: null }),
   },
   {
     type: "spotify",
@@ -137,6 +141,15 @@ export function createWidget(type) {
   const def = getWidgetDef(type);
   if (!def) return null;
   return { id: newWidgetId(), type, value: def.defaultValue() };
+}
+
+// AI'ın (bkz. active_widgets) ürettiği GERÇEK değerlerle bir widget
+// oluşturur — defaultValue()'nun ÜZERİNE yazar (spread), AI'ın belirtmediği
+// alanlar (ör. weightKg) varsayılanda kalır.
+export function createWidgetWithValue(type, valueOverride) {
+  const def = getWidgetDef(type);
+  if (!def) return null;
+  return { id: newWidgetId(), type, value: { ...def.defaultValue(), ...(valueOverride || {}) } };
 }
 
 export function formatClockTime(totalSeconds) {

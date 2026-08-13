@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Plus, X, Play, Pause, RotateCcw, Minus, Music2, Clapperboard, Image as ImageIcon, Trash2 } from "lucide-react";
 import WidgetPicker from "./WidgetPicker";
 import PopoverPortal from "./PopoverPortal";
@@ -115,35 +115,70 @@ export function WidgetList({ widgets, onChange }) {
 // Giriş/çıkış geçişi + kaldırma butonu sağlayan paylaşılan kabuk. `isCard`
 // (media/checklist/note gibi geniş içerikler) TAM GENİŞLİK bir blok olarak,
 // diğerleri (pill/mini-satır) satır içi bir öge olarak akar.
+//
+// MOBİL: `group-hover` dokunmatik cihazlarda ASLA tetiklenmez (hover state'i
+// yok) — X butonu masaüstü DIŞINDA hiç görünmezdi. `revealed` state'i bunu
+// tap/uzun-basma ile açar; dışarı bir dokunuş kapatır (document'e bağlı
+// pointerdown dinleyicisi, YALNIZCA revealed iken aktif).
 function WidgetShell({ children, onRemove }) {
   const [entered, setEntered] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const shellRef = useRef(null);
+  const longPressRef = useRef(null);
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setEntered(true));
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const handleRemove = () => {
+  useEffect(() => {
+    if (!revealed) return;
+    const onOutside = (e) => {
+      if (shellRef.current && !shellRef.current.contains(e.target)) setRevealed(false);
+    };
+    document.addEventListener("pointerdown", onOutside);
+    return () => document.removeEventListener("pointerdown", onOutside);
+  }, [revealed]);
+
+  const handleRemove = (e) => {
+    e.stopPropagation();
     setRemoving(true);
     setTimeout(onRemove, EXIT_MS);
   };
 
+  // Tek dokunuş: aç/kapa. Uzun basma (500ms basılı tutma) da AYNI şekilde
+  // açar — ikisi de spesifikasyondaki "tek tıklandığında VEYA uzun
+  // basıldığında" gereksinimini karşılar. Widget'ın kendi iç etkileşimlerini
+  // (ör. EditablePill'in popover'ı) ENGELLEMEZ — stopPropagation YOK,
+  // bilerek: reveal, içerikle etkileşime paralel, zararsız bir yan etki.
+  const onPointerDown = useCallback(() => {
+    longPressRef.current = setTimeout(() => setRevealed(true), 500);
+  }, []);
+  const clearLongPress = useCallback(() => {
+    clearTimeout(longPressRef.current);
+  }, []);
+
   return (
     <div
+      ref={shellRef}
       className="relative group transition-all ease-out"
       style={{
         transitionDuration: `${EXIT_MS}ms`,
         opacity: entered && !removing ? 1 : 0,
         transform: entered && !removing ? "scale(1)" : "scale(0.85)",
       }}
+      onClick={() => setRevealed((v) => !v)}
+      onPointerDown={onPointerDown}
+      onPointerUp={clearLongPress}
+      onPointerLeave={clearLongPress}
     >
       {children}
       <button
         onClick={handleRemove}
         aria-label="Widget'ı kaldır"
-        className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ background: "#FF6E92", color: "#0A0E13" }}
+        className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center transition-opacity group-hover:opacity-100"
+        style={{ background: "#FF6E92", color: "#0A0E13", opacity: revealed ? 1 : 0 }}
       >
         <X className="w-2.5 h-2.5" strokeWidth={3} />
       </button>
@@ -330,28 +365,46 @@ function CalorieWidget({ value, onUpdate }) {
 }
 
 // ---- Metrik: Set / Tekrar ----
+// repRange/rpe: AI'ın plandaki GERÇEK antrenman verisinden ürettiği
+// (bkz. utils/smartWidgets.js) opsiyonel alanlar — varsa sabit "reps"
+// yerine bunlar gösterilir (ör. "4×8-10 · RPE 8").
 function SetsRepsWidget({ value, onUpdate }) {
   const v = value || {};
-  const label = `💪 ${v.sets || 0}×${v.reps || 0}${v.weightKg ? ` @${v.weightKg}kg` : ""}`;
+  const repsText = v.repRange || v.reps || 0;
+  const rpeText = v.rpe ? ` · RPE ${v.rpe}` : "";
+  const label = `💪 ${v.sets || 0}×${repsText}${rpeText}${v.weightKg ? ` @${v.weightKg}kg` : ""}`;
   return (
     <EditablePill label={label} tint={EMERALD}>
       {[
         ["sets", "Set"],
         ["reps", "Tekrar"],
+        ["repRange", "Tekrar Aralığı (ör. 8-10, opsiyonel)"],
+        ["rpe", "RPE (opsiyonel)"],
         ["weightKg", "Ağırlık (kg, opsiyonel)"],
       ].map(([key, lbl]) => (
         <div key={key}>
           <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-faint)" }}>
             {lbl}
           </label>
-          <input
-            type="number"
-            min="0"
-            value={v[key] ?? ""}
-            onChange={(e) => onUpdate({ ...v, [key]: e.target.value === "" ? null : Number(e.target.value) })}
-            className={numInputClass}
-            style={numInputStyle}
-          />
+          {key === "repRange" ? (
+            <input
+              type="text"
+              value={v[key] ?? ""}
+              onChange={(e) => onUpdate({ ...v, [key]: e.target.value || null })}
+              placeholder="8-10"
+              className={numInputClass}
+              style={numInputStyle}
+            />
+          ) : (
+            <input
+              type="number"
+              min="0"
+              value={v[key] ?? ""}
+              onChange={(e) => onUpdate({ ...v, [key]: e.target.value === "" ? null : Number(e.target.value) })}
+              className={numInputClass}
+              style={numInputStyle}
+            />
+          )}
         </div>
       ))}
     </EditablePill>

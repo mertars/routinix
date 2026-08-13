@@ -271,7 +271,11 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
         <>
           <div className="fixed inset-0 z-[95] bg-black/55 backdrop-blur-sm animate-[fadeIn_0.2s_ease]" onClick={() => setOpen(false)} />
           <div
-            className="blur-cap-mobile fixed top-0 right-0 z-[96] h-full w-[92%] max-w-[400px] flex flex-col drawer-panel overflow-hidden"
+            // h-full DEĞİL h-[100dvh]: DrawerMenu.jsx'teki AYNI iOS Safari
+            // hatası — position:fixed + yüzde yükseklik, adres çubuğu
+            // açıkken görünür viewport'tan TAŞAR (alt sticky input dışarı
+            // kayar). dvh gerçek görünür yüksekliğe bağlanır.
+            className="blur-cap-mobile fixed top-0 right-0 z-[96] h-[100dvh] w-[92%] max-w-[400px] flex flex-col drawer-panel overflow-hidden"
             style={{
               background: "rgba(var(--glass-rgb), var(--alpha-modal))",
               backdropFilter: "blur(28px) saturate(160%)",
@@ -282,8 +286,12 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
           >
             <div className="neon-strip" />
 
-            {/* Başlık */}
-            <div className="shrink-0 px-4 pt-4 pb-3 border-b border-slate-200 dark:border-white/8 flex items-center justify-between gap-2">
+            {/* Başlık — safe-area-inset-top: PWA tam ekran/çentik durumunda
+                başlık çentiğin ALTINA girmesin. */}
+            <div
+              className="shrink-0 px-4 pb-3 border-b border-slate-200 dark:border-white/8 flex items-center justify-between gap-2"
+              style={{ paddingTop: "calc(1rem + env(safe-area-inset-top, 0px))" }}
+            >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div
                   className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-500"
@@ -395,6 +403,11 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
                     type="text"
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
+                    // Mobil klavye açılınca input'un ekran dışında/klavyenin
+                    // ARKASINDA kalmasını önler — dvh çoğu tarayıcıda bunu
+                    // zaten otomatik çözer, bu yalnızca eksik davranan
+                    // Android WebView'ler için bir güvenlik ağı.
+                    onFocus={(e) => e.target.scrollIntoView({ behavior: "smooth", block: "center" })}
                     placeholder="Örn: hipertrofi programımı yoğunlaştır..."
                     disabled={typing}
                     className="flex-1 min-w-0 bg-transparent outline-none text-[13px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 px-2.5 py-1.5"

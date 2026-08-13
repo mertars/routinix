@@ -7,7 +7,11 @@
 // import ETMEZ ama yorum satırıyla birbirine referans verir).
 const TASK_SHAPE = {
   vacation: ["title", "description", "duration_min", "estimated_cost", "map_search_query"],
-  fitness: ["title", "description", "duration_min", "priority"],
+  // active_widgets: bkz. planPrompt.js taskFieldGuide("fitness") — AI'ın
+  // ürettiği GERÇEK set/tekrar/RPE değerlerini taşıyan opsiyonel widget
+  // dizisi (bkz. src/utils/smartWidgets.js injectSmartWidgets — varsayılan
+  // "3x12" yerine bu değerleri kullanır).
+  fitness: ["title", "description", "duration_min", "priority", "active_widgets"],
   software: ["title", "description", "duration_min", "priority"],
   general: ["title", "description", "duration_min", "priority"],
 };

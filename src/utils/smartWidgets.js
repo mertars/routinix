@@ -1,5 +1,5 @@
 import { CATEGORIES } from "../constants";
-import { createWidget, getWidgetDef } from "./taskWidgets";
+import { createWidget, createWidgetWithValue, getWidgetDef } from "./taskWidgets";
 
 // Akıllı Widget Enjektörü (AI Context Widget Parser) — TEK doğruluk kaynağı.
 // DÜRÜSTLÜK NOTU: bu "AI" bir Gemini çağrısı DEĞİL — kategori + hedef
@@ -51,6 +51,14 @@ export function widgetTypesForContext(contextKey) {
 // zenginleştirir — flattenWeek'e (planService.js) gitmeden ÖNCE çağrılır.
 // Açıkça "dinlenme/tatil" günü olan görevler ATLANIR (fitness widget'ları bir
 // dinlenme gününe enjekte edilmez).
+//
+// `t.active_widgets` — AI'ın (bkz. api/_lib/planPrompt.js taskFieldGuide
+// "fitness") GERÇEK set/tekrar/RPE değerleriyle doldurduğu opsiyonel dizi
+// (yalnızca fitness kategorisinde, planHydration.js ile tuple'dan çözülür).
+// Bir tür için AI değeri VARSA sabit varsayılan ("3x12") YERİNE o kullanılır;
+// yoksa eskisi gibi generic createWidget() default'una düşülür. İşlendikten
+// sonra `active_widgets` geçici bir alan olduğu için task'tan SİLİNİR — DB
+// `tasks` tablosunda böyle bir sütun YOK, yalnızca `widgets` jsonb'ye yazılır.
 export function injectSmartWidgets(weekDays, contextKey) {
   const widgetTypes = widgetTypesForContext(contextKey);
   if (!contextKey || widgetTypes.length === 0) return weekDays;
@@ -59,9 +67,14 @@ export function injectSmartWidgets(weekDays, contextKey) {
     return {
       ...dayObj,
       tasks: dayObj.tasks.map((t) => {
-        if (REST_EXCLUSION_RE.test(t.title || "")) return t;
-        const fresh = widgetTypes.map(createWidget).filter(Boolean);
-        return { ...t, widgets: [...(t.widgets || []), ...fresh] };
+        const { active_widgets, ...rest } = t;
+        if (REST_EXCLUSION_RE.test(t.title || "")) return rest;
+
+        const aiByType = new Map((active_widgets || []).filter((w) => w?.type).map((w) => [w.type, w.value]));
+        const fresh = widgetTypes
+          .map((type) => (aiByType.has(type) ? createWidgetWithValue(type, aiByType.get(type)) : createWidget(type)))
+          .filter(Boolean);
+        return { ...rest, widgets: [...(t.widgets || []), ...fresh] };
       }),
     };
   });
