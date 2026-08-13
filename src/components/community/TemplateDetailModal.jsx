@@ -4,6 +4,7 @@ import { categoryOf } from "../../constants";
 import { parseStorySections } from "../../utils/formatTemplateStory";
 import { fetchComments, addComment, addReply } from "../../services/commentService";
 import { toggleLike, hasLikedTemplate, recordTemplateClone, cloneTemplateToMyPlans } from "../../services/communityService";
+import { isPlanLimitError } from "../../services/entitlementsService";
 import { buildTemplateShareMessage } from "../../utils/shareLink";
 import CoverPattern from "./CoverPattern";
 import Avatar from "./Avatar";
@@ -102,7 +103,7 @@ function CommentRow({ comment, isTemplateAuthor, onReply }) {
 // tasks satırı oluşturulur (communityService.cloneTemplateToMyPlans) — AI
 // boru hattı YENİDEN TETİKLENMEZ. Oluşan `plan` `onClone(plan)` ile yukarı
 // (CommunityHub → app.jsx → usePlanStudio.openSavedPlan) iletilir.
-export default function TemplateDetailModal({ template, myProfile, userId, authUserCreatedAt, onClose, onOpenAuthor, onClone }) {
+export default function TemplateDetailModal({ template, myProfile, userId, authUserCreatedAt, onClose, onOpenAuthor, onClone, onLimitReached }) {
   const [comments, setComments] = useState([]);
   const [loadingComments, setLoadingComments] = useState(true);
   const [liked, setLiked] = useState(false);
@@ -185,7 +186,12 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
     } catch (err) {
       logger.error("COMMUNITY_DETAIL", "Şablon klonlanamadı", { templateId: template.id, error: err?.message });
       setCloneState("idle");
-      setCloneError("Plan kopyalanamadı, tekrar dener misin?");
+      if (isPlanLimitError(err)) {
+        onLimitReached?.("plans");
+        setCloneError("Ücretsiz plan limitine (3) ulaştın — Pro'ya geç.");
+      } else {
+        setCloneError("Plan kopyalanamadı, tekrar dener misin?");
+      }
     }
   };
 
@@ -234,7 +240,12 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
     } catch (err) {
       logger.error("COMMUNITY_DETAIL", "Şablon klonlanamadı (düzenlenmiş)", { templateId: template.id, error: err?.message });
       setCloneState("idle");
-      setCloneError("Plan kopyalanamadı, tekrar dener misin?");
+      if (isPlanLimitError(err)) {
+        onLimitReached?.("plans");
+        setCloneError("Ücretsiz plan limitine (3) ulaştın — Pro'ya geç.");
+      } else {
+        setCloneError("Plan kopyalanamadı, tekrar dener misin?");
+      }
     }
   };
 

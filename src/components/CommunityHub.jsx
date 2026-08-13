@@ -48,7 +48,7 @@ const NexusBackground = memo(function NexusBackground() {
 // yeterlidir: `user` (auth kullanıcısı) ve `onPlanCloned` (bir şablon "Planlarıma
 // Ekle" ile anında kopyalanınca çağrılır — usePlanStudio.openSavedPlan'e
 // bağlanır, yeni planı doğrudan açar) alır.
-export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
+export default function CommunityHub({ open, user, onClose, onPlanCloned, onLimitReached }) {
   const [myProfile, setMyProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [usernameDraft, setUsernameDraft] = useState("");
@@ -431,6 +431,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned }) {
               setProfileCardTarget(author);
             }}
             onClone={handleClone}
+            onLimitReached={onLimitReached}
           />
         )}
 

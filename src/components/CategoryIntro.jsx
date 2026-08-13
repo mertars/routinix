@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Wand2, MessageSquarePlus, X } from "lucide-react";
 import { CATEGORIES, CATEGORY_KEYS, MIN_GOAL_LENGTH, TEMPLATE_CHIPS } from "../constants";
 import { getPromptSuggestions } from "../utils/promptSuggestions";
+import { fetchPlanUsage } from "../services/entitlementsService";
 import DashboardHeader from "./DashboardHeader";
 
 // Giriş ekranı: kategori (persona) seçimi + hedef, "Planlarım" listesi ve
 // yükleme/hata durumları. "Devam Et" ile dinamik onboarding sihirbazına geçilir.
 export default function CategoryIntro({
   stage,
+  userId,
   category,
   goal,
   goalTooShort,
@@ -27,6 +29,17 @@ export default function CategoryIntro({
   const [pulse, setPulse] = useState(false);
   const [extraNoteOpen, setExtraNoteOpen] = useState(false);
   const suggestions = getPromptSuggestions(category);
+
+  // Freemium rozeti — "Plan Hakkı: 2/3". Premium kullanıcılarda gizli.
+  const [planUsage, setPlanUsage] = useState(null);
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    fetchPlanUsage(userId).then((u) => !cancelled && setPlanUsage(u));
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   // Öneri çipine tıklanınca metni extraNote'a EKLER (üzerine yazmaz) — kutu
   // zaten doluysa aralarına bir boşluk/nokta ile ayrılmış olarak eklenir.
@@ -259,9 +272,19 @@ export default function CategoryIntro({
             görünürdü; artık dikeyde YER KAPLAMAYAN küçük bir tıklanabilir
             etikete indirgendi, tıklanınca aşağıdaki Popover/Modal açılır. */}
         <div className="flex items-center justify-between mb-1.5 md:mb-2">
-          <label className="text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 dark:text-[var(--text-faint)]">
-            Hedefin
-          </label>
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 dark:text-[var(--text-faint)]">
+              Hedefin
+            </label>
+            {planUsage && !planUsage.isPremium && (
+              <span
+                className="text-[9.5px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                style={{ background: "rgba(178,107,255,0.14)", color: mode.accent }}
+              >
+                Plan Hakkı: {planUsage.count}/{planUsage.limit}
+              </span>
+            )}
+          </div>
           {onExtraNoteChange && (
             <button
               type="button"

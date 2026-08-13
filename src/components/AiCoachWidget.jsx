@@ -64,13 +64,13 @@ function TypingBubble() {
 // ikisi de usePlanStudio üzerinden gerçek Supabase mutasyonları tetikler.
 // Kullanıcının TÜM planları arasında bir "hedef plan" seçilebilir (dropdown);
 // AI da serbest metinden hangi planı kastettiğini kendi tespit edebilir.
-export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth, onApplyAction, onSendMessage, onJumpToPlan }) {
+export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth, onApplyAction, onSendMessage, onJumpToPlan, onOpenPaywall }) {
   const [open, setOpen] = useState(false);
   // Hak sayısı artık YALNIZCA sunucudan (api/coach-action.js -> user_quotas)
   // gelir — localStorage tabanlı sayaç kaldırıldı (DevTools'tan silinerek
   // sıfırlanabiliyordu). null = henüz bilinmiyor (drawer açılana kadar).
   const [remaining, setRemaining] = useState(null);
-  const [trialLimit, setTrialLimit] = useState(20);
+  const [trialLimit, setTrialLimit] = useState(15);
   // Admin/sınırsız hesaplar için sunucu `unlimited: true, remaining: null`
   // döner (Infinity JSON'da sessizce null'a döndüğü için ayrı bir bayrak
   // kullanılır, bkz. api/coach-action.js) — sayısal bir "kalan hak" göstermek
@@ -382,6 +382,7 @@ export default function AiCoachWidget({ plan, userId, isAnonymous, onRequireAuth
                     AI Koç deneme limitin doldu. {trialLimit} ücretsiz mesaj hakkını kullandın — sınırsız erişim için Premium'a geç.
                   </p>
                   <button
+                    onClick={() => onOpenPaywall?.()}
                     className="w-full rounded-xl py-2.5 text-[12.5px] font-semibold"
                     style={{ background: "linear-gradient(90deg, #7C3AED, #4F46E5, #06B6D4)", color: "#0b0c10" }}
                   >

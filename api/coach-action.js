@@ -1,6 +1,7 @@
 import { getSupabaseAdmin, getUserFromRequest } from "./_lib/supabaseAdmin.js";
 import { getRemaining, consumeOne, TRIAL_LIMIT } from "./_lib/quota.js";
 import { isAdminUser } from "./_lib/adminAccess.js";
+import { isPremiumUser } from "./_lib/entitlements.js";
 import { runCoachIntent } from "./_lib/coachPrompt.js";
 import { classifyGeminiError } from "./_lib/aiErrors.js";
 import { matchDeterministicIntent } from "./_lib/ruleEngine.js";
@@ -53,26 +54,32 @@ export default async function handler(req, res) {
 
     // Admin durumu YALNIZCA JWT'den doğrulanmış `user.email`e göre, sunucu
     // tarafında hesaplanır (bkz. adminAccess.js dosya başı yorumu) — client
-    // isteğinden gelen hiçbir alan bu kararı ETKİLEMEZ.
+    // isteğinden gelen hiçbir alan bu kararı ETKİLEMEZ. Premium durumu da
+    // AYNI şekilde yalnızca sunucuda, user_entitlements'tan (bkz.
+    // entitlements.js) okunur — ikisi birleşip TEK "sınırsız" bayrağı olur,
+    // quota.js'in tek bildiği şey budur (admin/premium ayrımını bilmesine
+    // gerek yok).
     const isAdmin = isAdminUser(user);
+    const isUnlimited = isAdmin || (await isPremiumUser(user.id));
 
     if (action === "status") {
-      if (isAdmin) return res.status(200).json({ ok: true, consumed: false, unlimited: true, remaining: null, trialLimit: null });
+      if (isUnlimited) return res.status(200).json({ ok: true, consumed: false, unlimited: true, remaining: null, trialLimit: null });
       const remaining = await getRemaining(user.id);
       return res.status(200).json({ ok: true, consumed: false, unlimited: false, remaining, trialLimit: TRIAL_LIMIT });
     }
 
     // Hak kontrolü — AI çağrısı/mutasyon yapılmadan ÖNCE (gereksiz maliyeti
-    // önler); localStorage değil, tek gerçek kaynak burasıdır. Admin ise bu
-    // kontrol tamamen atlanır.
-    const remainingBefore = isAdmin ? Infinity : await getRemaining(user.id);
-    if (!isAdmin && remainingBefore <= 0) {
+    // önler); localStorage değil, tek gerçek kaynak burasıdır. Admin/premium
+    // ise bu kontrol tamamen atlanır.
+    const remainingBefore = isUnlimited ? Infinity : await getRemaining(user.id);
+    if (!isUnlimited && remainingBefore <= 0) {
       return res.status(403).json({
         ok: false,
         consumed: false,
         unlimited: false,
         remaining: 0,
         trialLimit: TRIAL_LIMIT,
+        code: "LIMIT_REACHED_AI_MESSAGES",
         message: `AI Koç deneme limitin doldu. Sınırsız kullanım için Premium'a geç.`,
       });
     }
@@ -98,9 +105,9 @@ export default async function handler(req, res) {
     const result = await dispatch(action, { message, targetPlanId, allPlans, userId: user.id, admin });
 
     // NOT: `Infinity` JSON.stringify'da sessizce `null`a döner — bu yüzden
-    // admin/sınırsız durumu ayrı bir `unlimited` bayrağıyla taşınır, asla
-    // ham Infinity/remaining sayısı olarak DEĞİL.
-    if (isAdmin) {
+    // admin/premium sınırsız durumu ayrı bir `unlimited` bayrağıyla taşınır,
+    // asla ham Infinity/remaining sayısı olarak DEĞİL.
+    if (isUnlimited) {
       result.unlimited = true;
       result.remaining = null;
       result.trialLimit = null;

@@ -1,6 +1,15 @@
 import { supabase } from "../lib/supabaseClient";
 import logger from "../utils/logger";
 
+// Sunucu fonksiyonundan (Vercel) daha erken, KONTROLLÜ bir zaman aşımı —
+// aiPipelineService.js'teki AYNI gerekçe: Gemini asılı kalırsa, kullanıcı
+// sonsuz yüklemede kalmak yerine net bir "zaman aşımı" mesajı görür. Bu
+// dosya ÖNCEDEN bu korumaya sahip DEĞİLDİ (pre-launch denetiminde bulunan
+// tek gerçek eksik — diğer 3 AI servis dosyası zaten bu deseni kullanıyordu)
+// — file.parse de 8192 token'a kadar çıkabildiğinden (bkz. geminiRouter.js
+// FILE_PARSE_SCHEMA) plan.create ile AYNI süre kullanılır.
+const REQUEST_TIMEOUT_MS = 35_000;
+
 // Studio Builder'ın dosya içe aktarma akışının TEK client-side giriş noktası
 // — planEditService.js İLE AYNI desen: JWT ile /api/parse-file sunucu
 // fonksiyonuna gidilir (Gemini API anahtarı yalnızca sunucuda okunur).
@@ -17,6 +26,9 @@ export async function parseFileWithGemini(fileContent, fileType) {
     throw new Error("Devam etmek için giriş yapmalısın.");
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   let res;
   try {
     res = await fetch("/api/parse-file", {
@@ -26,10 +38,14 @@ export async function parseFileWithGemini(fileContent, fileType) {
         Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({ fileContent, fileType }),
+      signal: controller.signal,
     });
   } catch (err) {
-    logger.error("PARSE_FILE", "Sunucuya ulaşılamadı", { fileType, error: err?.message });
-    throw new Error("Sunucuya ulaşılamadı — bağlantını kontrol edip tekrar dener misin?");
+    const timedOut = err?.name === "AbortError";
+    logger.error("PARSE_FILE", `Dosya ayrıştırılamadı (${timedOut ? "zaman aşımı" : "sunucuya ulaşılamadı"})`, { fileType, error: err?.message });
+    throw new Error(timedOut ? "Yapay zeka yanıt vermekte gecikti, lütfen tekrar dener misin?" : "Sunucuya ulaşılamadı — bağlantını kontrol edip tekrar dener misin?");
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   let body;

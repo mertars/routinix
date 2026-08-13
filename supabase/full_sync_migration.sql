@@ -687,7 +687,89 @@ create policy "user_biometric_profiles_update_own" on public.user_biometric_prof
 -- Bilerek YOK: delete policy'si — bkz. yukarıdaki dosya başı notu.
 
 -- =====================================================================
--- 17) PostgREST şema önbelleğini yenile — yeni sütun/tablo/fonksiyonların
+-- 18) user_entitlements + ücretsiz plan limiti (Freemium Gatekeeping)
+--
+--     user_entitlements: kullanıcı başına TEK satır, şu an yalnızca
+--     `is_premium` taşıyor — ileride gerçek bir ödeme sağlayıcısı (Stripe
+--     vb.) bağlanınca stripe_customer_id/current_period_end gibi alanlar
+--     buraya eklenecek. Client bu satırı OKUYABİLİR (rozet/paywall UI için)
+--     ama YAZAMAZ — insert/update policy'si BİLEREK YOK, yalnızca
+--     service_role (gerçek ödeme webhook'u) `is_premium`'u değiştirebilir;
+--     aksi halde bir kullanıcı kendi kendine "premium" flag'ini açabilirdi.
+--
+--     is_user_premium(): plans trigger'ının VE api/_lib/entitlements.js'in
+--     (service_role, AI Koç guard'ı) paylaştığı tek doğruluk kaynağı.
+--
+--     enforce_free_plan_limit(): §14'te BİLİNÇLİ OLARAK kaldırılan eski
+--     `enforce_plan_limit` trigger'ının YERİNE geçer — ürün kararı artık
+--     TERSİNE döndü (ücretsiz kullanıcı başına en fazla 3 plan). Önceki
+--     sabit bir sayaç KOLONU yerine CANLI `count(*)` kullanır — bir plan
+--     silinirse sayaç asla "yanlış yönde" takılı kalmaz (drift riski yok).
+--     TÜM plan oluşturma yolları (AI/manuel/şablon klonlama — bkz.
+--     planService.js + communityService.js, üçü de client-side insert)
+--     AYNI `plans` tablosuna INSERT ettiği için tek bir BEFORE INSERT
+--     trigger üçünü de otomatik kapsar — ayrı ayrı 3 yerde tekrar KOD
+--     YAZMAYA gerek YOK. Limit aşılınca RAISE EXCEPTION 'LIMIT_REACHED_PLANS'
+--     — client (planService.js/communityService.js) bu metni Postgrest
+--     hatasının `message` alanında YAKALAR (bkz. src/services/
+--     entitlementsService.js isPlanLimitError()).
+-- =====================================================================
+create table if not exists public.user_entitlements (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  is_premium boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.user_entitlements enable row level security;
+
+drop policy if exists "user_entitlements_select_own" on public.user_entitlements;
+create policy "user_entitlements_select_own" on public.user_entitlements
+  for select using (auth.uid() = user_id);
+-- Bilerek YOK: insert/update/delete policy'si — bkz. yukarıdaki dosya başı notu.
+
+create or replace function public.is_user_premium(p_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((select is_premium from public.user_entitlements where user_id = p_user_id), false);
+$$;
+
+revoke all on function public.is_user_premium(uuid) from public;
+grant execute on function public.is_user_premium(uuid) to authenticated, service_role;
+
+create or replace function public.enforce_free_plan_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_count int;
+  v_limit constant int := 3;
+begin
+  if public.is_user_premium(new.user_id) then
+    return new;
+  end if;
+
+  select count(*) into v_count from public.plans where user_id = new.user_id;
+  if v_count >= v_limit then
+    raise exception 'LIMIT_REACHED_PLANS' using errcode = 'P0001';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists plans_enforce_free_limit on public.plans;
+create trigger plans_enforce_free_limit
+  before insert on public.plans
+  for each row execute function public.enforce_free_plan_limit();
+
+-- =====================================================================
+-- 19) PostgREST şema önbelleğini yenile — yeni sütun/tablo/fonksiyonların
 --     REST API'de ANINDA görünür olması için (aksi halde önbellek süresi
 --     dolana kadar "column does not exist" hataları görülebilir). Bu script
 --     içindeki EN SON komut olmalı (üstteki tüm tablo/kolon değişiklikleri

@@ -44,6 +44,7 @@ import { InlineFallback, FabFallback, OverlayFallback } from "./components/LazyF
 // PrintablePlan ise `window.print()` tetiklendiği anda DOM'da olması
 // gerektiği için hâlâ UNCONDITIONAL mount + `fallback={null}` kullanır.
 const AuthModal = lazy(() => import("./components/AuthModal"));
+const PaywallModal = lazy(() => import("./components/PaywallModal"));
 const TaskDrawer = lazy(() => import("./components/TaskDrawer"));
 const RoutinesPopover = lazy(() => import("./components/RoutinesPopover"));
 const PrintModal = lazy(() => import("./components/PrintModal"));
@@ -76,6 +77,11 @@ export default function App() {
   // AuthModal'ın "neden açıldığını" anlatan opsiyonel bağlam mesajı (ör. AI
   // Koç/AI Plan Oluşturucu kilidine takılınca) — bkz. requireAuth aşağıda.
   const [authContext, setAuthContext] = useState(null);
+  // Freemium Gatekeeping paywall'ı — AYNI "tek paylaşılan tetikleyici" deseni
+  // (requireAuth İLE AYNI), yalnızca "hangi limite takıldı" bilgisini de
+  // taşır ("plans" | "ai_messages", bkz. PaywallModal.jsx).
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [paywallReason, setPaywallReason] = useState("plans");
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
@@ -123,7 +129,15 @@ export default function App() {
     setAuthOpen(true);
   }, []);
 
-  const ps = usePlanStudio({ user: auth.user, onRequireAuth: requireAuth });
+  // AYNI desen — usePlanStudio'nun `onLimitReached` prop'una geçilir (plan
+  // oluşturma DB trigger'ı LIMIT_REACHED_PLANS fırlatınca), AiCoachWidget'ın
+  // "Premium'a Geç" butonuna da bağlanır (bkz. aşağısı).
+  const requirePaywall = useCallback((reason) => {
+    setPaywallReason(reason || "plans");
+    setPaywallOpen(true);
+  }, []);
+
+  const ps = usePlanStudio({ user: auth.user, onRequireAuth: requireAuth, onLimitReached: requirePaywall });
   const { stage, mode } = ps;
 
   // Mesajsız/düz "Giriş Yap" için STABİL bir referans — Header memo() olduğu
@@ -331,6 +345,12 @@ export default function App() {
     </Suspense>
   );
 
+  const paywallModalNode = paywallOpen && (
+    <Suspense fallback={<OverlayFallback z={92} />}>
+      <PaywallModal open={paywallOpen} reason={paywallReason} accent={mode.accent} onClose={() => setPaywallOpen(false)} />
+    </Suspense>
+  );
+
   // Nexus link paylaşımı (`/t/:templateId`) — bu SPA'da react-router gibi bir
   // kütüphane yok; tek bir statik deep-link giriş noktası için tüm `stage`
   // durum makinesini bir router'a taşımak orantısız olurdu. Bunun yerine
@@ -342,8 +362,9 @@ export default function App() {
   if (sharedTemplateId) {
     return (
       <>
-        <SharedTemplateView idOrSlug={sharedTemplateId} auth={auth} onOpenAuth={openAuth} onDone={handleSharedTemplateDone} />
+        <SharedTemplateView idOrSlug={sharedTemplateId} auth={auth} onOpenAuth={openAuth} onLimitReached={requirePaywall} onDone={handleSharedTemplateDone} />
         {authModalNode}
+        {paywallModalNode}
       </>
     );
   }
@@ -466,6 +487,7 @@ export default function App() {
             {onIntroLike && (
               <CategoryIntro
                 stage={stage}
+                userId={auth.user?.id}
                 category={ps.category}
                 goal={ps.goal}
                 goalTooShort={ps.goalTooShort}
@@ -557,6 +579,9 @@ export default function App() {
 
       {/* Giriş/Kayıt modalı — koşullu mount. */}
       {authModalNode}
+
+      {/* Freemium Gatekeeping paywall — koşullu mount, AYNI desen. */}
+      {paywallModalNode}
 
       <ConfirmModal
         open={logoutConfirmOpen}
@@ -697,7 +722,7 @@ export default function App() {
           kopyalanan planı doğrudan usePlanStudio.openSavedPlan ile açar. */}
       {communityOpen && (
         <Suspense fallback={<OverlayFallback z={100} />}>
-          <CommunityHub open={communityOpen} user={auth.user} onClose={() => setCommunityOpen(false)} onPlanCloned={ps.openSavedPlan} />
+          <CommunityHub open={communityOpen} user={auth.user} onClose={() => setCommunityOpen(false)} onPlanCloned={ps.openSavedPlan} onLimitReached={requirePaywall} />
         </Suspense>
       )}
 
@@ -732,6 +757,7 @@ export default function App() {
             onApplyAction={ps.applyCoachAction}
             onSendMessage={ps.sendCoachMessage}
             onJumpToPlan={ps.openSavedPlan}
+            onOpenPaywall={() => requirePaywall("ai_messages")}
           />
         </Suspense>
       )}

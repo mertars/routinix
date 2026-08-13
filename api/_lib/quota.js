@@ -8,14 +8,19 @@ import { getSupabaseAdmin } from "./supabaseAdmin.js";
 // Bkz. supabase/ai_trial_limit.sql (yeni public.user_ai_trial tablosu +
 // increment_user_trial_usage RPC'si — bu SQL'in Supabase'de çalıştırılmış
 // olması GEREKİR, aksi halde aşağıdaki fallback yola düşülür).
-export const TRIAL_LIMIT = 20;
+//
+// Pre-launch freemium kararı: 20 → 15 (bkz. entitlements.js — Premium
+// kullanıcılar zaten bu sayaca HİÇ takılmaz, aşağıdaki `isUnlimited`
+// parametresi buna admin İLE AYNI şekilde bakar).
+export const TRIAL_LIMIT = 15;
 
 // Kullanıcının satırını getirir; yoksa 0 kullanımla oluşturur. Döner: kalan hak.
-// `isAdmin` true ise (bkz. adminAccess.js — YALNIZCA JWT'den doğrulanmış
-// user.email'e göre sunucu tarafında hesaplanır) veritabanına hiç gitmeden
-// Infinity döner — admin hesapları için sayaç hiç oluşturulmaz/tüketilmez.
-export async function getRemaining(userId, isAdmin = false) {
-  if (isAdmin) return Infinity;
+// `isUnlimited` true ise (admin E-POSTA allowlist'i VEYA user_entitlements.
+// is_premium — ikisi de çağıran tarafta, bkz. coach-action.js, birleştirilip
+// TEK bayrak olarak buraya geçilir) veritabanına hiç gitmeden Infinity
+// döner — sayaç hiç oluşturulmaz/tüketilmez.
+export async function getRemaining(userId, isUnlimited = false) {
+  if (isUnlimited) return Infinity;
 
   const admin = getSupabaseAdmin();
 
@@ -35,8 +40,8 @@ export async function getRemaining(userId, isAdmin = false) {
 // Başarılı bir aksiyondan SONRA çağrılır — kullanımı 1 artırır (ömür boyu
 // toplam). Yarış durumuna karşı DB seviyesinde koşullu update kullanır.
 // Döner: artıştan sonraki kalan hak.
-export async function consumeOne(userId, isAdmin = false) {
-  if (isAdmin) return Infinity;
+export async function consumeOne(userId, isUnlimited = false) {
+  if (isUnlimited) return Infinity;
 
   const admin = getSupabaseAdmin();
 

@@ -6,6 +6,7 @@ import Avatar from "./community/Avatar";
 import TemplateTaskEditor from "./community/TemplateTaskEditor";
 import { parseStorySections } from "../utils/formatTemplateStory";
 import { fetchTemplateByIdOrSlug, incrementTemplateView, cloneTemplateToMyPlans, recordTemplateClone } from "../services/communityService";
+import { isPlanLimitError } from "../services/entitlementsService";
 import { fetchProfileByAuthUserId } from "../services/profileService";
 import { buildTemplateShareMessage } from "../utils/shareLink";
 import logger from "../utils/logger";
@@ -26,7 +27,7 @@ import logger from "../utils/logger";
 // yok. Kullanıcı sonradan "Hesabını Kaydet" derse (AuthModal, isAnonymousUpgrade
 // modunda) AYNI auth.uid() kalıcı bir hesaba yükseltilir — hiçbir veri
 // taşınmaz/kopyalanmaz çünkü zaten aynı satırlara bağlıdır.
-export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone }) {
+export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onLimitReached, onDone }) {
   const [template, setTemplate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -148,7 +149,12 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
       setSuccessPlan(plan);
     } catch (err) {
       logger.error("SHARED_TEMPLATE", "Plan eklenemedi (hızlı ekle)", { idOrSlug, templateDbId: template?.id, error: err?.message });
-      setAddError("Plan eklenemedi, tekrar dener misin?");
+      if (isPlanLimitError(err)) {
+        onLimitReached?.("plans");
+        setAddError("Ücretsiz plan limitine (3) ulaştın — Pro'ya geç.");
+      } else {
+        setAddError("Plan eklenemedi, tekrar dener misin?");
+      }
     } finally {
       setAdding(false);
     }
@@ -174,7 +180,12 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onDone 
       setSuccessPlan(plan);
     } catch (err) {
       logger.error("SHARED_TEMPLATE", "Plan eklenemedi (düzenlenmiş)", { idOrSlug, templateDbId: template?.id, error: err?.message });
-      setAddError("Plan eklenemedi, tekrar dener misin?");
+      if (isPlanLimitError(err)) {
+        onLimitReached?.("plans");
+        setAddError("Ücretsiz plan limitine (3) ulaştın — Pro'ya geç.");
+      } else {
+        setAddError("Plan eklenemedi, tekrar dener misin?");
+      }
     } finally {
       setAdding(false);
     }

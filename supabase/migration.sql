@@ -1159,3 +1159,63 @@ drop policy if exists "user_biometric_profiles_update_own" on public.user_biomet
 create policy "user_biometric_profiles_update_own" on public.user_biometric_profiles
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 -- Bilerek YOK: delete policy'si — bkz. yukarıdaki dosya başı notu.
+
+-- =====================================================================
+-- 20) user_entitlements + ücretsiz plan limiti (Freemium Gatekeeping) —
+--     bkz. full_sync_migration.sql §18'deki AYNI bölümün BİREBİR kopyası
+--     (dosya başı notu orada). Kaynak doğruluk her iki dosyada da AYNI
+--     kalsın diye eş zamanlı güncellenir.
+-- =====================================================================
+create table if not exists public.user_entitlements (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  is_premium boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.user_entitlements enable row level security;
+
+drop policy if exists "user_entitlements_select_own" on public.user_entitlements;
+create policy "user_entitlements_select_own" on public.user_entitlements
+  for select using (auth.uid() = user_id);
+-- Bilerek YOK: insert/update/delete policy'si — yalnızca service_role yazar.
+
+create or replace function public.is_user_premium(p_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((select is_premium from public.user_entitlements where user_id = p_user_id), false);
+$$;
+
+revoke all on function public.is_user_premium(uuid) from public;
+grant execute on function public.is_user_premium(uuid) to authenticated, service_role;
+
+create or replace function public.enforce_free_plan_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_count int;
+  v_limit constant int := 3;
+begin
+  if public.is_user_premium(new.user_id) then
+    return new;
+  end if;
+
+  select count(*) into v_count from public.plans where user_id = new.user_id;
+  if v_count >= v_limit then
+    raise exception 'LIMIT_REACHED_PLANS' using errcode = 'P0001';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists plans_enforce_free_limit on public.plans;
+create trigger plans_enforce_free_limit
+  before insert on public.plans
+  for each row execute function public.enforce_free_plan_limit();

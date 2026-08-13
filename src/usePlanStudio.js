@@ -24,6 +24,7 @@ import {
   fetchPlanDetail,
   deletePlan as deletePlanSvc,
 } from "./services/planService";
+import { isPlanLimitError } from "./services/entitlementsService";
 import { callCoachAction } from "./services/coachActionService";
 import { updateManualPlanInSupabase } from "./services/planEditService";
 import { setHapticsEnabled } from "./lib/haptics";
@@ -104,7 +105,7 @@ function groupTasksToWeeks(taskRows) {
 // AI çağrıları (createEnrichedPlan / fetchNextWeekTasks) ve DB kalıcılığı
 // (savePlanToSupabase / saveWeekTasks) burada tetiklenir; App/bileşenler yalnızca
 // bu hook'un döndürdüğü değerleri ve aksiyonları kullanır.
-export default function usePlanStudio({ user, onRequireAuth } = {}) {
+export default function usePlanStudio({ user, onRequireAuth, onLimitReached } = {}) {
   const [category, setCategory] = useState("software");
   const [goal, setGoal] = useState("");
   const [extraNote, setExtraNote] = useState("");
@@ -313,11 +314,16 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       setPlanSummaryOpen(true);
       refreshSavedPlans();
     } catch (err) {
+      if (isPlanLimitError(err)) {
+        onLimitReached?.("plans");
+        setStage(STAGE_WIZARD);
+        return;
+      }
       logger.error("PLAN_CREATE", "Plan oluşturulamadı", { category, error: err?.message });
       setErrorMsg(err?.message || "Plan oluşturulurken bir sorun oluştu. Lütfen tekrar dene.");
       setStage(STAGE_ERROR);
     }
-  }, [user, onRequireAuth, questions, answers, extraNote, category, goal, templateDaysOverride, refreshSavedPlans]);
+  }, [user, onRequireAuth, onLimitReached, questions, answers, extraNote, category, goal, templateDaysOverride, refreshSavedPlans]);
 
   // ---- "Kendi Planını Hazırla" — AI çağrısı OLMADAN, elle plan kaydı ----
   // Diğer plan-oluşturma yollarıyla (startOnboarding/startFromTemplate)
@@ -385,9 +391,18 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
         onRequireAuth?.();
         throw new Error("Devam etmek için giriş yapmalısın.");
       }
-      const { plan, routines, tasks } = builder.editingPlanId
-        ? await updateManualPlanInSupabase(builder.editingPlanId, builder, user.id)
-        : await saveManualPlanToSupabase(builder, user.id);
+      let plan, routines, tasks;
+      try {
+        ({ plan, routines, tasks } = builder.editingPlanId
+          ? await updateManualPlanInSupabase(builder.editingPlanId, builder, user.id)
+          : await saveManualPlanToSupabase(builder, user.id));
+      } catch (err) {
+        if (isPlanLimitError(err)) {
+          onLimitReached?.("plans");
+          throw new Error("Ücretsiz plan limitine ulaştın.");
+        }
+        throw err;
+      }
       setDbPlan(plan);
       setRoutines(routines || []);
       setWeeks(groupTasksToWeeks(tasks));
@@ -397,7 +412,7 @@ export default function usePlanStudio({ user, onRequireAuth } = {}) {
       setEditingPlanPayload(null);
       refreshSavedPlans();
     },
-    [user, onRequireAuth, refreshSavedPlans]
+    [user, onRequireAuth, onLimitReached, refreshSavedPlans]
   );
 
   // ---- LAZY LOAD: sonraki haftayı üret + kaydet + ekle ----
