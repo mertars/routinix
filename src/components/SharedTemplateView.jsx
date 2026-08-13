@@ -9,7 +9,28 @@ import { fetchTemplateByIdOrSlug, incrementTemplateView, cloneTemplateToMyPlans,
 import { isPlanLimitError } from "../services/entitlementsService";
 import { fetchProfileByAuthUserId } from "../services/profileService";
 import { buildTemplateShareUrl } from "../utils/shareLink";
+import PrintablePlan from "./PrintablePlan";
 import logger from "../utils/logger";
+
+// editTasks (day_number bazlı DÜZ liste) → PrintablePlan'ın beklediği
+// {weeks:[{days:[{dayNumber,tasks}]}]} şekli. PlanBoard/coach-action.js'teki
+// AYNI grup-ve-sırala deseni — hafta sınırı burada ÖNEMSİZ (PrintablePlan
+// zaten weeks'i tek bir düz güne indirgeyip dayNumber'a göre sıralıyor), bu
+// yüzden TÜM günler tek bir sentetik "1. hafta" içine konur.
+function tasksToWeeks(tasks) {
+  const byDay = new Map();
+  (tasks || []).forEach((t, i) => {
+    // editTasks (bkz. yukarıdaki useEffect) şablon JSONB'sinden gelir,
+    // kararlı bir `id` TAŞIMAZ — PrintablePlan `key={t.id}` kullandığından
+    // her göreve indeks tabanlı sentetik bir id verilir (yalnızca React
+    // key/reconciliation amaçlı, anlamlı bir kimlik DEĞİL).
+    const d = t.day_number || 1;
+    if (!byDay.has(d)) byDay.set(d, []);
+    byDay.get(d).push({ ...t, id: t.id ?? `print-task-${i}` });
+  });
+  const days = [...byDay.entries()].sort((a, b) => a[0] - b[0]).map(([dayNumber, dayTasks]) => ({ dayNumber, tasks: dayTasks }));
+  return [{ weekNumber: 1, days }];
+}
 
 // Nexus Link Paylaşımı — `/t/:templateId` deep link'inin GERÇEK sayfası.
 // app.jsx bu bileşeni normal uygulama kabuğunun YERİNE render eder (bkz.
@@ -251,30 +272,17 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onLimit
 
   return (
     <div className="shared-template-print-root fixed inset-0 z-[200] overflow-y-auto bg-[var(--bg-app)] text-[var(--text-primary)]">
-      {/* Yazdırma/PDF desteği — `.no-print` işaretli her şey (üst şerit,
-          güvenlik/CTA butonları, kapak fotoğrafı) VE her `<button>` yazdırırken
-          tamamen kaldırılır; geriye yalnızca başlık, hikaye bölümleri ve
-          rutin listesinden oluşan temiz bir metin taslağı kalır. Zemin/metin
-          rengi TÜM alt elemanlarda (Tailwind'in koyu tema sınıflarını ezerek)
-          açıkça beyaza/siyaha zorlanır — koyu temanın ekrandaki hali kağıda
-          hiç yansımaz. "PDF Çıktısı Alınabilir" etiketi bu yüzden GERÇEK bir
-          işlevdir (bkz. handleQuickAdd — plan eklendikten hemen sonra
-          `window.print()` tetiklenir). */}
-      <style>{`
-        @media print {
-          button, .no-print { display: none !important; }
-          .shared-template-print-root {
-            position: static !important;
-            overflow: visible !important;
-          }
-          .shared-template-print-root, .shared-template-print-root * {
-            background: #ffffff !important;
-            color: #000000 !important;
-            border-color: #d4d4d8 !important;
-            box-shadow: none !important;
-          }
-        }
-      `}</style>
+      {/* Yazdırma/PDF desteği — ESKİDEN bu görünen EKRANI (`.no-print`
+          işaretli olmayan her şeyi) CSS ile beyaza/siyaha zorlayıp
+          basıyordu; önizleme modunda template_tasks (günlere ayrılmış
+          gerçek egzersiz/görev/detay listesi) HİÇ RENDER EDİLMİYORDU (yalnızca
+          hikaye metni + düz rutin listesi görünüyordu) — yazdırılan PDF
+          GERÇEK planı EKSİK içeriyordu. Artık PlanBoard'un GERÇEK PDF
+          motoruyla (PrintablePlan.jsx, aynı global `.print-root` CSS'i —
+          bkz. GlobalStyles.jsx, app.jsx'in bu sayfa için de monte ettiği)
+          AYNI mekanizma kullanılıyor: aşağıdaki gizli PrintablePlan,
+          editTasks/editRoutines'i (önizlemede DE template'ten dolu gelir,
+          bkz. yukarıdaki useEffect) TÜM gün/görev/set detaylarıyla basar. */}
       <div
         className="no-print fixed inset-0 z-0 pointer-events-none"
         aria-hidden="true"
@@ -430,6 +438,15 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onLimit
           <X className="w-3.5 h-3.5" /> Routinix'e devam et
         </button>
       </div>
+
+      {/* Ekranda GİZLİ (.print-root { display:none }, bkz. GlobalStyles.jsx),
+          yalnızca window.print() sırasında görünür — handlePrint/handleQuickAdd
+          tetikleyince TAM/eksiksiz A4 rapor budur, görünen ekran DEĞİL. */}
+      <PrintablePlan
+        plan={{ title: editTitle || template.title, summary: template.goal, total_days: editTotalDays }}
+        routines={editRoutines}
+        weeks={tasksToWeeks(editTasks)}
+      />
     </div>
   );
 }

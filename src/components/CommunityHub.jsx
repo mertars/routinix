@@ -48,7 +48,7 @@ const NexusBackground = memo(function NexusBackground() {
 // yeterlidir: `user` (auth kullanıcısı) ve `onPlanCloned` (bir şablon "Planlarıma
 // Ekle" ile anında kopyalanınca çağrılır — usePlanStudio.openSavedPlan'e
 // bağlanır, yeni planı doğrudan açar) alır.
-export default function CommunityHub({ open, user, onClose, onPlanCloned, onLimitReached }) {
+export default function CommunityHub({ open, user, onClose, onPlanCloned, onLimitReached, onOpenAuth }) {
   const [myProfile, setMyProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [usernameDraft, setUsernameDraft] = useState("");
@@ -135,7 +135,14 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned, onLimi
 
   const toggleTagFilter = (t) => setSelectedTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
 
+  // Misafir (anonim) oturumlar bir Nexus kullanıcı adı ALAMAZ/OLUŞTURAMAZ —
+  // hem burada (UI, hemen aşağıdaki "Nexus'a katılmak için..." bloğu bu
+  // formu misafirlere hiç GÖSTERMEZ) hem de DB katmanında (bkz.
+  // supabase/full_sync_migration.sql community_profiles_block_anonymous
+  // trigger'ı — client bu kontrolü atlayıp doğrudan insert denese bile
+  // reddedilir). Bu satır defansif bir ikinci katman.
   const handleCreateProfile = async () => {
+    if (user?.is_anonymous) return;
     if (!isValidUsername(usernameDraft)) {
       setUsernameError("3-24 karakter, yalnızca küçük harf/rakam/alt çizgi.");
       return;
@@ -151,6 +158,11 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned, onLimi
       setCreatingProfile(false);
     }
   };
+
+  // "Guest-XXXX" — misafirin GERÇEK auth.uid()'sinden türetilen, sabit/
+  // deterministik kısa bir görüntü etiketi (kalıcı bir profil DEĞİL, o
+  // yüzden username/community_profiles ile hiç ilişkilenmez).
+  const guestLabel = user?.is_anonymous ? `Guest-${user.id.slice(0, 4).toUpperCase()}` : null;
 
   const handleClone = (plan) => {
     setDetailTemplate(null);
@@ -254,7 +266,28 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned, onLimi
           </button>
         )}
 
-        {!profileLoading && user && !myProfile && (
+        {/* Misafir (anonim) oturum — kullanıcı adı FORMU HİÇ GÖSTERİLMEZ
+            (bkz. handleCreateProfile'daki AYNI engel + DB trigger'ı).
+            Kimliği yalnızca geçici "Guest-XXXX" etiketiyle görünür. */}
+        {!profileLoading && user?.is_anonymous && (
+          <div className="shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-b border-[var(--border-default)] flex items-center gap-2 flex-wrap">
+            <span className="text-[12px] text-[var(--text-muted)]">
+              <span className="font-mono text-[var(--text-faint)]">{guestLabel}</span> olarak geziniyorsun — Nexus'ta kullanıcı adı
+              almak ve şablon paylaşmak için hesap oluşturman gerekir.
+            </span>
+            {onOpenAuth && (
+              <button
+                onClick={onOpenAuth}
+                className="text-[11.5px] font-bold px-3 py-1.5 rounded-lg text-black shrink-0"
+                style={{ background: "linear-gradient(90deg, #22D3EE, #B26BFF)" }}
+              >
+                Hesap Oluştur
+              </button>
+            )}
+          </div>
+        )}
+
+        {!profileLoading && user && !user.is_anonymous && !myProfile && (
           <div className="shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-b border-[var(--border-default)] flex items-center gap-2 flex-wrap">
             <span className="text-[12px] text-[var(--text-muted)]">Nexus'a katılmak için bir kullanıcı adı seç:</span>
             <input

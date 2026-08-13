@@ -769,7 +769,38 @@ create trigger plans_enforce_free_limit
   for each row execute function public.enforce_free_plan_limit();
 
 -- =====================================================================
--- 19) PostgREST şema önbelleğini yenile — yeni sütun/tablo/fonksiyonların
+-- 20) Misafir (anonim) oturumlar Nexus kullanıcı adı ALAMAZ — CommunityHub.jsx
+--     zaten formu misafirlere hiç GÖSTERMİYOR, ama bu TEK BAŞINA yeterli
+--     değil: anon key + geçerli bir JWT ile herkes tarayıcı konsolundan
+--     doğrudan `supabase.from("community_profiles").insert(...)` çağırıp
+--     bu istemci kontrolünü atlayabilir. Supabase'in anonim kullanıcı
+--     JWT'lerinde YER ALAN `is_anonymous` claim'i (bkz. useAuth.js
+--     `session.user.is_anonymous` — AYNI claim, istemcide de okunur) burada
+--     `auth.jwt()` ile sunucu tarafında DOĞRULANIR — plans tablosundaki
+--     enforce_free_plan_limit trigger'ıyla AYNI güvenlik ilkesi (gerçek
+--     sınır her zaman DB'de, istemci kontrolü yalnızca UX).
+-- =====================================================================
+create or replace function public.enforce_no_anonymous_community_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
+    raise exception 'GUEST_CANNOT_CREATE_PROFILE' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists community_profiles_block_anonymous on public.community_profiles;
+create trigger community_profiles_block_anonymous
+  before insert on public.community_profiles
+  for each row execute function public.enforce_no_anonymous_community_profile();
+
+-- =====================================================================
+-- 21) PostgREST şema önbelleğini yenile — yeni sütun/tablo/fonksiyonların
 --     REST API'de ANINDA görünür olması için (aksi halde önbellek süresi
 --     dolana kadar "column does not exist" hataları görülebilir). Bu script
 --     içindeki EN SON komut olmalı (üstteki tüm tablo/kolon değişiklikleri

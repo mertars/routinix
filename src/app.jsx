@@ -6,6 +6,7 @@ import { tapFeedback } from "./lib/haptics";
 import logger, { setLogUser } from "./utils/logger";
 import Header from "./components/Header";
 import ConfirmModal from "./components/ConfirmModal";
+import GuestExitModal from "./components/GuestExitModal";
 import DrawerMenu from "./components/DrawerMenu";
 import DeletePlanModal from "./components/DeletePlanModal";
 import CategoryIntro from "./components/CategoryIntro";
@@ -82,6 +83,7 @@ export default function App() {
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [paywallReason, setPaywallReason] = useState("plans");
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [guestExitOpen, setGuestExitOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
   const [routinesOpen, setRoutinesOpen] = useState(false);
@@ -173,6 +175,7 @@ export default function App() {
   const anyOverlayOpen =
     authOpen ||
     logoutConfirmOpen ||
+    guestExitOpen ||
     deleteOpen ||
     taskDrawerOpen ||
     routinesOpen ||
@@ -318,7 +321,13 @@ export default function App() {
 
   // Header/DrawerMenu'ye geçen geri kalan tekil handler'lar — memo'nun etkili
   // olması için bunlar da stabil referanslı olmalı (bkz. yukarıdaki toggle*).
-  const requestSignOut = useCallback(() => setLogoutConfirmOpen(true), []);
+  // Misafir (anonim) oturumlar GERÇEK hesaplardan FARKLI bir uyarı görür —
+  // bkz. GuestExitModal.jsx dosya başı yorumu (çıkışın veri kaybına yol
+  // açması, gerçek hesaplarda GEÇERLİ DEĞİL, o yüzden ayrı bir modal/state).
+  const requestSignOut = useCallback(() => {
+    if (auth.isAnonymous) setGuestExitOpen(true);
+    else setLogoutConfirmOpen(true);
+  }, [auth.isAnonymous]);
   const toggleHamburger = useCallback(() => ps.setMenuOpen((v) => !v), [ps.setMenuOpen]);
   const closeHamburger = useCallback(() => ps.setMenuOpen(false), [ps.setMenuOpen]);
   const onLogoClick = useCallback(() => {
@@ -373,6 +382,14 @@ export default function App() {
   if (sharedTemplateId) {
     return (
       <>
+        {/* GlobalStyles normalde yalnızca aşağıdaki normal uygulama kabuğu
+            dalında monte edilir — bu erken dönüş onu ATLADIĞI için, o
+            olmadan SharedTemplateView'ın kendi "PDF Çıktı Al" butonu
+            PrintablePlan'ın dayandığı global `.print-root`/`@media print`
+            kurallarına (bkz. GlobalStyles.jsx) hiç erişemezdi. Bileşenin
+            kendisi durum/context taşımaz (yalnızca statik <style>), bu
+            yüzden burada AYRICA monte etmek güvenli/yan etkisiz. */}
+        <GlobalStyles />
         <SharedTemplateView idOrSlug={sharedTemplateId} auth={auth} onOpenAuth={openAuth} onLimitReached={requirePaywall} onDone={handleSharedTemplateDone} />
         {authModalNode}
         {paywallModalNode}
@@ -416,7 +433,9 @@ export default function App() {
             sırasıyla, kendisi de sticky top-0 z-30: art arda gelen sticky
             elemanlar tarayıcıda üst üste istiflenir, Header'ın piksel
             yüksekliğini bilmeye gerek kalmaz (bkz. GuestBanner.jsx yorumu). */}
-        {auth.isAnonymous && <GuestBanner onUpgrade={openAuth} onExitGuest={auth.signOut} />}
+        {/* onExitGuest ARTIK auth.signOut'u DOĞRUDAN çağırmıyor — GuestExitModal
+            uyarısı olmadan sert çıkış yapıyordu (bkz. requestSignOut). */}
+        {auth.isAnonymous && <GuestBanner onUpgrade={openAuth} onExitGuest={requestSignOut} />}
 
         <Header
           modeAccent={mode.accent}
@@ -611,6 +630,24 @@ export default function App() {
         onCancel={() => setLogoutConfirmOpen(false)}
       />
 
+      <GuestExitModal
+        open={guestExitOpen}
+        onCancel={() => setGuestExitOpen(false)}
+        onCreateAccount={() => {
+          setGuestExitOpen(false);
+          requireAuth();
+        }}
+        onConfirmExit={() => {
+          setGuestExitOpen(false);
+          // auth.signOut() — AYNI sert çıkış (bkz. yukarıdaki ConfirmModal
+          // yorumu): tam sayfa yenilemesi, misafirin anonim satırı zaten
+          // supabase.auth.signOut() ile oturumdan düşer (veri silinmesi
+          // GERÇEKTE bu adımda değil, RLS'in artık erişilemez auth.uid()'ye
+          // bağlı kalan eski satırları asla geri getirmemesiyle olur).
+          auth.signOut();
+        }}
+      />
+
       <DeletePlanModal
         open={deleteOpen}
         plans={ps.savedPlans}
@@ -729,7 +766,7 @@ export default function App() {
           kopyalanan planı doğrudan usePlanStudio.openSavedPlan ile açar. */}
       {communityOpen && (
         <Suspense fallback={<OverlayFallback z={100} />}>
-          <CommunityHub open={communityOpen} user={auth.user} onClose={() => setCommunityOpen(false)} onPlanCloned={ps.openSavedPlan} onLimitReached={requirePaywall} />
+          <CommunityHub open={communityOpen} user={auth.user} onClose={() => setCommunityOpen(false)} onPlanCloned={ps.openSavedPlan} onLimitReached={requirePaywall} onOpenAuth={openAuth} />
         </Suspense>
       )}
 

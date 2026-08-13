@@ -1219,3 +1219,27 @@ drop trigger if exists plans_enforce_free_limit on public.plans;
 create trigger plans_enforce_free_limit
   before insert on public.plans
   for each row execute function public.enforce_free_plan_limit();
+
+-- =====================================================================
+-- 21) Misafir (anonim) oturumlar Nexus kullanıcı adı ALAMAZ — bkz.
+--     full_sync_migration.sql §20'deki AYNI bölümün BİREBİR kopyası
+--     (dosya başı notu orada).
+-- =====================================================================
+create or replace function public.enforce_no_anonymous_community_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
+    raise exception 'GUEST_CANNOT_CREATE_PROFILE' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists community_profiles_block_anonymous on public.community_profiles;
+create trigger community_profiles_block_anonymous
+  before insert on public.community_profiles
+  for each row execute function public.enforce_no_anonymous_community_profile();
