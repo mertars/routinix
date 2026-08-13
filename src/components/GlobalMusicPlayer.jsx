@@ -111,6 +111,42 @@ export default function GlobalMusicPlayer() {
   );
 }
 
+// Hesap Bağlama satırı — 4 durum: bağlı değil (idle/error) → "Hesabını
+// Bağla" butonu; bağlanıyor → yükleniyor rozeti; bağlı (ready) → kullanıcı
+// adı + "Bağlantıyı Kes". Bağlanınca MusicContext.jsx zaten
+// fetchUserPlaylists ile "Kütüphanem" grubunu playlist seçiciye otomatik
+// ekliyor (bkz. yukarıdaki optgroup) — burası yalnızca OAuth tetikleyicisi.
+function SpotifyAccountRow({ m }) {
+  if (m.spotifyAuthStatus === "ready" && m.spotifyProfile) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-xl px-2.5 py-2 bg-white/[0.04] border border-white/10">
+        <span className="flex items-center gap-1.5 min-w-0 text-[11.5px] font-semibold text-white/75">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: SPOTIFY_TINT }} />
+          <span className="truncate">Bağlı: {m.spotifyProfile.displayName}</span>
+        </span>
+        <button onClick={m.disconnectSpotify} className="shrink-0 text-[11px] font-semibold text-white/40 hover:text-white/70 transition-colors">
+          Bağlantıyı Kes
+        </button>
+      </div>
+    );
+  }
+
+  const connecting = m.spotifyAuthStatus === "connecting";
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        onClick={m.connectSpotify}
+        disabled={connecting}
+        className="w-full rounded-xl px-3 py-2 text-[12px] font-bold transition-colors disabled:opacity-60"
+        style={{ background: `${SPOTIFY_TINT}22`, border: `1px solid ${SPOTIFY_TINT}55`, color: SPOTIFY_TINT }}
+      >
+        {connecting ? "Bağlanıyor..." : "🔗 Spotify Hesabını Bağla"}
+      </button>
+      {m.spotifyAuthError && <p className="text-[11px] text-rose-400">{m.spotifyAuthError}</p>}
+    </div>
+  );
+}
+
 function SpotifyControls() {
   const m = useMusic();
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -133,13 +169,15 @@ function SpotifyControls() {
   };
 
   return (
-    // Hesap bağlama (OAuth "Spotify Hesabını Bağla") satırı BİLEREK KALDIRILDI:
-    // bu, harici bir Spotify yönlendirmesiydi ve butona basar basmaz doğrudan
-    // oynatıcının açılması gereken bir akışta gereksiz bir ara adımdı. Çalma
-    // (aşağıdaki embed) zaten hesap bağlamadan da çalışıyor — connectSpotify/
-    // spotifyProfile context'te (MusicContext.jsx) DOKUNULMADAN duruyor,
-    // yalnızca bu panelin UI'ından çıkarıldı.
+    // Hesap bağlama satırı GERİ GETİRİLDİ — kullanıcı bildirimi: buton
+    // yokken KENDİ çalma listelerine ("Kütüphanem", bkz. spotifyUserPlaylists)
+    // hiçbir şekilde erişilemiyordu, yalnızca 4 hazır liste + elle link
+    // yapıştırma kalıyordu. connectSpotify/spotifyProfile zaten
+    // MusicContext.jsx'te HİÇ dokunulmadan duruyordu — burada yalnızca
+    // UI'a yeniden bağlanıyor.
     <div className="shrink-0 flex flex-col gap-2 mb-3">
+      <SpotifyAccountRow m={m} />
+
       <div className="flex items-center gap-1.5">
         <select
           value={isKnownPlaylist ? m.spotifyPlaylistId : "custom"}
