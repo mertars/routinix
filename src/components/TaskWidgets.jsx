@@ -255,8 +255,34 @@ function TimerWidget({ value, onUpdate }) {
   useEffect(() => {
     if (!running) return;
     startRef.current = Date.now() - displaySec * 1000;
-    const id = setInterval(() => setDisplaySec((Date.now() - startRef.current) / 1000), 250);
-    return () => clearInterval(id);
+    // ISINMA/PİL OPTİMİZASYONU: sekme arka plandayken 250ms'lik (saniyede 4
+    // kez) bu interval'i DURDURUR — startRef Date.now() bazlı olduğundan
+    // geri dönüşte TEK bir recompute gerçek geçen süreyi anında yakalar,
+    // görünmeyen bir sekmede saniyede 4 gereksiz re-render önlenmiş olur
+    // (bkz. PomodoroStudio.jsx CountdownDisplay'deki AYNI desen).
+    const recompute = () => setDisplaySec((Date.now() - startRef.current) / 1000);
+    let id = null;
+    const start = () => {
+      if (id) return;
+      id = setInterval(recompute, 250);
+    };
+    const stop = () => {
+      if (id) {
+        clearInterval(id);
+        id = null;
+      }
+    };
+    const onVisibilityChange = () => {
+      recompute();
+      if (document.hidden) stop();
+      else start();
+    };
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running]);
 

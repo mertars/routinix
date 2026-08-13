@@ -50,7 +50,10 @@ export default function GlobalMusicPlayer() {
       {/* Dış kutu — dönen conic-gradient ışıklı kenarlık. İç kutu (p-[2px]
           boşluk BIRAKARAK) üstüne oturuyor, geriye yalnızca 2px'lik dönen
           bir "ışık halkası" görünür kalıyor. */}
-      <div className="relative w-full rounded-[30px] p-[2px] overflow-hidden md:h-full" style={{ boxShadow: `0 24px 70px -20px ${tint}55` }}>
+      <div
+        className="relative w-full rounded-[30px] p-[2px] overflow-hidden md:h-full"
+        style={{ boxShadow: `0 24px 70px -20px ${tint}55`, transform: "translateZ(0)" }}
+      >
         <div
           className={`absolute ${m.panelOpen ? "motion-safe:animate-[spin_4s_linear_infinite]" : ""}`}
           style={{

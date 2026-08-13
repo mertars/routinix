@@ -102,6 +102,23 @@ export default function useAuth() {
   // olarak bunun sayesinde sıfır ek kod ile sağlanır.
   const upgradeAnonymousAccount = (email, password) => supabase.auth.updateUser({ email, password });
 
+  // E-posta OTP doğrulama — AuthModal.jsx'in kayıt/hesap-yükseltme
+  // sonrası zorunlu adımı (bkz. o dosyanın dosya başı yorumu). AYNI API,
+  // `type`e göre iki farklı akışı kapsar:
+  //   "signup": signUp()'tan sonra — doğru kod girilince Supabase GERÇEK
+  //             bir oturum döner (kullanıcı artık giriş yapmış olur).
+  //   "email_change": upgradeAnonymousAccount()'tan sonra — anonim oturumun
+  //             KENDİSİ zaten girişli, kod yalnızca yeni e-postayı onaylar.
+  // ÖN KOŞUL (bu dosyada AÇILAMAZ): Supabase Dashboard → Authentication →
+  // Email Templates → "Confirm signup"/"Change Email Address" şablonlarında
+  // e-posta gövdesine {{ .Token }} (6 haneli kod) eklenmiş olmalı — aksi
+  // halde kullanıcıya kod DEĞİL, yalnızca bir onay linki gider ve bu ekran
+  // hiçbir zaman doğrulanabilir bir kod alamaz.
+  const verifySignupOtp = (email, token, type = "signup") => supabase.auth.verifyOtp({ email, token, type });
+
+  // Kod ulaşmadı/süresi doldu — AYNI type ile yeniden gönderir.
+  const resendSignupOtp = (email, type = "signup") => supabase.auth.resend({ type, email });
+
   const isAnonymous = session?.user?.is_anonymous === true;
 
   // Google OAuth ile giriş — Supabase, kullanıcıyı Google onay ekranına
@@ -137,5 +154,7 @@ export default function useAuth() {
     signInWithGoogle,
     signInAnonymously,
     upgradeAnonymousAccount,
+    verifySignupOtp,
+    resendSignupOtp,
   };
 }

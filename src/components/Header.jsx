@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Timer, BarChart3, Users2, Menu, X, Play, Pause, Maximize2, LogOut } from "lucide-react";
+import { Timer, BarChart3, Users2, Menu, X, Play, Pause, Maximize2, LogOut, Download } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useMusic } from "../context/MusicContext";
 import { FEATURE_FLAGS } from "../constants";
@@ -172,6 +172,8 @@ function Header({
   onPomodoroClick,
   onAuthClick,
   onSignOut,
+  canInstall,
+  onInstallClick,
   onLogoClick,
   menuOpen,
   onMenuToggle,
@@ -296,6 +298,23 @@ function Header({
 
             <MiniMusicWidget />
           </div>
+
+          {canInstall && (
+            // Sadece mobil üst barda (masaüstünde tarayıcının kendi adres
+            // çubuğu/menü install ikonu zaten var) — Çıkış Yap/Giriş Yap
+            // butonunun SOLUNA, `beforeinstallprompt` event'i GERÇEKTEN
+            // ateşlenmişse (bkz. useInstallPrompt) görünür; zaten yüklü
+            // veya tarayıcı desteklemiyorsa hiç render edilmez.
+            <button
+              onClick={onInstallClick}
+              aria-label="Uygulamayı Ekrana Ekle"
+              title="Tek tıkla mobil uygulama gibi kullanın"
+              className="flex sm:hidden items-center justify-center w-9 h-9 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-default)" }}
+            >
+              <Download className="w-4 h-4" strokeWidth={2.25} />
+            </button>
+          )}
 
           {user ? (
             // Mobilde İKON-ONLY (bildirilen hata: "kaybolan Çıkış Yap butonu"

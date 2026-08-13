@@ -48,7 +48,20 @@ const TaskRow = memo(function TaskRow({ task, active, onSelectTask, onToggle, on
   return (
     <div
       className="flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
-      style={active ? { background: `color-mix(in srgb, ${BRAND} 12%, transparent)` } : undefined}
+      // ISINMA/HAFİF SANALLAŞTIRMA: bu liste TÜM planların TÜM görevlerini
+      // aynı anda basar (bkz. dosya başı groups/filteredTasks) — çok sayıda
+      // planı olan bir kullanıcıda yüzlerce satır DOM'a aynı anda binebilir.
+      // `content-visibility:auto` React'in DIŞINDA, tarayıcının KENDİ
+      // native primitifi: ekran dışındaki satırların layout/paint/render
+      // maliyetini atlar (react-window gibi bir kütüphane KURMADAN aynı
+      // etkiyi verir), görünüme girince otomatik/şeffaf biçimde geri gelir.
+      // `containIntrinsicSize` atlanan satırlar için yaklaşık yükseklik
+      // verir — o satırlar ölçülmeden scrollbar/scroll konumu ZIPLAMAZ.
+      style={{
+        contentVisibility: "auto",
+        containIntrinsicSize: "0 40px",
+        ...(active ? { background: `color-mix(in srgb, ${BRAND} 12%, transparent)` } : null),
+      }}
     >
       <button
         onClick={() => onToggle(task.id, !task.is_completed)}

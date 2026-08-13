@@ -284,6 +284,13 @@ const CountdownDisplay = memo(function CountdownDisplay({ mode, workMin, breakMi
     if (targetEndRef.current == null) {
       targetEndRef.current = Date.now() + secondsLeft * 1000;
     }
+    // ISINMA/PİL OPTİMİZASYONU: sekme arka plandayken (document.hidden)
+    // bu interval'i TAMAMEN DURDURUR — Date.now() tabanlı hedef bitiş
+    // zamanı (targetEndRef) sayesinde bu, sayacın DOĞRULUĞUNU hiç etkilemez
+    // (yukarıdaki dosya başı notu): sekme tekrar görünür olunca `recompute`
+    // aradaki GERÇEK süreyi tek seferde yakalar, sonra interval yeniden
+    // başlar. Kullanıcı zaten göremeyeceği bir DOM güncellemesini/re-render'ı
+    // dakikalarca sürebilen bir arka plan penceresinde önlemiş oluyoruz.
     let intervalId = null;
     const recompute = () => {
       // `targetEndRef` null'a düştüyse bu tick zaten tamamlanmayı tetikledi
@@ -293,17 +300,33 @@ const CountdownDisplay = memo(function CountdownDisplay({ mode, workMin, breakMi
       const remaining = Math.max(0, Math.ceil((targetEndRef.current - Date.now()) / 1000));
       setSecondsLeft(remaining);
       if (remaining <= 0) {
-        if (intervalId) clearInterval(intervalId);
+        stopTicking();
         targetEndRef.current = null;
         onModeComplete();
       }
     };
+    const stopTicking = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+    const startTicking = () => {
+      if (intervalId) return;
+      intervalId = setInterval(recompute, 1000);
+    };
+    const onVisibilityChange = () => {
+      recompute(); // görünür/gizli her geçişte anında doğru değeri yansıt
+      if (document.hidden) stopTicking();
+      else startTicking();
+    };
+
     recompute(); // sekmeye/panele geri dönüşte bir sonraki tick'i beklemeden anında doğru değeri göster
-    intervalId = setInterval(recompute, 1000);
-    document.addEventListener("visibilitychange", recompute);
+    if (!document.hidden) startTicking();
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
-      clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", recompute);
+      stopTicking();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       targetEndRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

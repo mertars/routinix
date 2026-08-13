@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { STAGE_INTRO, STAGE_WIZARD, STAGE_LOADING, STAGE_ERROR, STAGE_PLAN, ONBOARDING_STORAGE_KEY } from "./constants";
 import usePlanStudio from "./usePlanStudio";
 import useAuth from "./useAuth";
+import useInstallPrompt from "./hooks/useInstallPrompt";
 import { tapFeedback } from "./lib/haptics";
 import logger, { setLogUser } from "./utils/logger";
 import Header from "./components/Header";
@@ -64,6 +65,7 @@ const SpotlightMenu = lazy(() => import("./components/onboarding/SpotlightMenu")
 
 export default function App() {
   const auth = useAuth();
+  const { canInstall, promptInstall } = useInstallPrompt();
   // Nexus link paylaşımı ("/t/:templateId") — mount anında TEK SEFERLİK
   // okunur (sonraki navigasyonlar zaten `handleSharedTemplateDone` ile
   // `window.history.replaceState` üzerinden "/"e döner, bu state'i tekrar
@@ -354,6 +356,8 @@ export default function App() {
         }}
         onSignIn={auth.signIn}
         onSignUp={auth.isAnonymous ? auth.upgradeAnonymousAccount : auth.signUp}
+        onVerifyOtp={auth.verifySignupOtp}
+        onResendOtp={auth.resendSignupOtp}
         onGoogle={auth.signInWithGoogle}
         onSuccess={() => {
           setAuthOpen(false);
@@ -457,6 +461,8 @@ export default function App() {
           onPomodoroClick={togglePomodoro}
           onAuthClick={openAuth}
           onSignOut={requestSignOut}
+          canInstall={canInstall}
+          onInstallClick={promptInstall}
           onLogoClick={onLogoClick}
           menuOpen={ps.menuOpen}
           onMenuToggle={toggleHamburger}

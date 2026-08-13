@@ -1,9 +1,29 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 // Email + şifre ile giriş/kayıt modalı. signIn/signUp fonksiyonları prop olarak
 // gelir (useAuth'tan); modal sadece formu ve durumu (mod, hata, yükleniyor)
 // yönetir. Başarılı girişte onSuccess çağrılır (üst katman modalı kapatır).
-export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, onGoogle, onSuccess, isAnonymousUpgrade = false, contextMessage = null }) {
+//
+// OTP ZORUNLU DOĞRULAMA: kayıt (ya da misafir hesabı yükseltme) formu
+// gönderilince ARTIK doğrudan ana ekrana geçilmiyor — data.session hemen
+// dönse BİLE (Supabase projesinde "Confirm email" kapalıysa bu olurdu)
+// önce e-postaya gönderilen 6 haneli kodun girildiği bir adım araya girer
+// (bkz. handleVerifyOtp). Bunun GERÇEKTEN bir kod göndermesi için Supabase
+// Dashboard → Authentication → Email Templates'te {{ .Token }} kullanılıyor
+// olması GEREKİR (dosya başı notu useAuth.js'te de tekrarlanır).
+export default function AuthModal({
+  open,
+  accent,
+  onClose,
+  onSignIn,
+  onSignUp,
+  onGoogle,
+  onVerifyOtp,
+  onResendOtp,
+  onSuccess,
+  isAnonymousUpgrade = false,
+  contextMessage = null,
+}) {
   // KRİTİK DÜZELTME (canlıda bildirilen kilitlenme): "Giriş Yap" sekmesi
   // eskiden isAnonymousUpgrade=true iken TAMAMEN GİZLİYDİ — varsayım
   // "anonim bir kullanıcı zaten bu oturumu yükseltmek ister" idi, ama
@@ -22,7 +42,62 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  // OTP adımı — signup formu başarıyla gönderilince devreye girer.
+  // pendingEmail: OTP formu kendi email input'unu TAŞIMAZ, doğrulama hep
+  // kullanıcının AZ ÖNCE girdiği adrese karşı yapılır. otpType: "signup"
+  // (yeni kayıt) ya da "email_change" (misafir hesabı yükseltme) — bkz.
+  // useAuth.js verifySignupOtp.
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpType, setOtpType] = useState("signup");
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpResending, setOtpResending] = useState(false);
+  const otpInputRef = useRef(null);
+
   if (!open) return null;
+
+  const resetToForm = () => {
+    setOtpStep(false);
+    setOtpCode("");
+    setError("");
+    setInfo("");
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (otpVerifying || otpCode.trim().length !== 6) return;
+    setError("");
+    setOtpVerifying(true);
+    try {
+      const { error: err } = await onVerifyOtp(pendingEmail, otpCode.trim(), otpType);
+      if (err) {
+        setError(err.message || "Kod doğrulanamadı — kodu kontrol edip tekrar dener misin?");
+        return;
+      }
+      onSuccess?.();
+    } catch (err) {
+      setError(err?.message || "Beklenmedik bir hata oluştu.");
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (otpResending) return;
+    setError("");
+    setInfo("");
+    setOtpResending(true);
+    try {
+      const { error: err } = await onResendOtp(pendingEmail, otpType);
+      if (err) setError(err.message || "Kod tekrar gönderilemedi, biraz sonra tekrar dener misin?");
+      else setInfo("Yeni kod gönderildi — gelen kutunu (ve spam klasörünü) kontrol et.");
+    } catch (err) {
+      setError(err?.message || "Kod tekrar gönderilemedi.");
+    } finally {
+      setOtpResending(false);
+    }
+  };
 
   const accentColor = accent || "#6E7BFF";
 
@@ -51,24 +126,20 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
         }
         onSuccess?.();
       } else {
-        const { data, error: err } = await onSignUp(email.trim(), password);
+        const { error: err } = await onSignUp(email.trim(), password);
         if (err) {
           setError(err.message || "Kayıt başarısız. Lütfen tekrar dene.");
           return;
         }
-        // Anonim hesap yükseltme (bkz. useAuth.upgradeAnonymousAccount): bu
-        // `supabase.auth.updateUser(...)` çağırır, YENİ bir oturum DÖNMEZ
-        // (zaten anonim oturum olarak GİRİŞLİYDİ) — `data.session` kontrolü
-        // burada anlamsız, başarılı dönüş = anında tamamlanmış demektir.
-        if (isAnonymousUpgrade) {
-          onSuccess?.();
-        } else if (data?.session) {
-          // E-posta onayı açıksa session hemen gelmez; kullanıcıyı bilgilendir.
-          onSuccess?.();
-        } else {
-          setInfo("Kayıt oluşturuldu! E-posta adresine gönderilen onay bağlantısına tıkladıktan sonra giriş yapabilirsin.");
-          setTab("signin");
-        }
+        // DİREKT ANA EKRANA YÖNLENDİRME İPTAL — data.session hemen dönse
+        // BİLE (Supabase'de "Confirm email" kapalıysa bu olurdu) kullanıcı
+        // önce e-postasına gönderilen 6 haneli kodu girmeli. Anonim hesap
+        // yükseltme (isAnonymousUpgrade) İLE yeni kayıt AYNI OTP adımından
+        // geçer — yalnızca `type` farklı (bkz. useAuth.js verifySignupOtp).
+        setPendingEmail(email.trim());
+        setOtpType(isAnonymousUpgrade ? "email_change" : "signup");
+        setOtpCode("");
+        setOtpStep(true);
       }
     } catch (err) {
       setError(err?.message || "Beklenmedik bir hata oluştu.");
@@ -113,15 +184,22 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
         <div className="flex items-start justify-between mb-5">
           <div>
             <h2 className="text-[18px] font-bold text-[var(--text-primary)]">
-              {isAnonymousUpgrade && tab === "signup" ? "Hesabını Kaydet" : tab === "signin" ? "Giriş Yap" : "Kayıt Ol"}
+              {otpStep ? "E-postanı Doğrula" : isAnonymousUpgrade && tab === "signup" ? "Hesabını Kaydet" : tab === "signin" ? "Giriş Yap" : "Kayıt Ol"}
             </h2>
             <p className="text-[12px] text-[var(--text-muted)] mt-1">
-              {contextMessage ||
+              {otpStep ? (
+                <>
+                  <strong className="text-[var(--text-secondary)]">{pendingEmail}</strong> adresine gönderilen 6 haneli doğrulama
+                  kodunu gir.
+                </>
+              ) : (
+                contextMessage ||
                 (isAnonymousUpgrade && tab === "signup"
                   ? "Şu ana kadar oluşturduğun her şey kalır — sadece bir email/şifre ekle."
                   : isAnonymousUpgrade && tab === "signin"
                     ? "Zaten bir hesabın mı var? Giriş yap — bu misafir oturumundaki içerikler bu hesaba TAŞINMAZ, ayrı kalır."
-                    : "Planlarını kaydetmek için hesabına bağlan.")}
+                    : "Planlarını kaydetmek için hesabına bağlan.")
+              )}
             </p>
           </div>
           <button
@@ -134,6 +212,59 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
           </button>
         </div>
 
+        {otpStep ? (
+          <form onSubmit={handleVerifyOtp} className="flex flex-col gap-3">
+            <input
+              ref={otpInputRef}
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+              autoFocus
+              className="w-full rounded-xl border px-4 py-3 bg-transparent outline-none text-[22px] font-bold tracking-[0.5em] text-center text-[var(--text-primary)] placeholder:text-[var(--placeholder)]"
+              style={{ borderColor: "var(--border-default)", background: "var(--bg-card)" }}
+            />
+
+            {error && (
+              <p className="text-[12px] font-medium leading-relaxed" style={{ color: "#F0827A" }}>
+                {error}
+              </p>
+            )}
+            {info && (
+              <p className="text-[12px] font-medium leading-relaxed" style={{ color: "#6FCF97" }}>
+                {info}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={otpVerifying || otpCode.length !== 6}
+              className="w-full rounded-xl py-3 text-[14px] font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+              style={{ background: accentColor, color: "#0A0E13" }}
+            >
+              {otpVerifying ? "Doğrulanıyor..." : "Doğrula"}
+            </button>
+
+            <div className="flex items-center justify-between mt-1">
+              <button type="button" onClick={resetToForm} className="text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                ← Geri
+              </button>
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={otpResending}
+                className="text-[12px] font-semibold transition-colors disabled:opacity-50"
+                style={{ color: accentColor }}
+              >
+                {otpResending ? "Gönderiliyor..." : "Kodu Tekrar Gönder"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
         {/* Sekme kontrolü — ARTIK HER ZAMAN görünür (bkz. yukarıdaki kritik
             düzeltme notu): misafir modundaki bir kullanıcının da mevcut
             hesabına giriş yapabilmesi için kaçış yolu şart. */}
@@ -242,6 +373,8 @@ export default function AuthModal({ open, accent, onClose, onSignIn, onSignUp, o
             {loading ? "Lütfen bekle..." : tab === "signin" ? "Giriş Yap" : isAnonymousUpgrade ? "Hesabını Kaydet" : "Kayıt Ol"}
           </button>
         </form>
+          </>
+        )}
       </div>
     </div>
   );
