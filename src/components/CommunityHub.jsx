@@ -243,6 +243,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned, onLimi
 
         {user && (
           <button
+            data-tour-id="tour-nexus-wrapped"
             onClick={() => setWeeklyFlowOpen(true)}
             className="shrink-0 mx-4 sm:mx-6 lg:mx-8 mt-3 flex items-center justify-between gap-3 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-violet-500/10 px-4 py-2.5 text-left transition-colors hover:border-cyan-500/50"
           >
@@ -294,6 +295,7 @@ export default function CommunityHub({ open, user, onClose, onPlanCloned, onLimi
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
                 <input
+                  data-tour-id="tour-nexus-search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Şablon ara..."

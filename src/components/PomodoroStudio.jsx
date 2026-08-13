@@ -102,6 +102,7 @@ const ControlButtons = memo(function ControlButtons({ running, toggleRunning, re
       {/* Neon yeşil Spotify tetikleyici — global GlobalMusicPlayer.jsx
           panelini açar/odaklar (bkz. PomodoroStudio'daki onOpenSpotify). */}
       <button
+        data-tour-id="tour-pomodoro-music"
         onClick={onOpenSpotify}
         aria-label="Spotify'ı Aç"
         title="Spotify'ı Aç"
@@ -159,7 +160,7 @@ const MiniPlayerModal = memo(function MiniPlayerModal({ open, onClose, onStartRe
 // için gereksiz yeniden çizimi önler.
 const ModeTabs = memo(function ModeTabs({ mode, switchMode, running }) {
   return (
-    <div className="flex gap-1.5 p-1 rounded-full bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
+    <div data-tour-id="tour-pomodoro-timer" className="flex gap-1.5 p-1 rounded-full bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
       {[
         { key: "work", label: "Odaklanma" },
         { key: "break", label: "Mola" },
@@ -609,6 +610,7 @@ export default function PomodoroStudio({ open, userId, initialTask, onClose }) {
           </button>
 
           <button
+            data-tour-id="tour-pomodoro-focus"
             onClick={() => setIsFocusMode((v) => !v)}
             aria-label="Odak Modu / Işıkları Söndür"
             className={`flex items-center gap-1.5 rounded-full px-4 h-9 text-[12px] font-bold whitespace-nowrap transition-all ${

@@ -9,10 +9,3 @@
 export function buildTemplateShareUrl(template) {
   return `${window.location.origin}/t/${template.slug || template.id}`;
 }
-
-// Panoya yalın bir URL yerine, arkadaşa doğrudan yapıştırılabilecek hazır bir
-// mesaj kopyalar — "hesap açmadan incelenebilir" güven vurgusu dahil.
-export function buildTemplateShareMessage(template) {
-  const url = buildTemplateShareUrl(template);
-  return `Selam, Routinix üzerinde kurguladığım "${template.title}" şablonunu buradan hesap açmadan doğrudan inceleyebilirsin: ${url}`;
-}

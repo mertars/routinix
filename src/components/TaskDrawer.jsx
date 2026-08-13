@@ -193,6 +193,7 @@ export default function TaskDrawer({ open, userId, onClose, selectedTaskId, onSe
           anda açık olabildiği için TaskDrawer'ın her zaman en üstte kalması
           gerekir. */}
       <div
+        data-tour-id="tour-tasks-panel"
         className="task-sheet md:max-w-md w-full border-t md:border-t-0 md:border-r border-black/10 dark:border-white/10 shadow-2xl transform-gpu flex flex-col z-[99]"
         style={{ background: "var(--pomo-bg)" }}
       >

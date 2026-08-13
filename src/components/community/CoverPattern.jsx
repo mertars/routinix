@@ -1,24 +1,27 @@
 import { useState } from "react";
 import { coverById } from "../../data/presetCovers";
+import { stockCoverById, isStockCoverId } from "../../data/stockCovers";
 
-// Şablon kapak görseli — GERÇEK fotoğraf (Picsum Photos, `coverId`ye göre
-// DETERMİNİSTİK bir "seed" — aynı şablon HER ZAMAN aynı fotoğrafı gösterir,
-// sayfa yenilense de). Unsplash'ten elle bir foto ID'si seçmek yerine Picsum
-// kullanılır: Picsum'un seed-URL'leri TASARIM GEREĞİ asla 404 vermez (rastgele
-// seçilmiş bir foto ID'sinin GERÇEKTEN var olduğunu doğrulayamama sorunu
-// tamamen ortadan kalkar). Yine de ağ hatası/engelleme ihtimaline karşı
-// `onError` ile presetCovers.js'teki SAF CSS mesh-gradient'e güvenle düşülür
-// — kırık görsel ikonu kullanıcıya ASLA görünmez. Yüklenene kadar hafif bir
-// iskelet (`animate-pulse`, GPU'ya tek bir opacity animasyonundan fazlasına
-// mal olmaz) gösterilir.
+// Şablon kapak görseli — GERÇEK fotoğraf. İki kaynak yan yana yaşar:
+//   - "stock-*" id'ler → temalı LoremFlickr fotoğrafı (bkz. data/stockCovers.js
+//     — Fitness/Beslenme/Minimalist/Aesthetic/Çalışma&Disiplin galerisi).
+//   - "mono-*" id'ler (GERİYE DÖNÜK UYUMLULUK — halihazırda veritabanında
+//     seed edilmiş eski şablonlar) → eski Picsum-seed fotoğrafı.
+// Hangisi olursa olsun, ağ hatası/engelleme ihtimaline karşı `onError` ile
+// SAF CSS bir zemine (stok kapağın kendi tema rengi ya da presetCovers.js'in
+// mesh-gradient'i) güvenle düşülür — kırık görsel ikonu kullanıcıya ASLA
+// görünmez. Yüklenene kadar hafif bir iskelet (`animate-pulse`, GPU'ya tek
+// bir opacity animasyonundan fazlasına mal olmaz) gösterilir.
 export default function CoverPattern({ coverId, className = "", style, children }) {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
-  const photoUrl = `https://picsum.photos/seed/${encodeURIComponent(coverId || "nexus")}/640/360`;
-  const fallback = coverById(coverId);
+
+  const stock = isStockCoverId(coverId) ? stockCoverById(coverId) : null;
+  const photoUrl = stock ? stock.url : `https://picsum.photos/seed/${encodeURIComponent(coverId || "nexus")}/640/360`;
+  const fallbackBg = stock ? stock.fallbackBg : coverById(coverId).style;
 
   return (
-    <div className={`relative overflow-hidden ${className}`} style={{ background: errored ? fallback.style : "var(--bg-card)", ...style }}>
+    <div className={`relative overflow-hidden ${className}`} style={{ background: errored ? fallbackBg : "var(--bg-card)", ...style }}>
       {!errored && (
         <img
           src={photoUrl}

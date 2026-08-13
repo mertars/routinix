@@ -74,14 +74,11 @@ export const STAGE_PLAN = "plan";
 
 export const MIN_GOAL_LENGTH = 5;
 
-// OnboardingTour.jsx — localStorage anahtarı BURADA (yalın, lazy-load
-// GEREKTİRMEYEN bir dosyada) yaşar çünkü app.jsx "ilk ziyaret mi?"
-// kontrolünü mount ANINDA, OnboardingTour'un kendisi (lazy chunk) henüz
-// hiç yüklenmemişken yapması gerekiyor — component'i lazy import edip
-// yalnızca bir string sabiti için tetiklemek istemedik.
-// "_v2": 10 adımlı interaktif mikro-UI vitrinine geçişte BİLEREK yeni bir
-// anahtar — eski 4 adımlı turu daha önce görüp kapatmış kullanıcılar da
-// yeni, çok daha kapsamlı turu BİR KEZ görsün diye.
+// İlk ziyarette Hızlı Öğretici'yi (bkz. onboarding/SpotlightMenu.jsx)
+// otomatik açıp bir daha açmamak için — localStorage anahtarı BURADA
+// (yalın, lazy-load GEREKTİRMEYEN bir dosyada) yaşar çünkü app.jsx "ilk
+// ziyaret mi?" kontrolünü mount ANINDA yapması gerekiyor, SpotlightMenu
+// (lazy chunk) henüz hiç yüklenmemişken.
 export const ONBOARDING_STORAGE_KEY = "routinix_onboarding_v2";
 
 // "✨ Şablon Keşfet" (Template Hub) için görsel ağırlıklı, hazır rota kütüphanesi.

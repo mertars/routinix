@@ -5,7 +5,7 @@ import { parseStorySections } from "../../utils/formatTemplateStory";
 import { fetchComments, addComment, addReply } from "../../services/commentService";
 import { toggleLike, hasLikedTemplate, recordTemplateClone, cloneTemplateToMyPlans } from "../../services/communityService";
 import { isPlanLimitError } from "../../services/entitlementsService";
-import { buildTemplateShareMessage } from "../../utils/shareLink";
+import { buildTemplateShareUrl } from "../../utils/shareLink";
 import CoverPattern from "./CoverPattern";
 import Avatar from "./Avatar";
 import TemplateTaskEditor from "./TemplateTaskEditor";
@@ -256,7 +256,7 @@ export default function TemplateDetailModal({ template, myProfile, userId, authU
   // shareLink.js) — arkadaşa doğrudan yapıştırılabilir.
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(buildTemplateShareMessage(template));
+      await navigator.clipboard.writeText(buildTemplateShareUrl(template));
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     } catch {

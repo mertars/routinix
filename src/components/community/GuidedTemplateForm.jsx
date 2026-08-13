@@ -3,6 +3,7 @@ import { X, ChevronLeft, ChevronRight, Check, ClipboardList, Zap, Timer } from "
 import { categoryOf } from "../../constants";
 import { fetchUserPlans, fetchPlanDetail } from "../../services/planService";
 import { PRESET_COVERS, coverForCategory } from "../../data/presetCovers";
+import { STOCK_COVER_GROUPS, stockCoverById, isStockCoverId } from "../../data/stockCovers";
 import CoverPattern from "./CoverPattern";
 import { TAG_GROUPS, normalizeTag } from "../../data/communityTags";
 import { formatTemplateStory } from "../../utils/formatTemplateStory";
@@ -85,7 +86,14 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
 
   const category = selectedPlanDetail?.plan?.mode || "general";
   const totalDays = selectedPlanDetail?.plan?.total_days || myPlans.find((p) => p.id === selectedPlanId)?.total_days || 7;
-  const effectiveCover = coverId ? PRESET_COVERS.find((c) => c.id === coverId) : coverForCategory(category);
+  // coverId üç kaynaktan biri olabilir: yeni temalı stok fotoğraf
+  // ("stock-*"), eski mesh-gradient ("mono-*", geriye dönük uyumluluk) ya da
+  // hiçbiri seçilmediyse kategoriye göre otomatik mesh varsayılanı.
+  const effectiveCover = !coverId
+    ? coverForCategory(category)
+    : isStockCoverId(coverId)
+      ? stockCoverById(coverId) || coverForCategory(category)
+      : PRESET_COVERS.find((c) => c.id === coverId) || coverForCategory(category);
   const totalRoutines = selectedPlanDetail?.routines?.length || 0;
   const totalFocusMin = (selectedPlanDetail?.tasks || []).reduce((n, t) => n + (t.duration_min || 0), 0);
 
@@ -235,27 +243,40 @@ export default function GuidedTemplateForm({ open, authorProfileId, userId, onCl
 
           {step === 1 && (
             <StepShell title="Kapak & Etiketler">
-              <div className="grid grid-cols-5 gap-2">
-                {PRESET_COVERS.map((c) => {
-                  const active = effectiveCover.id === c.id;
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => setCoverId(c.id)}
-                      aria-label={c.label}
-                      className="aspect-square rounded-lg overflow-hidden"
-                      style={{ outline: active ? "2px solid #22D3EE" : "none", outlineOffset: 2 }}
-                    >
-                      {/* Aynı CoverPattern (gerçek fotoğraf + onError'da bu id'nin
-                          kendi mesh-gradient'ine düşüş) — kart/detay/önizlemede
-                          kullanılanla AYNI bileşen. Önceki sürüm burada doğrudan
-                          `c.style` (yalnızca CSS gradient) çiziyordu; bu yüzden
-                          seçici hâlâ eski "bulanık mor/yeşil kutular" görünümündeydi
-                          — fotoğraf sistemine hiç bağlanmamıştı. */}
-                      <CoverPattern coverId={c.id} className="w-full h-full" />
-                    </button>
-                  );
-                })}
+              {/* Temalı, yatay kaydırılabilir kapak galerisi — her tema
+                  (Fitness/Beslenme/Minimalist/Aesthetic/Çalışma & Disiplin)
+                  KENDİ satırında, `overflow-x-auto` ile sağa doğru kaydırılır
+                  (bkz. data/stockCovers.js). Eski `grid-cols-5` sabit ızgara
+                  BİLEREK kaldırıldı — 30 kapak tek ızgarada aşırı uzun bir
+                  sayfa kaydırmasına sebep oluyordu, artık her tema kendi
+                  kompakt şeridinde, dikeyde çok az yer kaplıyor. */}
+              <div className="flex flex-col gap-3">
+                {STOCK_COVER_GROUPS.map((group) => (
+                  <div key={group.key}>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[var(--text-faint)] mb-1.5">
+                      {group.emoji} {group.label}
+                    </p>
+                    <div className="edge-fade-x -mx-1 px-1 flex gap-2 overflow-x-auto no-scrollbar pb-0.5">
+                      {group.covers.map((c) => {
+                        const active = effectiveCover.id === c.id;
+                        return (
+                          <button
+                            key={c.id}
+                            onClick={() => setCoverId(c.id)}
+                            aria-label={c.label}
+                            className="shrink-0 w-20 h-20 rounded-lg overflow-hidden"
+                            style={{ outline: active ? "2px solid #22D3EE" : "none", outlineOffset: 2 }}
+                          >
+                            {/* CoverPattern: gerçek fotoğraf + onError'da bu
+                                temanın kendi düz renk zeminine düşüş (bkz. o
+                                dosya + data/stockCovers.js THEME_FALLBACK_BG). */}
+                            <CoverPattern coverId={c.id} className="w-full h-full" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="flex flex-col gap-2.5 mt-2">

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { X } from "lucide-react";
 import SpotlightOverlay from "./SpotlightOverlay";
 
 // Hızlı Öğretici / Feature Tour — DrawerMenu'deki (☰) "Hızlı Öğretici"
@@ -57,35 +58,60 @@ const FEATURES = [
   {
     key: "pomodoro",
     icon: "⏱️",
-    label: "Pomodoro",
+    label: "Pomodoro Öğreticisi",
     accent: "#FB7185",
-    steps: [{ targetId: "tour-header-pomodoro", title: "⏱️ Pomodoro & Derin Odak", description: "Süreni ayarla, müziğini bağla, Odak Modu'na geç." }],
+    // openKey: seçilince ÖNCE gerçek Pomodoro ekranı açılır (bkz. app.jsx
+    // screenOpeners), SONRA aşağıdaki adımlar o ekranın GERÇEK elemanları
+    // (fake demo/ekran görüntüsü DEĞİL) üzerinde sırayla gösterilir.
+    openKey: "pomodoro",
+    steps: [
+      { targetId: "tour-pomodoro-timer", title: "⏱️ Süre & Görev", description: "Odaklanma/Mola sürelerini buradan seçersin." },
+      { targetId: "tour-pomodoro-music", title: "🎵 Müzik", description: "Spotify çalma listeni buradan bağlayıp başlatırsın." },
+      { targetId: "tour-pomodoro-focus", title: "💡 Odak Modu", description: "Gereksiz kontroller kaybolsun, geriye yalnızca sayaç kalsın." },
+    ],
   },
   {
     key: "nexus",
     icon: "🌐",
     label: "Nexus Sosyal",
     accent: "#22D3EE",
-    steps: [{ targetId: "tour-header-nexus", title: "🌐 Nexus Sosyal", description: "Topluluğun paylaştığı planları keşfet, beğen, kendi planlarına ekle." }],
+    openKey: "nexus",
+    steps: [
+      { targetId: "tour-nexus-search", title: "🔍 Şablon Ara", description: "Topluluğun paylaştığı binlerce plandan aradığına anında ulaş." },
+      { targetId: "tour-nexus-wrapped", title: "✨ Haftalık Wrapped", description: "Bu haftaki verimlilik karneni Instagram Story formatında gör." },
+    ],
   },
   {
     key: "tasks",
     icon: "📋",
     label: "Görevler ve Planlar",
     accent: "#00C2D6",
-    steps: [{ targetId: "tour-header-tasks", title: "📋 Görevler ve Planlar", description: "Tüm planlarının ve görevlerinin tek, düzenli bir listesi." }],
+    openKey: "tasks",
+    steps: [{ targetId: "tour-tasks-panel", title: "📋 Görevler ve Planlar", description: "Tüm planlarının ve görevlerinin tek, düzenli bir listesi burada." }],
   },
 ];
 
-export default function SpotlightMenu({ open, onClose, onNavigateIntro, savedPlansCount = 0, onEnsurePlanOpen }) {
+export default function SpotlightMenu({ open, onClose, onNavigateIntro, savedPlansCount = 0, onEnsurePlanOpen, screenOpeners = {} }) {
   const [activeFeature, setActiveFeature] = useState(null);
   const [stepIndex, setStepIndex] = useState(0);
 
+  // DİKKAT: `onClose()` BURADA ÇAĞRILMAZ. app.jsx SpotlightMenu'yü
+  // `{spotlightOpen && <SpotlightMenu/>}` ile koşullu monte ediyor — pick()
+  // aynı anda hem onClose() (spotlightOpen'ı false yapar) hem de
+  // setActiveFeature(f) (yerel state) çağırırsa, React'in AYNI render
+  // turunda SpotlightMenu'yü TAMAMEN UNMOUNT etmesiyle activeFeature'a
+  // atanan değer hiç kullanılmadan kaybolur — spotlight ASLA görünmezdi
+  // (canlıda doğrulanan gerçek hata). Bunun yerine bileşen `open` DOĞRUYKEN
+  // monte kalır; küçük menü popover'ı yalnızca `activeFeature` set olunca
+  // KENDİ İÇİNDE gizlenir (bkz. aşağıdaki JSX `open && !activeFeature`).
   const pick = (f, disabled) => {
     if (disabled) return;
-    onClose();
     if (f.needsIntro) onNavigateIntro?.();
     if (f.requiresPlan) onEnsurePlanOpen?.();
+    // openKey: Pomodoro/Nexus/Görevler gibi kendi ekranı olan özellikler —
+    // spotlight'ın hedef alacağı gerçek elemanlar önce bu ekran AÇIK
+    // olmalı, aksi halde SpotlightOverlay "bulunamadı" düşer.
+    if (f.openKey) screenOpeners[f.openKey]?.();
     setStepIndex(0);
     setActiveFeature(f);
   };
@@ -94,7 +120,10 @@ export default function SpotlightMenu({ open, onClose, onNavigateIntro, savedPla
     if (activeFeature && stepIndex < activeFeature.steps.length - 1) {
       setStepIndex((i) => i + 1);
     } else {
+      // Son adım bitti — YALNIZCA burada gerçekten kapat (bileşeni unmount
+      // eder, bkz. yukarıdaki not).
       setActiveFeature(null);
+      onClose();
     }
   };
 
@@ -102,7 +131,7 @@ export default function SpotlightMenu({ open, onClose, onNavigateIntro, savedPla
 
   return (
     <>
-      {open && (
+      {open && !activeFeature && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center px-6" onClick={onClose}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div
@@ -116,7 +145,20 @@ export default function SpotlightMenu({ open, onClose, onNavigateIntro, savedPla
               boxShadow: "0 24px 60px -20px rgba(0,0,0,0.7)",
             }}
           >
-            <p className="px-3 pt-3 pb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-faint)" }}>
+            {/* Görünür Kapat (X) — ilk ziyarette OTOMATİK açılan bir menü
+                için "dışarı tıkla" tek başına yeterli bir ipucu DEĞİL (yeni
+                kullanıcı henüz hiçbir modal alışkanlığı edinmemiş olabilir);
+                diğer tüm modallardaki (PaywallModal/AuthModal) AYNI görünür
+                X deseni buraya da eklendi. */}
+            <button
+              onClick={onClose}
+              aria-label="Kapat"
+              className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
+              style={{ background: "rgba(var(--overlay-rgb),0.08)" }}
+            >
+              <X className="w-3.5 h-3.5" strokeWidth={2.25} />
+            </button>
+            <p className="px-3 pt-3 pb-2 pr-9 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-faint)" }}>
               🎯 Hızlı Öğretici
             </p>
             {FEATURES.map((f) => {

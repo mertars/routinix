@@ -8,7 +8,7 @@ import { parseStorySections } from "../utils/formatTemplateStory";
 import { fetchTemplateByIdOrSlug, incrementTemplateView, cloneTemplateToMyPlans, recordTemplateClone } from "../services/communityService";
 import { isPlanLimitError } from "../services/entitlementsService";
 import { fetchProfileByAuthUserId } from "../services/profileService";
-import { buildTemplateShareMessage } from "../utils/shareLink";
+import { buildTemplateShareUrl } from "../utils/shareLink";
 import logger from "../utils/logger";
 
 // Nexus Link Paylaşımı — `/t/:templateId` deep link'inin GERÇEK sayfası.
@@ -111,7 +111,7 @@ export default function SharedTemplateView({ idOrSlug, auth, onOpenAuth, onLimit
   const handleCopyLink = async () => {
     if (!template) return;
     try {
-      await navigator.clipboard.writeText(buildTemplateShareMessage(template));
+      await navigator.clipboard.writeText(buildTemplateShareUrl(template));
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     } catch {

@@ -59,7 +59,6 @@ const RhythmStudio = lazy(() => import("./components/RhythmStudio"));
 const NutritionArchitectStudio = lazy(() => import("./components/NutritionArchitectStudio"));
 const CommunityHub = lazy(() => import("./components/CommunityHub"));
 const NexusProfileOverlay = lazy(() => import("./components/community/NexusProfileOverlay"));
-const OnboardingTour = lazy(() => import("./components/OnboardingTour"));
 const SpotlightMenu = lazy(() => import("./components/onboarding/SpotlightMenu"));
 
 export default function App() {
@@ -96,7 +95,6 @@ export default function App() {
   const [nexusProfileOpen, setNexusProfileOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [printRange, setPrintRange] = useState(Infinity);
-  const [tourOpen, setTourOpen] = useState(false);
   const [spotlightOpen, setSpotlightOpen] = useState(false);
 
   // İlk ziyarette otomatik Onboarding Turu — SADECE giriş yapmamış/misafir
@@ -114,7 +112,15 @@ export default function App() {
     if (isAuthenticated) return;
     try {
       if (localStorage.getItem(ONBOARDING_STORAGE_KEY) !== "true") {
-        setTourOpen(true);
+        // Eski tek-akışlı 11 adımlı modal tur KALDIRILDI (bkz. silinen
+        // OnboardingTour.jsx) — yerine modüler Hızlı Öğretici (bkz.
+        // onboarding/SpotlightMenu.jsx) geçti: her özelliğin KENDİ gerçek
+        // ekranını açıp GERÇEK elemanları üzerinde anlatan bir menü. İlk
+        // ziyarette bu menü otomatik açılır, "görüldü" işareti hemen
+        // yazılır (SpotlightMenu'nün kendisi bir "bitir" akışı taşımaz,
+        // dilediği zaman tekrar açılabilecek kalıcı bir menüdür).
+        setSpotlightOpen(true);
+        localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
       }
     } catch (err) {
       logger.warn("ONBOARDING", "localStorage okunamadı, tur atlanıyor", { error: err?.message });
@@ -177,7 +183,7 @@ export default function App() {
     nutritionArchitectOpen ||
     communityOpen ||
     printOpen ||
-    tourOpen;
+    spotlightOpen;
 
   // Bugün / Rutinler / Şablon Keşfet / Planlarım / Pomodoro panellerinden aynı
   // anda yalnızca biri açık olur; tetiklendiklerinde hamburger menüsü de kapanır
@@ -252,13 +258,6 @@ export default function App() {
     ps.setMenuOpen(false);
     setNexusProfileOpen(true);
   }, [closeAllPanels, ps.setMenuOpen]);
-  // OnboardingTour — Header'daki ❓ ve DrawerMenu'deki "Nasıl Kullanılır?"
-  // AYNI stabil referansı paylaşır (memo'lu Header/DrawerMenu için gerekli,
-  // bkz. yukarıdaki AYNI ilke notu).
-  const openTour = useCallback(() => {
-    ps.setMenuOpen(false);
-    setTourOpen(true);
-  }, [ps.setMenuOpen]);
   // Spotlight Interactive Guide Engine (Hızlı Öğretici) — modalin kendisi
   // burada, DrawerMenu'nün "Hızlı Öğretici" satırıyla açılır (bkz.
   // onboarding/SpotlightMenu.jsx), burada yalnızca açık/kapalı durumu tutulur.
@@ -272,6 +271,18 @@ export default function App() {
       ps.openSavedPlan(ps.savedPlans[0].id);
     }
   }, [stage, ps.savedPlans, ps.openSavedPlan]);
+  // AYNI "zaten açıksa dokunma" ilkesi — Pomodoro/Nexus/Görevler ekranları
+  // KENDİ gerçek içindeki elemanları anlatabilmek için önce o ekran açık
+  // olmalı (bkz. onboarding/SpotlightMenu.jsx FEATURES[].openKey).
+  const ensurePomodoroOpenForSpotlight = useCallback(() => {
+    if (!pomodoroOpen) setPomodoroOpen(true);
+  }, [pomodoroOpen]);
+  const ensureCommunityOpenForSpotlight = useCallback(() => {
+    if (!communityOpen) setCommunityOpen(true);
+  }, [communityOpen]);
+  const ensureTaskDrawerOpenForSpotlight = useCallback(() => {
+    if (!taskDrawerOpen) setTaskDrawerOpen(true);
+  }, [taskDrawerOpen]);
   // Görev kartındaki "Başlat" — Pomodoro Studio'yu bu görev seçiliyken açar
   // (bkz. PomodoroStudio.jsx `initialTask` prop'u). Tam görev objesi TaskCard'dan
   // geldiği için PomodoroStudio kendi başına ayrı bir plan/görev fetch'i
@@ -450,7 +461,6 @@ export default function App() {
           onOpenPomodoro={togglePomodoro}
           onOpenNutritionArchitect={toggleNutritionArchitect}
           onOpenProfile={openNexusProfile}
-          onOpenTour={openTour}
           onOpenSpotlight={toggleSpotlight}
           onSignOut={requestSignOut}
         />
@@ -638,14 +648,6 @@ export default function App() {
           pencerede ayrı bir yükleniyor katmanı gösterilir. */}
       {ps.editLoading && <OverlayFallback z={110} />}
 
-      {/* İlk Ziyaret Turu — ilk açılışta otomatik, sonrasında yalnızca
-          Header/DrawerMenu'deki ❓ Rehber ile. Koşullu mount. */}
-      {tourOpen && (
-        <Suspense fallback={<OverlayFallback z={150} />}>
-          <OnboardingTour open={tourOpen} onClose={() => setTourOpen(false)} />
-        </Suspense>
-      )}
-
       {/* Hızlı Öğretici — eskiden Header'da (🎯), artık DrawerMenu'den açılan
           ORTALANMIŞ bir modal (bkz. SpotlightMenu.jsx dosya başı yorumu).
           Koşullu mount. */}
@@ -657,6 +659,11 @@ export default function App() {
             onNavigateIntro={ps.resetToIntro}
             savedPlansCount={ps.savedPlans.length}
             onEnsurePlanOpen={ensurePlanOpenForSpotlight}
+            screenOpeners={{
+              pomodoro: ensurePomodoroOpenForSpotlight,
+              nexus: ensureCommunityOpenForSpotlight,
+              tasks: ensureTaskDrawerOpenForSpotlight,
+            }}
           />
         </Suspense>
       )}
