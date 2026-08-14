@@ -413,7 +413,10 @@ export default function App() {
     // ZAMAN kaymaz; kaydırma yalnızca aşağıdaki `<main>`in KENDİ
     // `overflow-y-auto` alanında olur (bkz. main'in className'i). Masaüstü
     // (md:) davranışı BİREBİR korunuyor (normal akış, sayfa kendisi kayar).
-    <div className="fixed inset-0 w-full overflow-hidden md:relative md:inset-auto md:min-h-screen md:overflow-visible" style={{ background: "var(--bg-app)" }}>
+    <div
+      className="app-shell fixed inset-0 w-full overflow-hidden md:relative md:inset-auto md:min-h-screen md:overflow-visible"
+      style={{ background: "var(--bg-app)" }}
+    >
       {/* Atmosferik animasyonlu dağ/topoğrafya + neon şerit arka planı (içeriğin
           arkasında) — ambient glow rengi aktif kategoriye göre (intro'da seçili
           sekme, plan içindeyken planın kendi kategorisi) yumuşakça değişir. */}

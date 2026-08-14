@@ -523,6 +523,15 @@ export default function GlobalStyles() {
       .print-root { display: none; }
       @media print {
         #root { visibility: hidden; }
+        /* MOBİL PWA KABUK SABİTLEMESİ İLE ÇAKIŞMA (bkz. app.jsx ".app-shell"
+           yorumu): dar ekranlarda (<768px) kök kabuk position:fixed;
+           overflow:hidden — bu, .print-root'u visibility:visible yapsa
+           BİLE, üstündeki bu ata overflow:hidden ile onu KIRPIYORDU (bir
+           atanın overflow:hidden'ı, altındaki mutlak konumlu elemanın
+           görünürlüğünden BAĞIMSIZ olarak kutusunu kırpar) — sonuç: telefonda
+           "PDF İndir/Yazdır" ya boş/kırpılmış çıktı üretiyordu. Baskı anında
+           bu kabuğu normal akışa döndürüp kırpmayı tamamen kaldırıyoruz. */
+        .app-shell { position: static !important; overflow: visible !important; height: auto !important; inset: auto !important; }
         .print-root {
           display: block !important;
           visibility: visible;
