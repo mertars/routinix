@@ -3,6 +3,8 @@ import { generateOnboardingQuestions, createEnrichedPlan, fetchNextWeekTasks } f
 import { generateNutritionArchitecture } from "./_lib/nutritionPrompt.js";
 import { checkPlanRateLimit, logApiRequest } from "./_lib/planRateLimit.js";
 import { classifyGeminiError } from "./_lib/aiErrors.js";
+import { isAdminUser } from "./_lib/adminAccess.js";
+import { isPremiumUser } from "./_lib/entitlements.js";
 
 // Plan üretim pipeline'ının TEK sunucu tarafı giriş noktası. Eskiden client
 // (anon key) VITE_GEMINI_API_KEY ile Gemini'yi doğrudan çağırıyordu — anahtar
@@ -60,7 +62,19 @@ export default async function handler(req, res) {
     // Çok katmanlı hız sınırı (kullanıcı bazlı RPM/RPH/RPD + sistem geneli
     // Global Günlük Tavan) — bkz. api/_lib/planRateLimit.js. Bu kontrolün
     // KENDİSİ hiçbir zaman fırlatmaz (fail-open, bkz. o dosyadaki yorum).
-    const limitCheck = await checkPlanRateLimit(user.id);
+    //
+    // ADMIN/PREMIUM MUAFİYETİ: coach-action.js'teki (AI Koç) İLE AYNI
+    // `isUnlimited` deseni — bu kontrol olmadan admin/premium bir kullanıcı
+    // AI Koç kotasından muaf olsa BİLE, plan ÜRETİRKEN hâlâ bu ayrı
+    // RPM/RPH/RPD limitine takılıyordu (plans tablosundaki 3-plan limiti
+    // enforce_free_plan_limit'ten TAMAMEN bağımsız bir sayaç). Muaf
+    // kullanıcının isteği checkPlanRateLimit'e hiç girmediği için Global
+    // Günlük Tavan'a da takılmaz — ama logApiRequest yine de çalışır, yani
+    // bu istek diğer kullanıcıların Global Tavan sayımına dahil olmaya
+    // devam eder (yalnızca KENDİ engellenmesi devre dışı kalır).
+    const isAdmin = isAdminUser(user);
+    const isUnlimitedPlanner = isAdmin || (await isPremiumUser(user.id));
+    const limitCheck = isUnlimitedPlanner ? { allowed: true } : await checkPlanRateLimit(user.id);
     if (!limitCheck.allowed) {
       if (limitCheck.retryAfterSec) res.setHeader("Retry-After", String(limitCheck.retryAfterSec));
       return res.status(429).json({ ok: false, message: limitCheck.message });
