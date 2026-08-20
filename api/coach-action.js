@@ -96,6 +96,25 @@ export default async function handler(req, res) {
 
     const tasksByPlan = {};
     for (const t of tasks || []) (tasksByPlan[t.plan_id] = tasksByPlan[t.plan_id] || []).push(t);
+
+    // GERÇEK BUG (2026-08-20, canlıda doğrulandı — bkz. dosya başı yorumu):
+    // yukarıdaki toplu user_id sorgusu "limitsiz" görünüyor ama PostgREST'in
+    // varsayılan max-rows tavanı (1000) var. Çok plan/görevi olan bir
+    // kullanıcıda (bu hesapta 1000+ görev) bazı planların görevleri
+    // SESSİZCE dışarıda kalabiliyor — bir planın TÜM 420 görevi, SADECE bu
+    // yüzden, AI Koç'a "0 görev" olarak görünüyordu (visibilityLimited=false
+    // hesaplanıyordu, model "plan boş" sanıp confused/yanlış cevaplar
+    // veriyordu). Hedef/seçili plan — AI'ın GERÇEKTEN mutasyon yapacağı tek
+    // plan — bu yüzden AYRI, plan_id'ye göre taranan, kesilme riski olmayan
+    // bir sorguyla GARANTİ altına alınır. Diğer planlar yalnızca özet sayı
+    // gösterdiği için (describeOtherPlan) bu kesilme riski onlar için kabul
+    // edilebilir kalıyor.
+    if (targetPlanId) {
+      const { data: targetTasks, error: targetTasksErr } = await admin.from("tasks").select("*").eq("plan_id", targetPlanId);
+      if (targetTasksErr) throw targetTasksErr;
+      tasksByPlan[targetPlanId] = targetTasks || [];
+    }
+
     const allPlans = (plans || []).map((p) => ({ ...p, tasks: tasksByPlan[p.id] || [] }));
 
     if (allPlans.length === 0) {
@@ -179,18 +198,6 @@ async function dispatch(action, { message, targetPlanId, allPlans, userId, admin
 
     const hasTaskLevelChanges = aiResult.mutations.length || aiResult.newTasks.length || aiResult.deletedTaskIds.length;
     const hasChanges = hasTaskLevelChanges || aiResult.planTotalDays;
-
-    // GEÇİCİ TEŞHİS (2026-08-20) — dürüstlük guard'ı beklenmedik şekilde
-    // atlanıyor, canlı log ile gerçek değerler görülecek, sonra kaldırılacak.
-    // eslint-disable-next-line no-console
-    console.error("[coach-action DEBUG]", {
-      visibilityLimited: aiResult.visibilityLimited,
-      totalTaskCount: aiResult.totalTaskCount,
-      planTotalDays: aiResult.planTotalDays,
-      hasTaskLevelChanges,
-      intent: aiResult.intent,
-      targetPlanId: aiResult.targetPlanId,
-    });
 
     // KOD SEVİYESİNDE DÜRÜSTLÜK ZORLAMASI (2026-08-20, canlıda doğrulandı,
     // ÜÇ AŞAMADA): coachPrompt.js'e yalnızca PROMPT talimatıyla güvenmek
