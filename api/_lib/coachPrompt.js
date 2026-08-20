@@ -29,6 +29,13 @@ export async function runCoachIntent({ message, plans = [], selectedPlanId = nul
   const targetPlan = plans.find((p) => p.id === selectedPlanId) || (plans.length === 1 ? plans[0] : null);
   const otherPlans = plans.filter((p) => p.id !== targetPlan?.id);
 
+  // KOD SEVİYESİNDE hesaplanır (modele SORULMAZ) — coach-action.js bunu
+  // aşağıdaki dönüş değerinden okuyup, modelin reply METNİNE güvenmeden
+  // kendi dürüstlük kontrolünü uygular (bkz. dosya başı + coach-action.js
+  // dispatch'teki AYNI yorum — prompt talimatı TEK BAŞINA yetersiz kaldı).
+  const targetTotalTaskCount = targetPlan?.tasks?.length || 0;
+  const targetVisibilityLimited = targetTotalTaskCount > 80;
+
   // GÖRÜNÜRLÜK SINIRI BUG'I (2026-08-20, canlıda doğrulandı): büyük planlarda
   // (ör. 12 haftalık PPL, 420 görev) context yalnızca ilk 40 görevi
   // gösteriyordu ve model bunun FARKINDA değildi — "12 haftadan 6 haftaya
@@ -133,5 +140,7 @@ fields ve new_tasks nesnelerinde yalnızca gerçekten değişen/gerekli alanlar�
     newTasks: Array.isArray(parsed?.new_tasks) ? parsed.new_tasks.slice(0, 20) : [],
     deletedTaskIds: Array.isArray(parsed?.deleted_task_ids) ? parsed.deleted_task_ids.slice(0, 50) : [],
     planTotalDays: Number.isFinite(planTotalDays) && planTotalDays > 0 ? planTotalDays : null,
+    visibilityLimited: targetVisibilityLimited,
+    totalTaskCount: targetTotalTaskCount,
   };
 }

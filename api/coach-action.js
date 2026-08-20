@@ -178,6 +178,27 @@ async function dispatch(action, { message, targetPlanId, allPlans, userId, admin
     const aiResult = await runCoachIntent({ message, plans: allPlans, selectedPlanId: targetPlanId });
 
     const hasChanges = aiResult.mutations.length || aiResult.newTasks.length || aiResult.deletedTaskIds.length || aiResult.planTotalDays;
+
+    // KOD SEVİYESİNDE DÜRÜSTLÜK ZORLAMASI (2026-08-20, canlıda doğrulandı):
+    // coachPrompt.js'e yalnızca PROMPT talimatıyla ("dürüst ol, sahte başarı
+    // iddia etme") güvenmek YETERSİZ kaldı — model, mutations tamamen boş
+    // dönse BİLE reply metninde "yaptım/indirdim" gibi başarılı bir sonuç
+    // iddia etmeye devam etti (gerçek testte doğrulandı). Bu yüzden reply
+    // METNİNE hiç güvenilmiyor: eylem gerektiren bir intent (resize_plan/
+    // lighten/intensify/delete_task/add_task/postpone) olduğu halde HİÇBİR
+    // mutasyon üretilmediyse VE hedef planın görünürlüğü sınırlıysa (context'e
+    // sığmayacak kadar büyük plan), kullanıcıya modelin kendi metni DEĞİL,
+    // kodun ürettiği dürüst bir mesaj gösterilir.
+    const ACTION_INTENTS = new Set(["lighten", "intensify", "postpone", "add_task", "delete_task", "resize_plan"]);
+    if (!hasChanges && aiResult.visibilityLimited && ACTION_INTENTS.has(aiResult.intent)) {
+      return {
+        ok: true,
+        consumed: true,
+        message: `Bu plan şu an tek seferde işleyebileceğimden daha büyük (${aiResult.totalTaskCount} görev) — bu yüzden bu kadar geniş kapsamlı bir değişikliği güvenle yapamadım. Daha dar bir kapsamda (ör. "ilk 4 hafta" gibi) tekrar ister misin?`,
+        targetPlanId: aiResult.targetPlanId || null,
+      };
+    }
+
     if (!hasChanges) {
       const unclear = aiResult.intent === "unclear";
       return { ok: true, consumed: !unclear, message: aiResult.reply, targetPlanId: aiResult.targetPlanId || null };
