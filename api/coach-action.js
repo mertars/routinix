@@ -181,19 +181,23 @@ async function dispatch(action, { message, targetPlanId, allPlans, userId, admin
     const hasChanges = hasTaskLevelChanges || aiResult.planTotalDays;
 
     // KOD SEVİYESİNDE DÜRÜSTLÜK ZORLAMASI (2026-08-20, canlıda doğrulandı,
-    // İKİ AŞAMADA): coachPrompt.js'e yalnızca PROMPT talimatıyla güvenmek
-    // yetersiz kaldı — model reply metninde "yaptım" derken mutations boş
-    // dönmeye devam etti. İlk düzeltme (yalnızca `!hasChanges` kontrolü) DE
-    // yetersiz çıktı: model göremediği görevlere DOKUNMADAN yalnızca
-    // `plan_total_days`'i küçültüyordu (ör. 84->42) — bu TEK BAŞINA
-    // `hasChanges`'i true yapıp applyPlanDelta'ya giriyor ve planı BOZUYORDU
-    // (total_days küçülüyor ama yeni sınırın ötesindeki onlarca görev
-    // askıda/erişilemez kalıyor, gerçek testte doğrulandı). Bu yüzden kontrol
-    // `hasTaskLevelChanges`'e (mutations/newTasks/deletedTaskIds) bakıyor —
-    // eylem gerektiren bir intent'te göremediği bir plan için TEK BAŞINA
-    // planTotalDays değiştirmek de YETERSİZ/GÜVENSİZ sayılır.
-    const ACTION_INTENTS = new Set(["lighten", "intensify", "postpone", "add_task", "delete_task", "resize_plan"]);
-    if (aiResult.visibilityLimited && ACTION_INTENTS.has(aiResult.intent) && !hasTaskLevelChanges) {
+    // ÜÇ AŞAMADA): coachPrompt.js'e yalnızca PROMPT talimatıyla güvenmek
+    // yetersiz kaldı. İlk düzeltme (yalnızca `!hasChanges`) yetersiz çıktı:
+    // model göremediği görevlere DOKUNMADAN yalnızca `plan_total_days`'i
+    // küçültüyordu (84->42) — bu TEK BAŞINA hasChanges'i true yapıp
+    // applyPlanDelta'ya giriyor, planı BOZUYORDU (yeni sınırın ötesindeki
+    // görevler askıda kalıyor). İkinci düzeltme (`intent` alanına bakan bir
+    // ACTION_INTENTS filtresi) DE yetersiz çıktı — coach.intent'in
+    // responseSchema'sı YOK (yalnızca responseMimeType:json, bkz.
+    // geminiRouter.js), yani `intent` alanı ŞEMA ile ZORLANMIYOR; model
+    // aynı senaryoda farklı çağrılarda farklı/eşleşmeyen intent string'leri
+    // döndürebiliyor (gerçek testte doğrulandı: 3 özdeş istekten 2'si
+    // filtreyi atlattı). Bu yüzden `intent` alanına HİÇ güvenilmiyor —
+    // kontrol doğrudan TEHLİKELİ KOMBİNASYONA bakıyor: görünürlüğü sınırlı
+    // bir planda (context'e sığmayan görev sayısı) plan_total_days
+    // değişirken hiçbir görev-seviyesi işlem yoksa, bu HANGİ intent
+    // etiketiyle gelirse gelsin HER ZAMAN güvensizdir.
+    if (aiResult.visibilityLimited && aiResult.planTotalDays && !hasTaskLevelChanges) {
       return {
         ok: true,
         consumed: true,
