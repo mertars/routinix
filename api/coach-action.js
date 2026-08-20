@@ -177,20 +177,23 @@ async function dispatch(action, { message, targetPlanId, allPlans, userId, admin
     // sorup duruyordu.
     const aiResult = await runCoachIntent({ message, plans: allPlans, selectedPlanId: targetPlanId });
 
-    const hasChanges = aiResult.mutations.length || aiResult.newTasks.length || aiResult.deletedTaskIds.length || aiResult.planTotalDays;
+    const hasTaskLevelChanges = aiResult.mutations.length || aiResult.newTasks.length || aiResult.deletedTaskIds.length;
+    const hasChanges = hasTaskLevelChanges || aiResult.planTotalDays;
 
-    // KOD SEVİYESİNDE DÜRÜSTLÜK ZORLAMASI (2026-08-20, canlıda doğrulandı):
-    // coachPrompt.js'e yalnızca PROMPT talimatıyla ("dürüst ol, sahte başarı
-    // iddia etme") güvenmek YETERSİZ kaldı — model, mutations tamamen boş
-    // dönse BİLE reply metninde "yaptım/indirdim" gibi başarılı bir sonuç
-    // iddia etmeye devam etti (gerçek testte doğrulandı). Bu yüzden reply
-    // METNİNE hiç güvenilmiyor: eylem gerektiren bir intent (resize_plan/
-    // lighten/intensify/delete_task/add_task/postpone) olduğu halde HİÇBİR
-    // mutasyon üretilmediyse VE hedef planın görünürlüğü sınırlıysa (context'e
-    // sığmayacak kadar büyük plan), kullanıcıya modelin kendi metni DEĞİL,
-    // kodun ürettiği dürüst bir mesaj gösterilir.
+    // KOD SEVİYESİNDE DÜRÜSTLÜK ZORLAMASI (2026-08-20, canlıda doğrulandı,
+    // İKİ AŞAMADA): coachPrompt.js'e yalnızca PROMPT talimatıyla güvenmek
+    // yetersiz kaldı — model reply metninde "yaptım" derken mutations boş
+    // dönmeye devam etti. İlk düzeltme (yalnızca `!hasChanges` kontrolü) DE
+    // yetersiz çıktı: model göremediği görevlere DOKUNMADAN yalnızca
+    // `plan_total_days`'i küçültüyordu (ör. 84->42) — bu TEK BAŞINA
+    // `hasChanges`'i true yapıp applyPlanDelta'ya giriyor ve planı BOZUYORDU
+    // (total_days küçülüyor ama yeni sınırın ötesindeki onlarca görev
+    // askıda/erişilemez kalıyor, gerçek testte doğrulandı). Bu yüzden kontrol
+    // `hasTaskLevelChanges`'e (mutations/newTasks/deletedTaskIds) bakıyor —
+    // eylem gerektiren bir intent'te göremediği bir plan için TEK BAŞINA
+    // planTotalDays değiştirmek de YETERSİZ/GÜVENSİZ sayılır.
     const ACTION_INTENTS = new Set(["lighten", "intensify", "postpone", "add_task", "delete_task", "resize_plan"]);
-    if (!hasChanges && aiResult.visibilityLimited && ACTION_INTENTS.has(aiResult.intent)) {
+    if (aiResult.visibilityLimited && ACTION_INTENTS.has(aiResult.intent) && !hasTaskLevelChanges) {
       return {
         ok: true,
         consumed: true,
