@@ -78,8 +78,9 @@ export async function runJson(operation, systemInstruction, userPrompt, label = 
   const model = getRoutedModel(operation, systemInstruction);
 
   let text;
+  let result;
   try {
-    const result = await model.generateContent(userPrompt);
+    result = await model.generateContent(userPrompt);
     text = result.response.text();
   } catch (err) {
     throw wrapGeminiError(err, `${label} başarısız oldu (Gemini SDK hatası).`);
@@ -90,6 +91,14 @@ export async function runJson(operation, systemInstruction, userPrompt, label = 
     const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
     return JSON.parse(cleaned);
   } catch {
+    // TEŞHİS: finishReason "MAX_TOKENS" ise bu maxOutputTokens'ın yanıtı
+    // ORTASINDAN kestiği anlamına gelir (geminiRouter.js'teki tavanı
+    // yükseltmek gerekir) — başka bir finishReason (ör. "STOP" ama yine de
+    // geçersiz JSON) modelin gerçekten bozuk çıktı ürettiğini gösterir, bu
+    // ikisi FARKLI kök nedenler ve farklı çözümler gerektirir.
+    const finishReason = result?.response?.candidates?.[0]?.finishReason;
+    // eslint-disable-next-line no-console
+    console.error(`[runJson] ${label} parse hatası — finishReason: ${finishReason || "bilinmiyor"}, ham metin (ilk 500 karakter):`, text?.slice(0, 500));
     throw new Error(`${label} yanıtı geçerli JSON değil.`);
   }
 }

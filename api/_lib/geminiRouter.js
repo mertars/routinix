@@ -195,7 +195,11 @@ const ROUTES = {
   // (plan küçültme/görev silme) AYNI çağrıda kararlaştırılıyor, bu yüzden
   // mesaj türüne göre ÖNCEDEN ikiye ayrılamıyor (bkz. coachPrompt.js).
   // Gerçek testte flash-lite HER İKİ karmaşıklık seviyesinde de sağlam.
-  "coach.intent": { model: FLASH_LITE, maxOutputTokens: 3072 },
+  // Canlıda "geçerli JSON değil" hatasıyla kesiliyordu — mutations (<=50) +
+  // new_tasks (<=20) + deleted_task_ids (<=50) aynı yanıtta birikince 3072
+  // yetersiz kalıp yanıtı ortasından kesebiliyordu (bkz. plan.next_week'teki
+  // AYNI kesilme hatası, 2026-08-20 canlı log). Tavan yükseltildi.
+  "coach.intent": { model: FLASH_LITE, maxOutputTokens: 6144 },
 
   // Günlük Ritim Raporu — küçük, sabit şemalı (summary + <=3 madde) çıktı.
   "rhythm.report": { model: FLASH_LITE, maxOutputTokens: 512 },
@@ -207,8 +211,11 @@ const ROUTES = {
   "plan.create": { model: FLASH_LITE, maxOutputTokens: 8192 },
 
   // Sonraki hafta (haftalık program revizesi) — tek haftalık (7 gün) çıktı,
-  // plan.create'in first_week_tasks'ıyla aynı büyüklük mertebesinde.
-  "plan.next_week": { model: FLASH_LITE, maxOutputTokens: 4096 },
+  // plan.create'in first_week_tasks'ıyla AYNI büyüklük mertebesinde (yukarıdaki
+  // yorumda da öyle deniyor) ama tavanı yarısı kadardı (4096) — canlıda
+  // "2. hafta üretimi yanıtı geçerli JSON değil" hatasıyla tekrar tekrar
+  // kesiliyordu (2026-08-20, gerçek prod log). plan.create ile eşitlendi.
+  "plan.next_week": { model: FLASH_LITE, maxOutputTokens: 8192 },
 
   // Evrensel dosya içe aktarma (api/parse-file.js) — kullanıcının yüklediği
   // JSON/Markdown/TXT/CSV/PDF-metni/ICS'i sabit bir plan şemasına çevirir.

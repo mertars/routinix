@@ -84,8 +84,9 @@ fields ve new_tasks nesnelerinde yalnızca gerçekten değişen/gerekli alanlar�
 
   const model = await getCachedCoachModel(systemInstruction);
   let text;
+  let result;
   try {
-    const result = await model.generateContent(userPrompt);
+    result = await model.generateContent(userPrompt);
     text = result.response.text();
   } catch (err) {
     throw wrapGeminiError(err, "Yapay zeka isteği başarısız oldu.");
@@ -96,6 +97,11 @@ fields ve new_tasks nesnelerinde yalnızca gerçekten değişen/gerekli alanlar�
     const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
     parsed = JSON.parse(cleaned);
   } catch {
+    // TEŞHİS: bkz. planPrompt.js runJson'daki AYNI notu — finishReason
+    // "MAX_TOKENS" ise geminiRouter.js'teki coach.intent tavanı hâlâ yetersiz demektir.
+    const finishReason = result?.response?.candidates?.[0]?.finishReason;
+    // eslint-disable-next-line no-console
+    console.error(`[runCoachIntent] parse hatası — finishReason: ${finishReason || "bilinmiyor"}, ham metin (ilk 500 karakter):`, text?.slice(0, 500));
     throw new Error("Yapay zeka yanıtı geçerli JSON değil.");
   }
 
