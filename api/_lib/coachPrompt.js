@@ -29,14 +29,31 @@ export async function runCoachIntent({ message, plans = [], selectedPlanId = nul
   const targetPlan = plans.find((p) => p.id === selectedPlanId) || (plans.length === 1 ? plans[0] : null);
   const otherPlans = plans.filter((p) => p.id !== targetPlan?.id);
 
+  // GÖRÜNÜRLÜK SINIRI BUG'I (2026-08-20, canlıda doğrulandı): büyük planlarda
+  // (ör. 12 haftalık PPL, 420 görev) context yalnızca ilk 40 görevi
+  // gösteriyordu ve model bunun FARKINDA değildi — "12 haftadan 6 haftaya
+  // indir" gibi geniş kapsamlı bir istekte model kendinden emin "yaptım"
+  // diye cevap veriyordu ama mutations/deleted_task_ids TAMAMEN boş
+  // dönüyordu (hiçbir şey değişmiyordu, kullanıcı sessizce yok sayılıyordu).
+  // Tavan 40->80'e çıkarıldı (küçük/orta planların TAMAMI artık sığıyor)
+  // VE modele TOPLAM görev sayısı ile kaçının gösterildiği AÇIKÇA söyleniyor
+  // — aşağıdaki KESİN KURALLAR'daki "GÖRÜNÜRLÜK DÜRÜSTLÜĞÜ" kuralı, model
+  // göremediği görevleri etkileyecek bir istekte artık SAHTE bir başarı
+  // iddia etmek yerine dürüstçe reddetmek ZORUNDA.
   const describeTargetPlan = (p) => {
-    const tasks = (p.tasks || [])
-      .slice()
+    const allTasks = (p.tasks || []).slice();
+    const totalCount = allTasks.length;
+    const shownCount = Math.min(totalCount, 80);
+    const tasks = allTasks
       .sort((a, b) => (a.is_completed === b.is_completed ? a.day_number - b.day_number : a.is_completed ? 1 : -1))
-      .slice(0, 40)
+      .slice(0, 80)
       .map((t) => `${t.day_number}|${t.id}|${t.title}|${t.duration_min ?? "-"}dk|${t.priority ?? "-"}|${t.is_completed ? "tamam" : "bekliyor"}`)
       .join("\n");
-    return `PLAN[${p.id}] "${p.title}" (${p.mode || "general"}, ${p.total_days ?? "?"} gün) — ŞU AN SEÇİLİ/HEDEF PLAN\nformat → gün|task_id|başlık|süre|öncelik|durum\n${tasks || "(görev yok)"}`;
+    const visibilityNote =
+      totalCount > shownCount
+        ? `\n⚠️ GÖRÜNÜRLÜK SINIRI: Bu planın TOPLAM ${totalCount} görevi var, sana yalnızca ilk ${shownCount} tanesi gösteriliyor — geri kalan ${totalCount - shownCount} görevi SEN GÖREMİYORSUN.`
+        : "";
+    return `PLAN[${p.id}] "${p.title}" (${p.mode || "general"}, ${p.total_days ?? "?"} gün, toplam ${totalCount} görev) — ŞU AN SEÇİLİ/HEDEF PLAN\nformat → gün|task_id|başlık|süre|öncelik|durum${visibilityNote}\n${tasks || "(görev yok)"}`;
   };
 
   const describeOtherPlan = (p) => {
@@ -66,6 +83,7 @@ KESİN KURALLAR:
 - "muadil öner" gibi tamamen bilgilendirici/istişari isteklerde mutations/new_tasks/deleted_task_ids BOŞ kalabilir, plan_total_days null kalabilir, yalnızca reply doldurulur — bu geçerli bir yanıttır.
 - deleted_task_ids/mutations[].task_id alanlarında YALNIZCA sana verilen context'teki gerçek id'leri kullan. Böyle bir id yoksa veya emin değilsen o görevi ekleme, UYDURMA.
 - Plan bağlamıyla alakasız (genel sohbet, konu dışı soru) ya da ne istendiği gerçekten anlaşılmayan isteklerde intent'i "unclear" yap, mutations/new_tasks/deleted_task_ids'i boş bırak, reply'de kısaca ne yapabileceğini hatırlat.
+- GÖRÜNÜRLÜK DÜRÜSTLÜĞÜ (ZORUNLU): Hedef planın açıklamasında "⚠️ GÖRÜNÜRLÜK SINIRI" notu varsa (planın TAMAMI sana gösterilmiyor) VE kullanıcının isteği görmediğin görevleri de kapsayacak kadar genişse (ör. "tüm planı N haftaya indir", "bütün programı yeniden düzenle") — mutations/new_tasks/deleted_task_ids'i KESİNLİKLE BOŞ bırak, plan_total_days'i null bırak, "yaptım/düzenledim/indirdim" gibi BAŞARILI bir sonuç ASLA iddia ETME. reply'de dürüstçe bu planın şu an tek seferde işleyemeyeceğin kadar büyük olduğunu söyle ve kullanıcıya isteğini daha dar bir kapsamda (ör. "önce ilk birkaç haftayı ele alalım") tekrarlamasını öner. Sahte bir başarı mesajı, hiçbir şey yapmamaktan çok daha kötüdür.
 - reply KISA olsun (1-3 cümle), sıcak ve motive edici ama abartısız bir üslupla, Türkçe yaz.
 
 Yanıtın SADECE ve KESİNLİKLE şu JSON şeması olmalı, şema dışına hiçbir metin ekleme:
