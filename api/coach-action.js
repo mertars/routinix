@@ -180,6 +180,18 @@ async function dispatch(action, { message, targetPlanId, allPlans, userId, admin
     const hasTaskLevelChanges = aiResult.mutations.length || aiResult.newTasks.length || aiResult.deletedTaskIds.length;
     const hasChanges = hasTaskLevelChanges || aiResult.planTotalDays;
 
+    // GEÇİCİ TEŞHİS (2026-08-20) — dürüstlük guard'ı beklenmedik şekilde
+    // atlanıyor, canlı log ile gerçek değerler görülecek, sonra kaldırılacak.
+    // eslint-disable-next-line no-console
+    console.error("[coach-action DEBUG]", {
+      visibilityLimited: aiResult.visibilityLimited,
+      totalTaskCount: aiResult.totalTaskCount,
+      planTotalDays: aiResult.planTotalDays,
+      hasTaskLevelChanges,
+      intent: aiResult.intent,
+      targetPlanId: aiResult.targetPlanId,
+    });
+
     // KOD SEVİYESİNDE DÜRÜSTLÜK ZORLAMASI (2026-08-20, canlıda doğrulandı,
     // ÜÇ AŞAMADA): coachPrompt.js'e yalnızca PROMPT talimatıyla güvenmek
     // yetersiz kaldı. İlk düzeltme (yalnızca `!hasChanges`) yetersiz çıktı:
