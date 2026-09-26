@@ -18,13 +18,17 @@ export const POSITION_LABELS: Record<Position, string> = {
   FV: "Forvet",
 };
 
-/** Mevkiye özel vurgu rengi (rozetler ve sahadaki mini kartlar için). */
+/**
+ * Mevkiye özel kimlik rengi (rozetler, sahadaki mini kartlar). Koyu zemin için
+ * aynı açıklık bandında seçildi ve renk körlüğü ayrımı doğrulandı; renk hiçbir
+ * zaman tek başına bilgi taşımaz — yanında her zaman mevki kısaltması yazar.
+ */
 export const POSITION_COLORS: Record<Position, string> = {
-  KL: "#f5b73b",
-  DEF: "#4cc3ff",
-  OS: "#3ef08a",
-  KNT: "#c58bff",
-  FV: "#ff6b6b",
+  KL: "#bd8706",
+  DEF: "#149ed8",
+  OS: "#04af5d",
+  KNT: "#ac72e4",
+  FV: "#ec5a5c",
 };
 
 export const MAIN_ATTR_LABELS: Record<MainAttr, string> = {

@@ -1,11 +1,7 @@
-import { PageHeader } from "@/components/page-header";
+import { PlayersScreen } from "@/components/screens/players-screen";
 
 export const metadata = { title: "Oyuncular" };
 
 export default function Page() {
-  return (
-    <main className="pb-nav">
-      <PageHeader title="Oyuncular" />
-    </main>
-  );
+  return <PlayersScreen />;
 }

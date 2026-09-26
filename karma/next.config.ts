@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   turbopack: { root: path.resolve(__dirname) },
   outputFileTracingRoot: path.resolve(__dirname),
   reactStrictMode: true,
+  // `next dev`'in projeye AGENTS.md / CLAUDE.md yazmasını kapat.
+  agentRules: false,
   poweredByHeader: false,
   async redirects() {
     return [{ source: "/", destination: "/oyuncular", permanent: false }];
