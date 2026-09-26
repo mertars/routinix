@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { X, Plus, Trash2, LogOut, Repeat2, Compass, ListChecks, Users2, BarChart3, Timer, FolderOpen, Target, ChefHat } from "lucide-react";
+import { X, Plus, Trash2, LogOut, Repeat2, Compass, ListChecks, Users2, BarChart3, Timer, FolderOpen, Target, ChefHat, Shuffle } from "lucide-react";
 import { FEATURE_FLAGS } from "../constants";
 
 // 2 sütunlu bento tuşu — "Orta Grid Menü Tuşları" bölümü için. "Siyah Cam"
@@ -80,6 +80,17 @@ function DrawerMenu({
       color: "#F4406B",
       label: "Beslenme & Antrenman Mimarı",
       onClick: onOpenNutritionArchitect,
+      always: true,
+    },
+    // Halısaha takım dengeleme uygulaması (Karma) — Routinix'ten bağımsız,
+    // /karma altında statik olarak yayınlanıyor (bkz. karma/README.md).
+    // Kendi sayfası olduğu için doğrudan oraya gidilir.
+    {
+      key: "karma",
+      icon: <Shuffle className="w-4 h-4" strokeWidth={2.25} />,
+      color: "#19B862",
+      label: "Halısaha Karma",
+      onClick: () => window.location.assign("/karma/oyuncular"),
       always: true,
     },
     { key: "plans", icon: <FolderOpen className="w-4 h-4" strokeWidth={2.25} />, color: "#64748B", label: "Planlarım", onClick: onOpenPlans, always: false },
