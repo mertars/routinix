@@ -33,11 +33,39 @@ npm test           # Vitest birim testleri
 npm run typecheck
 npm run build      # üretim derlemesi
 npm run icons      # PWA ikonlarını ve iOS açılış görsellerini yeniden üret
+npm run build:routinix  # Routinix içine gömülecek statik çıktıyı public/karma'ya yaz
 ```
 
 Node 20.9+ gerekir.
 
-## Vercel'e deploy
+## Routinix içinde yayın (/karma)
+
+Karma, Routinix'in canlı Vercel projesi üzerinden `/karma` adresinde yayınlanır;
+Routinix'in menüsündeki (çekmece) **Halısaha Karma** tuşu buraya açılır.
+
+- Karma statik olarak (`output: "export"`, `basePath: "/karma"`) derlenir ve
+  çıktısı reponun kökündeki `public/karma/` klasörüne kopyalanır. Routinix'in
+  kendi build'i (Vite) `public/` klasörünü olduğu gibi yayına taşıdığı için
+  Routinix'in derleme süreci değişmez.
+- Sayfa adresleri Routinix'in `vercel.json` dosyasındaki `/karma/...`
+  yönlendirmeleriyle karşılanır (Routinix'in "her şey index.html'e" kuralından
+  önce gelir).
+- Routinix'in Tailwind'i `karma/` ve `public/karma/` klasörlerini taramaz
+  (`src/index.css` → `@source not`), böylece Routinix'in CSS'i değişmez.
+
+**Karma'da değişiklik yaptıktan sonra:**
+
+```bash
+cd karma
+npm run build:routinix   # public/karma'yı yeniden üretir
+git add ../public/karma && git commit -m "Karma: Routinix içindeki derlemeyi güncelle"
+```
+
+Routinix içinde çalışırken Karma'nın sayfa başlığında Routinix'e dönüş
+bağlantısı görünür. Veriler aynı alan adının localStorage'ında
+(`karma:data` anahtarıyla) tutulur, Routinix'in verilerine karışmaz.
+
+## Ayrı bir Vercel projesi olarak deploy (opsiyonel)
 
 1. Vercel'de **Add New → Project** ile bu repoyu içe aktar.
 2. **Root Directory** olarak `karma` seç (Framework: Next.js otomatik algılanır).

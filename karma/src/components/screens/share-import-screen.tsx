@@ -4,6 +4,7 @@ import { Link2Off, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { withBase } from "@/lib/base-path";
 import { overallRating } from "@/lib/scoring";
 import { decodeShare, KarmaImportError, type SharePayload } from "@/lib/storage";
 import { useKarma } from "@/lib/store";
@@ -33,7 +34,7 @@ export function ShareImportScreen() {
   const finish = (message: string) => {
     toast(message);
     // Hash'i temizle (geri tuşuyla tekrar içe aktarılmasın)
-    history.replaceState(null, "", "/paylas");
+    history.replaceState(null, "", withBase("/paylas"));
     router.replace("/oyuncular");
   };
 

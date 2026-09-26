@@ -2,6 +2,7 @@
 
 import { Copy, Link2, MessageCircle, Share2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { withBase } from "@/lib/base-path";
 import { encodeShare } from "@/lib/storage";
 import { useKarma } from "@/lib/store";
 import { copyText } from "../builder/share-sheet";
@@ -22,7 +23,7 @@ export function ShareLinkSheet({ open, onClose }: { open: boolean; onClose: () =
   const url = useMemo(() => {
     if (!open || typeof window === "undefined") return "";
     const code = encodeShare({ players, matches, settings }, { includeMatches, includeWeights, includePhotos });
-    return `${window.location.origin}/paylas#${code}`;
+    return `${window.location.origin}${withBase("/paylas")}#${code}`;
   }, [open, players, matches, settings, includeMatches, includeWeights, includePhotos]);
 
   const message = `⚽ Karma halısaha grubumuz (${players.length} oyuncu). Açınca kendi telefonuna ekleyebilirsin:\n${url}`;

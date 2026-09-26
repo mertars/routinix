@@ -39,10 +39,6 @@ const defs = `
       <stop offset="0" stop-color="#6bffaa"/>
       <stop offset="1" stop-color="#19b862"/>
     </linearGradient>
-    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#3ef08a" stop-opacity=".16"/>
-      <stop offset="1" stop-color="#3ef08a" stop-opacity="0"/>
-    </radialGradient>
     <radialGradient id="bg" cx="50%" cy="30%" r="80%">
       <stop offset="0" stop-color="#123522"/>
       <stop offset="1" stop-color="#050d09"/>
@@ -67,15 +63,15 @@ function splashSvg(w, h) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   ${defs}
   <rect width="${w}" height="${h}" fill="#050d09"/>
-  <circle cx="${w / 2}" cy="${h * 0.46}" r="${w * 0.75}" fill="url(#glow)"/>
   <circle cx="${w / 2}" cy="${h * 0.46}" r="${w * 0.28}" fill="none" stroke="#3ef08a" stroke-opacity=".12" stroke-width="${w * 0.006}"/>
   ${mark((w - logo) / 2, h * 0.46 - logo / 2, logo)}
 </svg>`;
 }
 
-async function png(svg, file) {
+async function png(svg, file, { palette = false } = {}) {
   await mkdir(dirname(file), { recursive: true });
-  await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toFile(file);
+  // Açılış görselleri büyük ama az renkli: paletli PNG boyutu ~4 kat küçültür.
+  await sharp(Buffer.from(svg)).png({ compressionLevel: 9, ...(palette ? { palette: true, quality: 92, dither: 0.6 } : {}) }).toFile(file);
   console.log("✓", file.replace(root, "public"));
 }
 
@@ -87,5 +83,5 @@ await writeFile(join(root, "icons/favicon.svg"), iconSvg(64, { radius: 14, scale
 console.log("✓ public/icons/favicon.svg");
 
 for (const [w, h, r] of STARTUP_SIZES) {
-  await png(splashSvg(w * r, h * r), join(root, `splash/splash-${w * r}x${h * r}.png`));
+  await png(splashSvg(w * r, h * r), join(root, `splash/splash-${w * r}x${h * r}.png`), { palette: true });
 }

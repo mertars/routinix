@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { useEffect, type ReactNode } from "react";
+import { withBase } from "@/lib/base-path";
 import { useKarma } from "@/lib/store";
 import { BottomNav } from "./bottom-nav";
 import { LogoMark } from "./logo";
@@ -18,7 +19,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+    navigator.serviceWorker.register(withBase("/sw.js"), { scope: withBase("/") }).catch(() => {});
   }, []);
 
   return (

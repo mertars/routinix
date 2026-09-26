@@ -3,9 +3,12 @@
 // (dosya adları içerik hash'i taşır). Diğer statik dosyalar: önbellekten sun,
 // arkada tazele.
 
-const VERSION = "karma-v1";
-const PAGES = ["/oyuncular", "/kadro", "/maclar", "/ayarlar", "/paylas"];
-const ASSETS = ["/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/favicon.svg"];
+const VERSION = "karma-v2";
+// Uygulama kökte ("/") veya Routinix içinde ("/karma") yayınlanabilir; kök yol
+// service worker'ın kapsamından çıkarılır.
+const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, "");
+const PAGES = ["/oyuncular", "/kadro", "/maclar", "/ayarlar", "/paylas"].map((p) => BASE + p);
+const ASSETS = ["/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/favicon.svg"].map((p) => BASE + p);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -39,7 +42,7 @@ async function networkFirst(request) {
     if (response.ok && response.type === "basic") cache.put(stripHash(request.url), response.clone());
     return response;
   } catch {
-    const cached = (await cache.match(stripHash(request.url), { ignoreSearch: true })) || (await cache.match("/oyuncular"));
+    const cached = (await cache.match(stripHash(request.url), { ignoreSearch: true })) || (await cache.match(BASE + "/oyuncular"));
     return cached || new Response("Çevrimdışı", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }
 }
@@ -73,9 +76,9 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(networkFirst(request));
-  } else if (url.pathname.startsWith("/_next/static/")) {
+  } else if (url.pathname.startsWith(BASE + "/_next/static/")) {
     event.respondWith(cacheFirst(request));
-  } else if (!url.pathname.startsWith("/_next/")) {
+  } else if (!url.pathname.startsWith(BASE + "/_next/")) {
     event.respondWith(staleWhileRevalidate(request));
   }
 });
