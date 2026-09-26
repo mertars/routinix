@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // `next dev`'in projeye AGENTS.md / CLAUDE.md yazmasını kapat.
   agentRules: false,
+  // Geliştirme göstergesi alt menünün üstüne biniyor; hata ekranı yine çalışır.
+  devIndicators: false,
   poweredByHeader: false,
   async redirects() {
     return [{ source: "/", destination: "/oyuncular", permanent: false }];

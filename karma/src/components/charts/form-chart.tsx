@@ -26,7 +26,7 @@ export function FormChart({ form }: { form: FormEntry[] }) {
   return (
     <figure>
       <div className="relative" role="img" aria-label={`Son ${form.length} maç: ${form.map((f) => `${formatDate(f.date)} ${RESULT_LABELS[f.result]} (${f.goalDiff > 0 ? "+" : ""}${f.goalDiff})`).join(", ")}`}>
-        <div className="flex items-stretch justify-around gap-2" style={{ height: half * 2 + 24 }} aria-hidden="true">
+        <div className="flex items-stretch justify-around gap-2" aria-hidden="true">
           {form.map((f) => {
             const h = Math.max(4, (Math.abs(f.goalDiff) / maxAbs) * half);
             const up = f.goalDiff >= 0;
@@ -40,21 +40,21 @@ export function FormChart({ form }: { form: FormEntry[] }) {
                 onPointerLeave={() => setActive(null)}
                 onClick={() => setActive((a) => (a === f.matchId ? null : f.matchId))}
               >
-                {/* Yukarı yarı */}
-                <div className="flex w-full flex-1 flex-col items-center justify-end">
+                {/* Yukarı yarı (sabit yükseklik: sıfır çizgisi tüm sütunlarda aynı hizada) */}
+                <div className="flex w-full flex-col items-center justify-end" style={{ height: half + 22 }}>
                   {up && (
                     <>
-                      <span className="mb-1 font-display text-sm font-bold text-ink-soft tabular">{f.goalDiff > 0 ? `+${f.goalDiff}` : "0"}</span>
+                      <span className="mb-1 h-[18px] font-display text-sm font-bold leading-[18px] text-ink-soft tabular">{f.goalDiff > 0 ? `+${f.goalDiff}` : "0"}</span>
                       <span className="w-5 rounded-t-[4px]" style={{ height: f.goalDiff === 0 ? 3 : h, background: RESULT_COLOR[f.result], opacity: active && active !== f.matchId ? 0.4 : 1 }} />
                     </>
                   )}
                 </div>
                 <div className="h-px w-full bg-white/15" />
-                <div className="flex w-full flex-1 flex-col items-center justify-start">
+                <div className="flex w-full flex-col items-center justify-start" style={{ height: half + 22 }}>
                   {!up && (
                     <>
                       <span className="w-5 rounded-b-[4px]" style={{ height: h, background: RESULT_COLOR[f.result], opacity: active && active !== f.matchId ? 0.4 : 1 }} />
-                      <span className="mt-1 font-display text-sm font-bold text-ink-soft tabular">{f.goalDiff}</span>
+                      <span className="mt-1 h-[18px] font-display text-sm font-bold leading-[18px] text-ink-soft tabular">{f.goalDiff}</span>
                     </>
                   )}
                 </div>
