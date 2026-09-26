@@ -11,6 +11,7 @@ import { FormationThumb } from "../builder/formation-thumb";
 import { TeamStyleSheet } from "../builder/team-style-sheet";
 import { Wordmark } from "../logo";
 import { PageHeader } from "../page-header";
+import { InstallCard } from "../settings/install-card";
 import { ShareLinkSheet } from "../settings/share-link-sheet";
 import { WeightsEditor } from "../settings/weights-editor";
 import { Button } from "../ui/button";
@@ -57,6 +58,7 @@ export function SettingsScreen() {
     <main className="pb-nav">
       <PageHeader title="Ayarlar" eyebrow="Karma" />
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4">
+        <InstallCard />
         <Section title="Mevki ağırlıkları" subtitle="Genel puan, mevkiye göre 6 ana özelliğin ağırlıklı ortalamasıdır.">
           <WeightsEditor />
         </Section>
