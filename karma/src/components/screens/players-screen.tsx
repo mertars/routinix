@@ -93,7 +93,7 @@ export function PlayersScreen() {
   }
 
   return (
-    <main className="pb-nav">
+    <main className="pb-[calc(var(--nav-height)+var(--safe-bottom)+96px)]">
       <PageHeader
         title="Oyuncular"
         eyebrow="Karma"

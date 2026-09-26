@@ -26,6 +26,7 @@ import {
   type Foot,
   type GkAttributes,
   type KarmaData,
+  type Lineup,
   type Match,
   type MatchFormat,
   type MatchTeam,
@@ -277,11 +278,33 @@ function sanitizeConstraint(v: unknown, ids: Set<string>): Constraint | null {
   return null;
 }
 
+/** Kayıtlı bir kadro hâlâ geçerli mi (oyuncular duruyor, diziliş uyuyor)? Değilse atılır. */
+function sanitizeLineup(v: unknown, ids: Set<string>, format: MatchFormat): Lineup | null {
+  if (!isObj(v) || typeof v.id !== "string" || !Array.isArray(v.teams) || v.teams.length !== 2 || !Array.isArray(v.out)) return null;
+  const seen = new Set<string>();
+  const valid = (x: unknown): x is string => typeof x === "string" && ids.has(x) && !seen.has(x) && (seen.add(x), true);
+  const teams: Lineup["teams"][number][] = [];
+  for (const t of v.teams) {
+    if (!isObj(t) || typeof t.formationId !== "string" || !Array.isArray(t.slots) || !Array.isArray(t.subs)) return null;
+    const f = FORMATION_BY_ID[t.formationId];
+    if (!f || f.format !== format || t.slots.length !== f.slots.length) return null;
+    if (!t.slots.every(valid) || !t.subs.every(valid)) return null;
+    teams.push({ formationId: f.id, slots: [...t.slots] as string[], subs: [...t.subs] as string[] });
+  }
+  if (!v.out.every(valid)) return null;
+  return { id: v.id, teams: [teams[0], teams[1]], out: [...v.out] as string[] };
+}
+
 function sanitizeBuilder(v: unknown, settings: Settings, ids: Set<string>): BuilderState {
   const d = createDefaultBuilder(settings);
   if (!isObj(v)) return d;
   const format = isFormat(v.format) ? v.format : d.format;
   const f = Array.isArray(v.formations) ? v.formations : [];
+  // Son kurulan kadrolar korunur (uygulama yeniden açıldığında saha kaybolmasın);
+  // biri bile geçersizse hepsi atılır, kullanıcı yeniden "Karma Yap" der.
+  const rawAlts = Array.isArray(v.alternatives) ? v.alternatives : [];
+  const parsedAlts = rawAlts.map((l) => sanitizeLineup(l, ids, format));
+  const alternatives = parsedAlts.every((l) => l !== null) ? (parsedAlts as Lineup[]).slice(0, 5) : [];
   const idList = (x: unknown) => (Array.isArray(x) ? [...new Set(x.filter((id): id is string => typeof id === "string" && ids.has(id)))] : []);
   return {
     selectedIds: idList(v.selectedIds),
@@ -295,10 +318,8 @@ function sanitizeBuilder(v: unknown, settings: Settings, ids: Set<string>): Buil
       ? v.constraints.map((c) => sanitizeConstraint(c, ids)).filter((c): c is Constraint => c !== null)
       : [],
     teamStyles: sanitizeTeamStyles(v.teamStyles, settings.teamStyles),
-    // Hesaplanmış kadrolar oyuncu verisine bağlı; geçici kabul edilir ve
-    // yüklemede güvenle sıfırlanır.
-    alternatives: [],
-    activeAlternative: 0,
+    alternatives,
+    activeAlternative: Math.min(Math.max(0, Math.round(num(v.activeAlternative, 0))), Math.max(0, alternatives.length - 1)),
     seed: Math.round(num(v.seed, 1)),
   };
 }

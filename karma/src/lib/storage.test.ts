@@ -105,6 +105,35 @@ describe("doğrulama", () => {
   });
 });
 
+describe("kayıtlı kadrolar", () => {
+  const players = createSamplePlayers(1);
+  const ids = players.map((p) => p.id);
+  const lineup = {
+    id: "l1",
+    teams: [
+      { formationId: "7:1-2-3-1", slots: ids.slice(0, 7), subs: [] },
+      { formationId: "7:1-2-3-1", slots: ids.slice(7, 14), subs: [] },
+    ],
+    out: [],
+  };
+
+  it("geçerliyse yeniden açılışta korunur", () => {
+    const data = sanitizeData({ players, builder: { format: 7, alternatives: [lineup], activeAlternative: 3 } });
+    expect(data.builder.alternatives).toHaveLength(1);
+    expect(data.builder.activeAlternative).toBe(0);
+  });
+
+  it("oyuncusu silinmiş veya dizilişi uymayan kadro atılır", () => {
+    const missing = sanitizeData({ players: players.slice(1), builder: { format: 7, alternatives: [lineup] } });
+    expect(missing.builder.alternatives).toEqual([]);
+    const wrongFormat = sanitizeData({ players, builder: { format: 6, alternatives: [lineup] } });
+    expect(wrongFormat.builder.alternatives).toEqual([]);
+    const dup = structuredClone(lineup);
+    dup.teams[1].slots[0] = ids[0];
+    expect(sanitizeData({ players, builder: { format: 7, alternatives: [dup] } }).builder.alternatives).toEqual([]);
+  });
+});
+
 describe("JSON dışa/içe aktarma", () => {
   it("gidiş-dönüş veriyi korur", () => {
     const data = sampleData();

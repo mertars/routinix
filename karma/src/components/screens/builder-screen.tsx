@@ -116,14 +116,14 @@ export function BuilderScreen() {
   return (
     <main className="pb-nav">
       <PageHeader
-        title={view === "result" ? "Kadro hazır" : "Kadro Kur"}
+        title={view === "result" && builder.alternatives.length ? "Kadro hazır" : "Kadro Kur"}
         eyebrow="Karma"
-        subtitle={view === "result" ? `${builder.format}v${builder.format} · alternatifler arasında gez, elle düzenle` : "Gelenleri seç, formatı belirle, Karma'la."}
+        subtitle={view === "result" && builder.alternatives.length ? `${builder.format}v${builder.format} · alternatifler arasında gez, elle düzenle` : "Gelenleri seç, formatı belirle, Karma'la."}
       />
-      {view === "setup" ? (
-        <SetupView onRun={() => run(false)} running={running} />
-      ) : (
+      {view === "result" && builder.alternatives.length > 0 ? (
         <ResultView onEdit={() => setView("setup")} onReshuffle={() => run(true)} running={running} warnings={warnings} />
+      ) : (
+        <SetupView onRun={() => run(false)} running={running} />
       )}
       <ShuffleOverlay show={running} />
     </main>
