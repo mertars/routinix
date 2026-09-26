@@ -108,9 +108,9 @@ export const COST_WEIGHTS = {
   constraint: 500,
 } as const;
 
-const ALT_PENALTY = 1.5;
-const OFF_PENALTY = 4;
-const OFF_DROP_FACTOR = 0.15;
+const ALT_PENALTY = 2.5;
+const OFF_PENALTY = 10;
+const OFF_DROP_FACTOR = 0.4;
 
 // ---------------------------------------------------------------------------
 // Hazırlık

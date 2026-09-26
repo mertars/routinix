@@ -85,6 +85,7 @@ export const useKarma = create<KarmaState>()((set, get) => ({
         ...s.builder,
         selectedIds: s.builder.selectedIds.filter((x) => x !== id),
         knownIds: s.builder.knownIds.filter((x) => x !== id),
+        benchIds: s.builder.benchIds.filter((x) => x !== id),
         constraints: s.builder.constraints.filter((c) =>
           c.type === "position" ? c.playerId !== id : c.a !== id && c.b !== id,
         ),

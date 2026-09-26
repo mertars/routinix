@@ -113,15 +113,21 @@ export const DEFAULT_WEIGHTS: Weights = {
 export const MATCH_FORMATS: MatchFormat[] = [5, 6, 7, 8];
 
 export const TEAM_COLORS = [
-  { value: "#ff8a1f", label: "Turuncu" },
-  { value: "#f4f7f5", label: "Beyaz" },
-  { value: "#3ef08a", label: "Neon yeşil" },
-  { value: "#4cc3ff", label: "Mavi" },
-  { value: "#ff4d6d", label: "Kırmızı" },
-  { value: "#ffd23f", label: "Sarı" },
-  { value: "#b184ff", label: "Mor" },
-  { value: "#1f2a24", label: "Siyah" },
+  { value: "#ff8a1f", label: "Turuncu", emoji: "🟠" },
+  { value: "#f4f7f5", label: "Beyaz", emoji: "⚪" },
+  { value: "#3ef08a", label: "Neon yeşil", emoji: "🟢" },
+  { value: "#4cc3ff", label: "Mavi", emoji: "🔵" },
+  { value: "#ff4d6d", label: "Kırmızı", emoji: "🔴" },
+  { value: "#ffd23f", label: "Sarı", emoji: "🟡" },
+  { value: "#b184ff", label: "Mor", emoji: "🟣" },
+  { value: "#1f2a24", label: "Siyah", emoji: "⚫" },
 ] as const;
+
+export function teamColorEmoji(color: string): string {
+  return TEAM_COLORS.find((c) => c.value.toLowerCase() === color.toLowerCase())?.emoji ?? "🔘";
+}
+
+export const POSITION_EMOJI: Record<Position, string> = { KL: "🧤", DEF: "🛡️", OS: "🧠", KNT: "⚡", FV: "🎯" };
 
 export const DEFAULT_TEAM_STYLES: [TeamStyle, TeamStyle] = [
   { name: "Yelekliler", color: "#ff8a1f" },

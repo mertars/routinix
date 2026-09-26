@@ -87,8 +87,10 @@ describe("dengeleme: 14 oyuncu, 7v7", () => {
     expect(result.keepers.sort()).toEqual(keepers);
   });
 
-  it("oyuncuların çoğunu kendi mevkisinde oynatır", () => {
-    expect(evalBest.teams[0].offPosition + evalBest.teams[1].offPosition).toBeLessThanOrEqual(2);
+  it("oyuncuları mümkün olduğunca kendi mevkisinde oynatır", () => {
+    // Örnek grupta 1-2-3-1 için en az 1 mevki dışı zorunlu (3. orta saha
+    // oyuncusu için slot yok); algoritma bunu mevki dışı kullanmamalı.
+    expect(evalBest.teams[0].offPosition + evalBest.teams[1].offPosition).toBe(1);
   });
 
   it("slot puanı slottaki mevkiye göre hesaplanır", () => {

@@ -132,6 +132,7 @@ export function createDefaultBuilder(settings: Settings = createDefaultSettings(
     format: settings.defaultFormat,
     formations: [f, f],
     extraMode: "bench",
+    benchIds: [],
     rotatingKeeper: false,
     constraints: [],
     teamStyles: structuredClone(settings.teamStyles),
@@ -288,6 +289,7 @@ function sanitizeBuilder(v: unknown, settings: Settings, ids: Set<string>): Buil
     format,
     formations: [sanitizeFormationId(f[0], format), sanitizeFormationId(f[1], format)],
     extraMode: v.extraMode === "rotate" ? "rotate" : "bench",
+    benchIds: idList(v.benchIds),
     rotatingKeeper: v.rotatingKeeper === true,
     constraints: Array.isArray(v.constraints)
       ? v.constraints.map((c) => sanitizeConstraint(c, ids)).filter((c): c is Constraint => c !== null)

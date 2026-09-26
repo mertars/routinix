@@ -161,11 +161,17 @@ export interface Settings {
 
 export interface BuilderState {
   selectedIds: string[];
-  /** Seçim listesi en son hangi oyunculara göre oluşturuldu (yeni eklenen aktifleri otomatik seçmek için). */
+  /**
+   * Seçim en son hangi "aktif oyuncu" kümesine göre yapıldı. Oyuncular
+   * ekranında aktiflik değişirse seçim yeniden aktiflere eşitlenir; aksi halde
+   * kullanıcının elle yaptığı seçim korunur.
+   */
   knownIds: string[];
   format: MatchFormat;
   formations: [string, string];
   extraMode: ExtraMode;
+  /** "Yedek kalsın" modunda elle seçilen, bu maç oynamayacak oyuncular. */
+  benchIds: string[];
   rotatingKeeper: boolean;
   constraints: Constraint[];
   teamStyles: [TeamStyle, TeamStyle];
