@@ -61,7 +61,8 @@ export const useKarma = create<KarmaState>()((set, get) => ({
   async hydrate(custom) {
     if (get().hydrated) return;
     storage = custom ?? getStorage();
-    const loaded = await storage.load();
+    // Depolama okunamasa bile uygulama açılış ekranında takılı kalmasın.
+    const loaded = await storage.load().catch(() => null);
     set({ ...(loaded ?? createDefaultData()), hydrated: true });
   },
 

@@ -64,10 +64,10 @@ export function createLocalStorage(key: string = STORAGE_KEY, store?: Storage): 
   return {
     kind: "local",
     async load() {
-      const raw = ls()?.getItem(key);
-      if (!raw) return null;
       try {
-        return sanitizeData(JSON.parse(raw));
+        // Bazı tarayıcı modlarında localStorage erişimi bile hata fırlatır.
+        const raw = ls()?.getItem(key);
+        return raw ? sanitizeData(JSON.parse(raw)) : null;
       } catch {
         return null;
       }

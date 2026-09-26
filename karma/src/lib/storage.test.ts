@@ -53,6 +53,11 @@ describe("depolama adaptörleri", () => {
     expect(await createLocalStorage("test", ls).load()).toBeNull();
   });
 
+  it("localStorage erişimi hata fırlatırsa boş döner", async () => {
+    const throwing = { getItem: () => { throw new DOMException("engelli", "SecurityError"); } } as unknown as Storage;
+    expect(await createLocalStorage("test", throwing).load()).toBeNull();
+  });
+
   it("bellek adaptörü veriyi kopyalayarak saklar", async () => {
     const storage = createMemoryStorage();
     const data = sampleData();
