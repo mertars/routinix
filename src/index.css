@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* Aynı repodaki bağımsız Karma uygulaması (karma/ kaynakları ve public/karma
+   derlenmiş çıktısı) Routinix'in CSS'ine sınıf eklemesin. */
+@source not "../karma";
+@source not "../public/karma";
 /* Tailwind v4 CSS-first dark mode: .dark class herhangi bir atadaki elemente
    eklendiğinde dark: varyantı devreye girer (bkz. ThemeContext.jsx). */
 @custom-variant dark (&:where(.dark, .dark *));

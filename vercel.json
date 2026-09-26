@@ -12,6 +12,34 @@
       "destination": "/api/og-template?slug=:slug"
     },
     {
+      "source": "/karma",
+      "destination": "/karma/oyuncular.html"
+    },
+    {
+      "source": "/karma/",
+      "destination": "/karma/oyuncular.html"
+    },
+    {
+      "source": "/karma/oyuncular",
+      "destination": "/karma/oyuncular.html"
+    },
+    {
+      "source": "/karma/kadro",
+      "destination": "/karma/kadro.html"
+    },
+    {
+      "source": "/karma/maclar",
+      "destination": "/karma/maclar.html"
+    },
+    {
+      "source": "/karma/ayarlar",
+      "destination": "/karma/ayarlar.html"
+    },
+    {
+      "source": "/karma/paylas",
+      "destination": "/karma/paylas.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
