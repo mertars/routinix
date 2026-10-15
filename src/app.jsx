@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { STAGE_INTRO, STAGE_WIZARD, STAGE_LOADING, STAGE_ERROR, STAGE_PLAN, ONBOARDING_STORAGE_KEY } from "./constants";
 import usePlanStudio from "./usePlanStudio";
 import useAuth from "./useAuth";
+import { KESEM_BASE, isKesemPath } from "./kesem/config";
 import useInstallPrompt from "./hooks/useInstallPrompt";
 import { tapFeedback } from "./lib/haptics";
 import logger, { setLogUser } from "./utils/logger";
@@ -58,6 +59,7 @@ const PomodoroStudio = lazy(() => import("./components/PomodoroStudio"));
 const OnboardingWizard = lazy(() => import("./components/OnboardingWizard"));
 const ManualPlanBuilder = lazy(() => import("./components/ManualPlanBuilder"));
 const RhythmStudio = lazy(() => import("./components/RhythmStudio"));
+const KesemApp = lazy(() => import("./kesem/KesemApp"));
 const NutritionArchitectStudio = lazy(() => import("./components/NutritionArchitectStudio"));
 const CommunityHub = lazy(() => import("./components/CommunityHub"));
 const NexusProfileOverlay = lazy(() => import("./components/community/NexusProfileOverlay"));
@@ -95,6 +97,8 @@ export default function App() {
   const [pomodoroInitialTask, setPomodoroInitialTask] = useState(null);
   const [rhythmOpen, setRhythmOpen] = useState(false);
   const [nutritionArchitectOpen, setNutritionArchitectOpen] = useState(false);
+  // Harcama Takibi (Kesem) — /kesem/... adresiyle doğrudan (PWA/yenileme) da açılır.
+  const [kesemOpen, setKesemOpen] = useState(() => typeof window !== "undefined" && isKesemPath(window.location.pathname));
   const [communityOpen, setCommunityOpen] = useState(false);
   const [nexusProfileOpen, setNexusProfileOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
@@ -205,6 +209,7 @@ export default function App() {
     setPomodoroOpen(false);
     setRhythmOpen(false);
     setNutritionArchitectOpen(false);
+    setKesemOpen(false);
     setCommunityOpen(false);
   }, []);
   const toggleTaskDrawer = useCallback(() => {
@@ -249,6 +254,17 @@ export default function App() {
     ps.setMenuOpen(false);
     setNutritionArchitectOpen(next);
   }, [nutritionArchitectOpen, closeAllPanels, ps.setMenuOpen]);
+  const openKesem = useCallback(() => {
+    closeAllPanels();
+    ps.setMenuOpen(false);
+    window.history.pushState({ kesem: true, depth: 0 }, "", KESEM_BASE);
+    setKesemOpen(true);
+  }, [closeAllPanels, ps.setMenuOpen]);
+  // Modülden çıkış: /kesem geçmiş girişlerini geride bırakmadan ana adrese dön.
+  const closeKesem = useCallback(() => {
+    window.history.replaceState({}, "", "/");
+    setKesemOpen(false);
+  }, []);
   const toggleCommunity = useCallback(() => {
     const next = !communityOpen;
     closeAllPanels();
@@ -488,6 +504,7 @@ export default function App() {
           onOpenCommunity={toggleCommunity}
           onOpenPomodoro={togglePomodoro}
           onOpenNutritionArchitect={toggleNutritionArchitect}
+          onOpenKesem={openKesem}
           onOpenProfile={openNexusProfile}
           onOpenSpotlight={toggleSpotlight}
           onSignOut={requestSignOut}
@@ -765,6 +782,15 @@ export default function App() {
       {nutritionArchitectOpen && (
         <Suspense fallback={<OverlayFallback z={90} />}>
           <NutritionArchitectStudio open={nutritionArchitectOpen} userId={auth.user?.id} onClose={() => setNutritionArchitectOpen(false)} />
+        </Suspense>
+      )}
+
+      {/* 💸 Harcama Takibi (Kesem) — tam ekran, lazy; kapalıyken hiçbir iz yok.
+          Veri kullanıcıya özel yerel IndexedDB'de (bkz. src/kesem/data/idb.js);
+          oturum çözülmeden açılmaz ki doğru kullanıcının veritabanı seçilsin. */}
+      {kesemOpen && auth.authReady && (
+        <Suspense fallback={<OverlayFallback z={95} />}>
+          <KesemApp userId={auth.user?.id || null} onExit={closeKesem} />
         </Suspense>
       )}
 

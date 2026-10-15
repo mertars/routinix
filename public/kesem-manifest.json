@@ -1,0 +1,16 @@
+{
+  "id": "/kesem",
+  "name": "Harcama Takibi",
+  "short_name": "Harcama",
+  "description": "Günlük harcamalarını, bütçeni ve birikimlerini takip et.",
+  "start_url": "/kesem",
+  "scope": "/kesem",
+  "display": "standalone",
+  "background_color": "#0c0a0d",
+  "theme_color": "#0c0a0d",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/favicon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

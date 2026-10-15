@@ -1,5 +1,6 @@
 import { memo } from "react";
-import { X, Plus, Trash2, LogOut, Repeat2, Compass, ListChecks, Users2, BarChart3, Timer, FolderOpen, Target, ChefHat, Shuffle } from "lucide-react";
+import { X, Plus, Trash2, LogOut, Repeat2, Compass, ListChecks, Users2, BarChart3, Timer, FolderOpen, Target, ChefHat, Shuffle, Wallet } from "lucide-react";
+import { useMenuLabel } from "../kesem/config";
 import { FEATURE_FLAGS } from "../constants";
 
 // 2 sütunlu bento tuşu — "Orta Grid Menü Tuşları" bölümü için. "Siyah Cam"
@@ -57,7 +58,10 @@ function DrawerMenu({
   onOpenProfile,
   onOpenSpotlight,
   onOpenNutritionArchitect,
+  onOpenKesem,
 }) {
+  // Harcama Takibi modülünün menü adı (config.js; kullanıcı Ayarlar'dan değiştirebilir).
+  const kesemLabel = useMenuLabel();
   if (!open) return null;
 
   const go = (fn) => () => {
@@ -93,6 +97,8 @@ function DrawerMenu({
       onClick: () => window.location.assign("/karma/oyuncular"),
       always: true,
     },
+    // Harcama Takibi (Kesem) — src/kesem/ altında lazy yüklenen modül.
+    { key: "kesem", icon: <Wallet className="w-4 h-4" strokeWidth={2.25} />, color: "#E0457B", label: kesemLabel, onClick: onOpenKesem, always: true },
     { key: "plans", icon: <FolderOpen className="w-4 h-4" strokeWidth={2.25} />, color: "#64748B", label: "Planlarım", onClick: onOpenPlans, always: false },
     // Header'ın (🎯) tetikleyicisinin YENİ yeri — bkz. onboarding/SpotlightMenu.jsx
     // dosya başı yorumu: artık ortalanmış bir modal, drawer kapansa da sorunsuz açılır.
